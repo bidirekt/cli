@@ -15,7 +15,7 @@ vendors:
     in: github.com/jarcoal/httpmock
 components:
   cmd:
-    in: cmd
+    in: cmd/**
   bootstrap:
     in: internal
   components:
