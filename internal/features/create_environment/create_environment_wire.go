@@ -1,7 +1,7 @@
 package create_environment
 
 type CreateEnvironmentRequestBody struct {
-	Participant string `json:"participant"`
+	Environment string `json:"environment"`
 }
 
 type CreateEnvironmentResponseBody struct {
