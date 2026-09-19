@@ -15,11 +15,23 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Overridden at link time by the release pipeline (-ldflags "-X github.com/contracttesting/cli/internal.version=<tag>").
+var version = "dev"
+
 var rootCommand = &cobra.Command{
 	Use:           "ctio",
 	Short:         "CLI for ContractTesting",
+	Version:       version,
 	SilenceErrors: true,
 	SilenceUsage:  true,
+}
+
+var versionCommand = &cobra.Command{
+	Use:   "version",
+	Short: "Print the ctio version",
+	Run: func(command *cobra.Command, _ []string) {
+		_, _ = fmt.Fprintf(command.OutOrStdout(), "ctio version %s\n", version)
+	},
 }
 
 func Run() {
@@ -49,6 +61,7 @@ func Run() {
 	record_deployment.Register(rootCommand, components)
 	can_i_deploy.Register(rootCommand, components)
 	rename_participant.Register(rootCommand, components)
+	rootCommand.AddCommand(versionCommand)
 
 	if err := rootCommand.Execute(); err != nil {
 		if !errors.Is(err, can_i_deploy.ErrSilent) && !errors.Is(err, publish_contract.ErrSilent) {
