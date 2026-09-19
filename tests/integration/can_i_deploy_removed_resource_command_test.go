@@ -26,7 +26,7 @@ func TestCanIDeployCommandRemovedResourceStillConsumed(t *testing.T) {
 	defer httpmock.DeactivateAndReset()
 
 	responseBody := `{
-	  "message": "Contract checked successfully",
+	  "message": "contract checked successfully",
 	  "participant": "orders-api",
 	  "version": "v2",
 	  "environment": "production",

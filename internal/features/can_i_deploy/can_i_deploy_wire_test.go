@@ -10,7 +10,7 @@ import (
 
 func TestCanIDeployResponseBodyUnmarshalsResults(t *testing.T) {
 	payload := `{
-	  "message": "Contract checked successfully",
+	  "message": "contract checked successfully",
 	  "participant": "payments-web",
 	  "version": "abc123",
 	  "environment": "production",
@@ -50,7 +50,7 @@ func TestCanIDeployResponseBodyUnmarshalsResults(t *testing.T) {
 	var body CanIDeployResponseBody
 	require.NoError(t, json.Unmarshal([]byte(payload), &body))
 
-	assert.Equal(t, "Contract checked successfully", body.Message)
+	assert.Equal(t, "contract checked successfully", body.Message)
 	assert.False(t, body.Deployable)
 	assert.Equal(t, "production", body.Environment)
 	require.Len(t, body.Results, 2)
