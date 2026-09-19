@@ -35,7 +35,7 @@ func TestCanIDeployCommand(t *testing.T) {
 					return nil, err
 				}
 				capturedBody = body
-				return httpmock.NewStringResponse(http.StatusOK, `{"message":"Contract checked successfully","deployable":true,"environment":"production","results":{}}`), nil
+				return httpmock.NewStringResponse(http.StatusOK, `{"message":"contract checked successfully","deployable":true,"environment":"production","results":{}}`), nil
 			})
 
 		command := can_i_deploy.NewCanIDeployCommand(
@@ -61,7 +61,7 @@ func TestCanIDeployCommand(t *testing.T) {
 		defer httpmock.DeactivateAndReset()
 
 		responseBody := `{
-		  "message": "Contract checked successfully",
+		  "message": "contract checked successfully",
 		  "participant": "front",
 		  "version": "v1",
 		  "environment": "production",
@@ -122,7 +122,7 @@ payments (v2):
 		defer httpmock.DeactivateAndReset()
 
 		responseBody := `{
-		  "message": "Contract checked successfully",
+		  "message": "contract checked successfully",
 		  "participant": "front",
 		  "version": "v1",
 		  "environment": "production",
