@@ -30,26 +30,26 @@ func NewHTTPClient(config *Config) *HTTPClient {
 	return httpClient
 }
 
-func (c *HTTPClient) StdClient() *http.Client {
-	return c.restClient.Client()
+func (this *HTTPClient) StdClient() *http.Client {
+	return this.restClient.Client()
 }
 
-func (c *HTTPClient) SetBaseURL(url string) {
-	c.restClient.SetBaseURL(url)
+func (this *HTTPClient) SetBaseURL(url string) {
+	this.restClient.SetBaseURL(url)
 }
 
-func (c *HTTPClient) Get(ctx context.Context, url string) (*resty.Response, error) {
-	return c.restClient.R().Get(url)
+func (this *HTTPClient) Get(ctx context.Context, url string) (*resty.Response, error) {
+	return this.restClient.R().SetContext(ctx).Get(url)
 }
 
-func (c *HTTPClient) Post(ctx context.Context, url string, body any) (*resty.Response, error) {
-	return c.restClient.R().SetBody(body).Post(url)
+func (this *HTTPClient) Post(ctx context.Context, url string, body any) (*resty.Response, error) {
+	return this.restClient.R().SetContext(ctx).SetBody(body).Post(url)
 }
 
-func (c *HTTPClient) Put(ctx context.Context, url string, body any) (*resty.Response, error) {
-	return c.restClient.R().SetBody(body).Put(url)
+func (this *HTTPClient) Put(ctx context.Context, url string, body any) (*resty.Response, error) {
+	return this.restClient.R().SetContext(ctx).SetBody(body).Put(url)
 }
 
-func (c *HTTPClient) Delete(ctx context.Context, url string) (*resty.Response, error) {
-	return c.restClient.R().Delete(url)
+func (this *HTTPClient) Delete(ctx context.Context, url string) (*resty.Response, error) {
+	return this.restClient.R().SetContext(ctx).Delete(url)
 }
