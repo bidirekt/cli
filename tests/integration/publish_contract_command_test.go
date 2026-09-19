@@ -177,7 +177,7 @@ func TestPublishContractCommand(t *testing.T) {
 		assert.Zero(t, httpmock.GetTotalCallCount())
 	})
 
-	t.Run("validation failure prints the message and every violation on its own line", func(t *testing.T) {
+	t.Run("validation failure renders each violation with its source, exits silently", func(t *testing.T) {
 		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
@@ -186,7 +186,7 @@ func TestPublishContractCommand(t *testing.T) {
 		require.NoError(t, os.WriteFile(file, []byte("provides:\n  rest: {}\n"), 0o600))
 
 		httpmock.RegisterResponder(http.MethodPost, endpoint,
-			httpmock.NewStringResponder(http.StatusBadRequest, `{"message":"contract validation failed","violations":["duplicate schema: Pet declared in pets.yaml and store.yaml","unresolved schema name: Owner referenced at provides GET /pets 200 (pets.yaml)"]}`))
+			httpmock.NewStringResponder(http.StatusBadRequest, `{"message":"contract validation failed","violations":[{"code":"schema.unresolved_ref","path":"schemas;Invoice;properties;payment","source":"billing.yaml","details":{"schema":"Payment","property":"Invoice.payment"}},{"code":"schema.unresolved_name","path":"provides;rest;/pets;get;responses;200","source":"pets.yaml","details":{"schema":"Pets","resource":"provides GET /pets 200"}}]}`))
 
 		command := publish_contract.NewPublishCommand(
 			publish_contract.NewPublishContractClient(httpClient),
@@ -200,8 +200,64 @@ func TestPublishContractCommand(t *testing.T) {
 
 		require.ErrorIs(t, err, publish_contract.ErrSilent)
 		assert.Equal(t, "❌ contract validation failed\n"+
-			"  - duplicate schema: Pet declared in pets.yaml and store.yaml\n"+
-			"  - unresolved schema name: Owner referenced at provides GET /pets 200 (pets.yaml)\n",
+			"  - billing.yaml: unresolved ref \"Payment\" in Invoice.payment\n"+
+			"  - pets.yaml: unresolved schema \"Pets\" referenced by provides GET /pets 200\n",
+			errOut.String())
+		assert.Empty(t, out.String())
+	})
+
+	t.Run("validation failure with null details renders the violation", func(t *testing.T) {
+		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpmock.ActivateNonDefault(httpClient.StdClient())
+		defer httpmock.DeactivateAndReset()
+
+		file := filepath.Join(t.TempDir(), "contract.yaml")
+		require.NoError(t, os.WriteFile(file, []byte("provides:\n  rest: {}\n"), 0o600))
+
+		httpmock.RegisterResponder(http.MethodPost, endpoint,
+			httpmock.NewStringResponder(http.StatusBadRequest, `{"message":"contract validation failed","violations":[{"code":"schema.array_without_items","path":"schemas;Pets","source":"api.yaml","details":null}]}`))
+
+		command := publish_contract.NewPublishCommand(
+			publish_contract.NewPublishContractClient(httpClient),
+		)
+		var out, errOut bytes.Buffer
+		command.SetOut(&out)
+		command.SetErr(&errOut)
+		command.SetArgs([]string{file, "--participant", participant, "--version", version})
+
+		err := command.Execute()
+
+		require.ErrorIs(t, err, publish_contract.ErrSilent)
+		assert.Equal(t, "❌ contract validation failed\n"+
+			"  - api.yaml: array schema without items at schemas;Pets\n",
+			errOut.String())
+		assert.Empty(t, out.String())
+	})
+
+	t.Run("unknown violation code falls back to the code with its details", func(t *testing.T) {
+		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpmock.ActivateNonDefault(httpClient.StdClient())
+		defer httpmock.DeactivateAndReset()
+
+		file := filepath.Join(t.TempDir(), "contract.yaml")
+		require.NoError(t, os.WriteFile(file, []byte("provides:\n  rest: {}\n"), 0o600))
+
+		httpmock.RegisterResponder(http.MethodPost, endpoint,
+			httpmock.NewStringResponder(http.StatusBadRequest, `{"message":"contract validation failed","violations":[{"code":"something.new","path":"provides;rest;/pets","source":"api.yaml","details":{"hint":"x"}}]}`))
+
+		command := publish_contract.NewPublishCommand(
+			publish_contract.NewPublishContractClient(httpClient),
+		)
+		var out, errOut bytes.Buffer
+		command.SetOut(&out)
+		command.SetErr(&errOut)
+		command.SetArgs([]string{file, "--participant", participant, "--version", version})
+
+		err := command.Execute()
+
+		require.ErrorIs(t, err, publish_contract.ErrSilent)
+		assert.Equal(t, "❌ contract validation failed\n"+
+			"  - api.yaml: something.new at provides;rest;/pets (hint: x)\n",
 			errOut.String())
 		assert.Empty(t, out.String())
 	})

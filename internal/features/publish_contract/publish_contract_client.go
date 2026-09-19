@@ -19,13 +19,13 @@ func NewPublishContractClient(httpClient *components.HTTPClient) *PublishContrac
 	}
 }
 
-func (c *PublishContractClient) PublishContract(ctx context.Context, requestBody *PublishContractRequestBody) (string, error) {
+func (this *PublishContractClient) PublishContract(ctx context.Context, requestBody *PublishContractRequestBody) (string, error) {
 	requestBodyJSON, err := json.Marshal(requestBody)
 	if err != nil {
 		return "", fmt.Errorf("cannot serialize contract to JSON: %w", err)
 	}
 
-	response, err := c.httpClient.Post(ctx, "/api/contracts", requestBodyJSON)
+	response, err := this.httpClient.Post(ctx, "/api/contracts", requestBodyJSON)
 	if err != nil {
 		return "", fmt.Errorf("cannot post contract to broker: %w", err)
 	}
