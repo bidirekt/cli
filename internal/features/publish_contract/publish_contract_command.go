@@ -65,13 +65,8 @@ func NewPublishCommand(publishContractClient *PublishContractClient) *cobra.Comm
 		if err != nil {
 			var validationFailed *ValidationFailedError
 			if errors.As(err, &validationFailed) {
-				if _, err := fmt.Fprintf(command.ErrOrStderr(), "❌ %s\n", validationFailed.Message); err != nil {
+				if _, err := fmt.Fprint(command.ErrOrStderr(), formatValidationFailedReport(validationFailed.Message, validationFailed.Violations)); err != nil {
 					return err
-				}
-				for _, violation := range validationFailed.Violations {
-					if _, err := fmt.Fprintf(command.ErrOrStderr(), "  - %s\n", violation); err != nil {
-						return err
-					}
 				}
 
 				return ErrSilent
