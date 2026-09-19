@@ -36,6 +36,7 @@ deps:
       - features
     canUse:
       - cobra
+      - testify
   features:
     mayDependOn:
       - components
