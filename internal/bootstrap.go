@@ -5,17 +5,17 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/contracttesting/cli/internal/components"
-	"github.com/contracttesting/cli/internal/features/can_i_deploy"
-	"github.com/contracttesting/cli/internal/features/create_environment"
-	"github.com/contracttesting/cli/internal/features/create_participant"
-	"github.com/contracttesting/cli/internal/features/publish_contract"
-	"github.com/contracttesting/cli/internal/features/record_deployment"
-	"github.com/contracttesting/cli/internal/features/rename_participant"
+	"github.com/bidirekt/cli/internal/components"
+	"github.com/bidirekt/cli/internal/features/can_i_deploy"
+	"github.com/bidirekt/cli/internal/features/create_environment"
+	"github.com/bidirekt/cli/internal/features/create_participant"
+	"github.com/bidirekt/cli/internal/features/publish_contract"
+	"github.com/bidirekt/cli/internal/features/record_deployment"
+	"github.com/bidirekt/cli/internal/features/rename_participant"
 	"github.com/spf13/cobra"
 )
 
-// Overridden at link time by the release pipeline (-ldflags "-X github.com/contracttesting/cli/internal.version=<tag>").
+// Overridden at link time by the release pipeline (-ldflags "-X github.com/bidirekt/cli/internal.version=<tag>").
 var version = "dev"
 
 var rootCommand = &cobra.Command{

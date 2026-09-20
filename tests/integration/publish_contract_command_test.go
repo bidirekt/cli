@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/contracttesting/cli/internal/components"
-	"github.com/contracttesting/cli/internal/features/publish_contract"
+	"github.com/bidirekt/cli/internal/components"
+	"github.com/bidirekt/cli/internal/features/publish_contract"
 	"github.com/jarcoal/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
