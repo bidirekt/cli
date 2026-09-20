@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/contracttesting/cli/internal"
+	"github.com/bidirekt/cli/internal"
 	"github.com/joho/godotenv"
 )
 

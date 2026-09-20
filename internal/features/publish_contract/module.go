@@ -1,7 +1,7 @@
 package publish_contract
 
 import (
-	"github.com/contracttesting/cli/internal/components"
+	"github.com/bidirekt/cli/internal/components"
 	"github.com/spf13/cobra"
 )
 

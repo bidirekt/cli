@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/contracttesting/cli/internal/components"
-	"github.com/contracttesting/cli/internal/features/create_environment"
+	"github.com/bidirekt/cli/internal/components"
+	"github.com/bidirekt/cli/internal/features/create_environment"
 	"github.com/jarcoal/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

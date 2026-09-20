@@ -1,4 +1,4 @@
-module github.com/contracttesting/cli
+module github.com/bidirekt/cli
 
 go 1.25.13
 
