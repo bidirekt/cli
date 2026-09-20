@@ -20,7 +20,7 @@ var version = "dev"
 
 var rootCommand = &cobra.Command{
 	Use:           "ctio",
-	Short:         "CLI for ContractTesting",
+	Short:         "CLI for Bidirekt",
 	Version:       version,
 	SilenceErrors: true,
 	SilenceUsage:  true,
