@@ -19,7 +19,7 @@ import (
 var version = "dev"
 
 var rootCommand = &cobra.Command{
-	Use:           "ctio",
+	Use:           "bidirekt",
 	Short:         "CLI for Bidirekt",
 	Version:       version,
 	SilenceErrors: true,
@@ -28,9 +28,9 @@ var rootCommand = &cobra.Command{
 
 var versionCommand = &cobra.Command{
 	Use:   "version",
-	Short: "Print the ctio version",
+	Short: "Print the bidirekt version",
 	Run: func(command *cobra.Command, _ []string) {
-		_, _ = fmt.Fprintf(command.OutOrStdout(), "ctio version %s\n", version)
+		_, _ = fmt.Fprintf(command.OutOrStdout(), "bidirekt version %s\n", version)
 	},
 }
 

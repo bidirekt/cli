@@ -1,5 +1,5 @@
 /cli
-/ctio
+/bidirekt
 *.test
 *.out
 vendor/
