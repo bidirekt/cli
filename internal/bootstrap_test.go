@@ -19,7 +19,7 @@ func TestVersionIsPrintedByTheFlagAndTheCommand(t *testing.T) {
 			rootCommand.SetArgs([]string{arg})
 
 			require.NoError(t, rootCommand.Execute())
-			assert.Equal(t, "ctio version dev\n", out.String())
+			assert.Equal(t, "bidirekt version dev\n", out.String())
 			assert.Empty(t, errOut.String())
 		})
 	}

@@ -7,7 +7,7 @@ type Config struct {
 }
 
 func NewConfig() *Config {
-	brokerURL := os.Getenv("CTIO_BROKER_URL")
+	brokerURL := os.Getenv("BIDIREKT_BROKER_URL")
 
 	if brokerURL == "" {
 		brokerURL = "http://localhost:8080"
