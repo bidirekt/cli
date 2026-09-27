@@ -31,7 +31,7 @@ func NewCreateEnvironmentCommand(client *CreateEnvironmentClient) *cobra.Command
 			return err
 		}
 
-		if _, err := fmt.Fprintf(command.OutOrStdout(), "🌍 %s %s\n", name, message); err != nil {
+		if _, err := fmt.Fprintf(command.OutOrStdout(), "%s %s\n", name, message); err != nil {
 			return err
 		}
 

@@ -16,7 +16,7 @@ const requestTimeout = 30 * time.Second
 
 var ErrSilent = errors.New("failure already reported")
 
-var supportedFileExtensions = map[string]bool{".yaml": true, ".yml": true, ".json": true}
+var supportedFileExtensions = map[string]bool{".yaml": true, ".yml": true}
 
 func NewPublishCommand(publishContractClient *PublishContractClient) *cobra.Command {
 
@@ -75,7 +75,7 @@ func NewPublishCommand(publishContractClient *PublishContractClient) *cobra.Comm
 			return err
 		}
 
-		if _, err := fmt.Fprintf(command.OutOrStdout(), "📜 %s %s\n", participant, message); err != nil {
+		if _, err := fmt.Fprintf(command.OutOrStdout(), "%s %s\n", participant, message); err != nil {
 			return err
 		}
 
@@ -84,7 +84,7 @@ func NewPublishCommand(publishContractClient *PublishContractClient) *cobra.Comm
 
 	command := &cobra.Command{
 		Use:   "publish [file...]",
-		Short: "Publish one or more contract YAML or JSON files to the broker",
+		Short: "Publish one or more contract YAML files to the broker",
 		Args:  cobra.MinimumNArgs(1),
 		RunE:  commandHandler,
 	}

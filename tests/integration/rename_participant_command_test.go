@@ -50,7 +50,7 @@ func TestRenameParticipantCommand(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 1, httpmock.GetCallCountInfo()["POST "+endpoint])
 		assert.JSONEq(t, `{"oldName":"pets-service","newName":"orders-service"}`, string(capturedBody))
-		assert.Contains(t, out.String(), oldName+" participant renamed to "+newName)
+		assert.Equal(t, oldName+" participant renamed to "+newName+"\n", out.String())
 		assert.Empty(t, errOut.String())
 	})
 
