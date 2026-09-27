@@ -51,7 +51,7 @@ func TestCanIDeployCommand(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 1, httpmock.GetCallCountInfo()["POST "+endpoint])
 		assert.JSONEq(t, `{"participant":"front","version":"v1","environment":"production"}`, string(capturedBody))
-		assert.Contains(t, out.String(), "front can be deployed to production")
+		assert.Equal(t, "front can be deployed to production\n", out.String())
 		assert.Empty(t, errOut.String())
 	})
 

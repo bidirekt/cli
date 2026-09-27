@@ -56,7 +56,7 @@ func NewCanIDeployCommand(client *CanIDeployClient) *cobra.Command {
 			return ErrSilent
 		}
 
-		if _, err := fmt.Fprintf(command.OutOrStdout(), "🚀 %s can be deployed to %s\n", participant, environment); err != nil {
+		if _, err := fmt.Fprintf(command.OutOrStdout(), "%s can be deployed to %s\n", participant, environment); err != nil {
 			return err
 		}
 

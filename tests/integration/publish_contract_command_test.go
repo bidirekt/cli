@@ -3,6 +3,7 @@ package integration_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -48,7 +49,7 @@ func TestPublishContractCommand(t *testing.T) {
 		defer httpmock.DeactivateAndReset()
 
 		const content = `{"provides":{"rest":{}}}`
-		file := filepath.Join(t.TempDir(), "contract.json")
+		file := filepath.Join(t.TempDir(), "contract.yaml")
 		require.NoError(t, os.WriteFile(file, []byte(content), 0o600))
 
 		var capturedBody []byte
@@ -75,7 +76,7 @@ func TestPublishContractCommand(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 1, httpmock.GetCallCountInfo()["POST "+endpoint])
 		assert.JSONEq(t, expectedBody(t, [2]string{file, content}), string(capturedBody))
-		assert.Contains(t, out.String(), participant+" contract publish successful")
+		assert.Equal(t, participant+" contract publish successful\n", out.String())
 		assert.Empty(t, errOut.String())
 	})
 
@@ -150,6 +151,31 @@ func TestPublishContractCommand(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), notes)
 		assert.Zero(t, httpmock.GetTotalCallCount())
+	})
+
+	t.Run("json file is refused before any request", func(t *testing.T) {
+		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpmock.ActivateNonDefault(httpClient.StdClient())
+		defer httpmock.DeactivateAndReset()
+
+		contract := filepath.Join(t.TempDir(), "contract.json")
+		require.NoError(t, os.WriteFile(contract, []byte(`{"provides":{"rest":{}}}`), 0o600))
+
+		command := publish_contract.NewPublishCommand(
+			publish_contract.NewPublishContractClient(httpClient),
+		)
+		var out, errOut bytes.Buffer
+		command.SetOut(&out)
+		command.SetErr(&errOut)
+		command.SetArgs([]string{contract, "--participant", participant, "--version", version})
+
+		err := command.Execute()
+
+		require.Error(t, err)
+		assert.Equal(t, fmt.Sprintf("unsupported contract file extension: %q", contract), err.Error())
+		assert.Zero(t, httpmock.GetTotalCallCount())
+		assert.Empty(t, out.String())
+		assert.Empty(t, errOut.String())
 	})
 
 	t.Run("unreadable file in the list fails before any request", func(t *testing.T) {
@@ -294,7 +320,7 @@ func TestPublishContractCommand(t *testing.T) {
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
-		file := filepath.Join(t.TempDir(), "contract.json")
+		file := filepath.Join(t.TempDir(), "contract.yaml")
 		require.NoError(t, os.WriteFile(file, []byte(`{}`), 0o600))
 
 		command := publish_contract.NewPublishCommand(

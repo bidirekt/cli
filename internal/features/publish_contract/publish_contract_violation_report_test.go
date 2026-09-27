@@ -12,8 +12,8 @@ func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
 	report := formatValidationFailedReport("contract validation failed", []Violation{
 		{Code: "key.unknown", Path: "provides;rest;/pets;patch", Source: "api.yaml", Details: map[string]string{"key": "patch"}},
 		{Code: "value.invalid_kind", Path: "provides;rest;/pets;get", Source: "api.yaml", Details: map[string]string{"expected": "mapping", "got": "string"}},
-		{Code: "endpoint.syntax", Path: "provides;rest;/users/{userId}", Source: "api.json", Details: map[string]string{"key": "/users/{userId}", "error": "dynamic path segments must use *"}},
-		{Code: "service.name_syntax", Path: "consumes;Payments-API", Source: "api.json", Details: map[string]string{"key": "Payments-API", "error": "must be snake_case"}},
+		{Code: "endpoint.syntax", Path: "provides;rest;/users/{userId}", Source: "api.yaml", Details: map[string]string{"key": "/users/{userId}", "error": "dynamic path segments must use *"}},
+		{Code: "service.name_syntax", Path: "consumes;Payments-API", Source: "api.yaml", Details: map[string]string{"key": "Payments-API", "error": "must be snake_case"}},
 		{Code: "status.out_of_range", Path: "provides;rest;/pets;get;responses;999", Source: "api.yaml", Details: map[string]string{"key": "999", "error": "must be between 100 and 599"}},
 		{Code: "schema.invalid_type", Path: "schemas;Pet;properties;id;type", Source: "api.yaml", Details: map[string]string{"value": "strng", "allowed": allowedTypes}},
 		{Code: "schema.array_without_items", Path: "schemas;Pets", Source: "api.yaml"},
@@ -29,9 +29,9 @@ func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
 	assert.Equal(t, `❌ contract validation failed
   - api.yaml: unknown key "patch" at provides;rest;/pets;patch
   - api.yaml: unexpected string at provides;rest;/pets;get, expected mapping
-  - api.json: invalid endpoint "/users/{userId}" at provides;rest;/users/{userId}
+  - api.yaml: invalid endpoint "/users/{userId}" at provides;rest;/users/{userId}
       dynamic path segments must use *
-  - api.json: invalid service name "Payments-API" at consumes;Payments-API
+  - api.yaml: invalid service name "Payments-API" at consumes;Payments-API
       must be snake_case
   - api.yaml: invalid status code "999" at provides;rest;/pets;get;responses;999
       must be between 100 and 599
@@ -89,7 +89,7 @@ func TestFormatViolationLine(t *testing.T) {
 		headline, explanation := formatViolationLine(Violation{
 			Code:    "endpoint.syntax",
 			Path:    "provides;rest;/users/{userId}",
-			Source:  "api.json",
+			Source:  "api.yaml",
 			Details: map[string]string{"key": "/users/{userId}", "error": "dynamic path segments must use *"},
 		})
 
@@ -101,7 +101,7 @@ func TestFormatViolationLine(t *testing.T) {
 		headline, explanation := formatViolationLine(Violation{
 			Code:    "service.name_syntax",
 			Path:    "consumes;Payments-API",
-			Source:  "api.json",
+			Source:  "api.yaml",
 			Details: map[string]string{"key": "Payments-API", "error": "must be snake_case"},
 		})
 
