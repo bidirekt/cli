@@ -12,6 +12,7 @@ import (
 	"github.com/bidirekt/cli/internal/features/publish_contract"
 	"github.com/bidirekt/cli/internal/features/record_deployment"
 	"github.com/bidirekt/cli/internal/features/rename_participant"
+	"github.com/bidirekt/cli/internal/paint"
 	"github.com/spf13/cobra"
 )
 
@@ -65,7 +66,8 @@ func Run() {
 
 	if err := rootCommand.Execute(); err != nil {
 		if !errors.Is(err, can_i_deploy.ErrSilent) && !errors.Is(err, publish_contract.ErrSilent) {
-			_, _ = fmt.Fprintf(rootCommand.ErrOrStderr(), "❌ %s\n", err.Error())
+			errWriter := rootCommand.ErrOrStderr()
+			_, _ = fmt.Fprintln(errWriter, paint.For(errWriter).Red(err.Error()))
 		}
 
 		os.Exit(1)

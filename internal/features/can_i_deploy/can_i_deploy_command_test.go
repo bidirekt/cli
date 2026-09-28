@@ -1,8 +1,10 @@
 package can_i_deploy
 
 import (
+	"bytes"
 	"testing"
 
+	"github.com/bidirekt/cli/internal/paint"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -36,9 +38,9 @@ func TestFormatNotDeployableReportWalksTheTree(t *testing.T) {
 		},
 	}
 
-	report := formatNotDeployableReport("payments-web", "production", results)
+	report := formatNotDeployableReport(paint.For(&bytes.Buffer{}), "payments-web", "production", results)
 
-	assert.Equal(t, `❌ payments-web cannot be deployed to production
+	assert.Equal(t, `payments-web cannot be deployed to production
 
 payments-api (3.1.0):
   GET /payments/*
@@ -65,15 +67,45 @@ func TestFormatNotDeployableReportOmitsVersionWhenNull(t *testing.T) {
 		},
 	}
 
-	report := formatNotDeployableReport("payments-web", "production", results)
+	report := formatNotDeployableReport(paint.For(&bytes.Buffer{}), "payments-web", "production", results)
 
-	assert.Equal(t, `❌ payments-web cannot be deployed to production
+	assert.Equal(t, `payments-web cannot be deployed to production
 
 payments-api:
   GET /payments/*
     response 200:
       - no matching resource in provider
 `, report)
+}
+
+func TestFormatNotDeployableReportPaintsTheHeadlineRed(t *testing.T) {
+	t.Setenv("NO_COLOR", "")
+	t.Setenv("CLICOLOR_FORCE", "1")
+
+	results := map[string]CanIDeployResult{
+		"payments-api": {
+			Deployable: false,
+			Endpoints: map[string]map[string]map[string][]ContractBreak{
+				"/payments/*": {
+					"get": {
+						"200": {
+							{Reason: "provider_resource_not_found"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	report := formatNotDeployableReport(paint.For(&bytes.Buffer{}), "payments-web", "production", results)
+
+	assert.Equal(t, "\x1b[31mpayments-web cannot be deployed to production\x1b[0m\n"+
+		"\n"+
+		"payments-api:\n"+
+		"  GET /payments/*\n"+
+		"    response 200:\n"+
+		"      - no matching resource in provider\n",
+		report)
 }
 
 func TestFormatBreakLine(t *testing.T) {

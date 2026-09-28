@@ -225,7 +225,7 @@ func TestPublishContractCommand(t *testing.T) {
 		err := command.Execute()
 
 		require.ErrorIs(t, err, publish_contract.ErrSilent)
-		assert.Equal(t, "❌ contract validation failed\n"+
+		assert.Equal(t, "contract validation failed\n"+
 			"  - billing.yaml: unresolved ref \"Payment\" in Invoice.payment\n"+
 			"  - pets.yaml: unresolved schema \"Pets\" referenced by provides GET /pets 200\n",
 			errOut.String())
@@ -254,7 +254,7 @@ func TestPublishContractCommand(t *testing.T) {
 		err := command.Execute()
 
 		require.ErrorIs(t, err, publish_contract.ErrSilent)
-		assert.Equal(t, "❌ contract validation failed\n"+
+		assert.Equal(t, "contract validation failed\n"+
 			"  - api.yaml: array schema without items at schemas;Pets\n",
 			errOut.String())
 		assert.Empty(t, out.String())
@@ -282,7 +282,7 @@ func TestPublishContractCommand(t *testing.T) {
 		err := command.Execute()
 
 		require.ErrorIs(t, err, publish_contract.ErrSilent)
-		assert.Equal(t, "❌ contract validation failed\n"+
+		assert.Equal(t, "contract validation failed\n"+
 			"  - api.yaml: something.new at provides;rest;/pets (hint: x)\n",
 			errOut.String())
 		assert.Empty(t, out.String())

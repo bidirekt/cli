@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bidirekt/cli/internal/paint"
 	"github.com/spf13/cobra"
 )
 
@@ -65,7 +66,8 @@ func NewPublishCommand(publishContractClient *PublishContractClient) *cobra.Comm
 		if err != nil {
 			var validationFailed *ValidationFailedError
 			if errors.As(err, &validationFailed) {
-				if _, err := fmt.Fprint(command.ErrOrStderr(), formatValidationFailedReport(validationFailed.Message, validationFailed.Violations)); err != nil {
+				errWriter := command.ErrOrStderr()
+				if _, err := fmt.Fprint(errWriter, formatValidationFailedReport(paint.For(errWriter), validationFailed.Message, validationFailed.Violations)); err != nil {
 					return err
 				}
 
@@ -75,7 +77,9 @@ func NewPublishCommand(publishContractClient *PublishContractClient) *cobra.Comm
 			return err
 		}
 
-		if _, err := fmt.Fprintf(command.OutOrStdout(), "%s %s\n", participant, message); err != nil {
+		writer := command.OutOrStdout()
+		brush := paint.For(writer)
+		if _, err := fmt.Fprintln(writer, brush.Green(participant+" "+message)); err != nil {
 			return err
 		}
 

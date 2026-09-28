@@ -20,6 +20,8 @@ components:
     in: internal
   components:
     in: internal/components
+  paint:
+    in: internal/paint
   features:
     in: internal/features/*
   tests:
@@ -33,6 +35,7 @@ deps:
   bootstrap:
     mayDependOn:
       - components
+      - paint
       - features
     canUse:
       - cobra
@@ -40,6 +43,7 @@ deps:
   features:
     mayDependOn:
       - components
+      - paint
     canUse:
       - cobra
       - testify

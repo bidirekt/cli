@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/bidirekt/cli/internal/paint"
 )
 
-func formatValidationFailedReport(message string, violations []Violation) string {
+func formatValidationFailedReport(brush paint.Brush, message string, violations []Violation) string {
 	var report strings.Builder
-	fmt.Fprintf(&report, "❌ %s\n", message)
+	report.WriteString(brush.Red(message) + "\n")
 
 	for _, violation := range violations {
 		headline, explanation := formatViolationLine(violation)
