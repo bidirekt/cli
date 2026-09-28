@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/bidirekt/cli/internal/paint"
 	"github.com/spf13/cobra"
 )
 
@@ -29,7 +30,9 @@ func NewCreateParticipantCommand(client *CreateParticipantClient) *cobra.Command
 			return err
 		}
 
-		if _, err := fmt.Fprintf(command.OutOrStdout(), "%s %s\n", name, message); err != nil {
+		writer := command.OutOrStdout()
+		brush := paint.For(writer)
+		if _, err := fmt.Fprintln(writer, brush.Green(name+" "+message)); err != nil {
 			return err
 		}
 

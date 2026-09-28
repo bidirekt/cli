@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bidirekt/cli/internal/paint"
 	"github.com/spf13/cobra"
 )
 
@@ -43,20 +44,24 @@ func NewCanIDeployCommand(client *CanIDeployClient) *cobra.Command {
 
 		resp, err := client.Check(ctx, requestBody)
 		if err != nil {
-			if _, err := fmt.Fprintf(command.ErrOrStderr(), "❌ %s\n", err.Error()); err != nil {
+			errWriter := command.ErrOrStderr()
+			if _, err := fmt.Fprintln(errWriter, paint.For(errWriter).Red(err.Error())); err != nil {
 				return err
 			}
 			return ErrSilent
 		}
 
 		if !resp.Deployable {
-			if _, err := fmt.Fprint(command.OutOrStdout(), formatNotDeployableReport(participant, environment, resp.Results)); err != nil {
+			writer := command.OutOrStdout()
+			if _, err := fmt.Fprint(writer, formatNotDeployableReport(paint.For(writer), participant, environment, resp.Results)); err != nil {
 				return err
 			}
 			return ErrSilent
 		}
 
-		if _, err := fmt.Fprintf(command.OutOrStdout(), "%s can be deployed to %s\n", participant, environment); err != nil {
+		writer := command.OutOrStdout()
+		brush := paint.For(writer)
+		if _, err := fmt.Fprintln(writer, brush.Green(participant+" can be deployed to "+environment)); err != nil {
 			return err
 		}
 
@@ -78,9 +83,9 @@ func NewCanIDeployCommand(client *CanIDeployClient) *cobra.Command {
 	return command
 }
 
-func formatNotDeployableReport(participant, environment string, results map[string]CanIDeployResult) string {
+func formatNotDeployableReport(brush paint.Brush, participant, environment string, results map[string]CanIDeployResult) string {
 	var report strings.Builder
-	fmt.Fprintf(&report, "❌ %s cannot be deployed to %s\n", participant, environment)
+	report.WriteString(brush.Red(participant+" cannot be deployed to "+environment) + "\n")
 
 	counterparts := make([]string, 0, len(results))
 	for name, result := range results {

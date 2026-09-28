@@ -104,7 +104,7 @@ func TestCanIDeployCommand(t *testing.T) {
 		err := command.Execute()
 
 		require.Error(t, err)
-		assert.Equal(t, `❌ front cannot be deployed to production
+		assert.Equal(t, `front cannot be deployed to production
 
 payments (v2):
   GET /payments/*

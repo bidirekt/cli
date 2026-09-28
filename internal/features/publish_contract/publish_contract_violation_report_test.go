@@ -1,15 +1,17 @@
 package publish_contract
 
 import (
+	"bytes"
 	"testing"
 
+	"github.com/bidirekt/cli/internal/paint"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
 	const allowedTypes = "object, array, string, integer, float, boolean"
 
-	report := formatValidationFailedReport("contract validation failed", []Violation{
+	report := formatValidationFailedReport(paint.For(&bytes.Buffer{}), "contract validation failed", []Violation{
 		{Code: "key.unknown", Path: "provides;rest;/pets;patch", Source: "api.yaml", Details: map[string]string{"key": "patch"}},
 		{Code: "value.invalid_kind", Path: "provides;rest;/pets;get", Source: "api.yaml", Details: map[string]string{"expected": "mapping", "got": "string"}},
 		{Code: "endpoint.syntax", Path: "provides;rest;/users/{userId}", Source: "api.yaml", Details: map[string]string{"key": "/users/{userId}", "error": "dynamic path segments must use *"}},
@@ -26,7 +28,7 @@ func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
 		{Code: "something.new", Path: "provides;rest;/pets", Source: "api.yaml", Details: map[string]string{"hint": "x"}},
 	})
 
-	assert.Equal(t, `❌ contract validation failed
+	assert.Equal(t, `contract validation failed
   - api.yaml: unknown key "patch" at provides;rest;/pets;patch
   - api.yaml: unexpected string at provides;rest;/pets;get, expected mapping
   - api.yaml: invalid endpoint "/users/{userId}" at provides;rest;/users/{userId}
@@ -49,13 +51,26 @@ func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
 }
 
 func TestFormatValidationFailedReportOmitsTheSourceWhenEmpty(t *testing.T) {
-	report := formatValidationFailedReport("contract validation failed", []Violation{
+	report := formatValidationFailedReport(paint.For(&bytes.Buffer{}), "contract validation failed", []Violation{
 		{Code: "schema.array_without_items", Path: "schemas;Pets"},
 	})
 
-	assert.Equal(t, `❌ contract validation failed
+	assert.Equal(t, `contract validation failed
   - array schema without items at schemas;Pets
 `, report)
+}
+
+func TestFormatValidationFailedReportPaintsTheHeadlineRed(t *testing.T) {
+	t.Setenv("NO_COLOR", "")
+	t.Setenv("CLICOLOR_FORCE", "1")
+
+	report := formatValidationFailedReport(paint.For(&bytes.Buffer{}), "contract validation failed", []Violation{
+		{Code: "schema.array_without_items", Path: "schemas;Pets"},
+	})
+
+	assert.Equal(t, "\x1b[31mcontract validation failed\x1b[0m\n"+
+		"  - array schema without items at schemas;Pets\n",
+		report)
 }
 
 func TestFormatViolationLine(t *testing.T) {

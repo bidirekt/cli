@@ -53,6 +53,32 @@ func TestCreateParticipantCommand(t *testing.T) {
 		assert.Empty(t, errOut.String())
 	})
 
+	t.Run("paints the message green when color is forced", func(t *testing.T) {
+		t.Setenv("NO_COLOR", "")
+		t.Setenv("CLICOLOR_FORCE", "1")
+
+		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpmock.ActivateNonDefault(httpClient.StdClient())
+		defer httpmock.DeactivateAndReset()
+
+		httpmock.RegisterResponder(http.MethodPost, endpoint,
+			httpmock.NewStringResponder(http.StatusOK, `{"success":true,"message":"participant created"}`))
+
+		command := create_participant.NewCreateParticipantCommand(
+			create_participant.NewCreateParticipantClient(httpClient),
+		)
+		var out, errOut bytes.Buffer
+		command.SetOut(&out)
+		command.SetErr(&errOut)
+		command.SetArgs([]string{name})
+
+		err := command.Execute()
+
+		require.NoError(t, err)
+		assert.Equal(t, "\x1b[32m"+name+" participant created\x1b[0m\n", out.String())
+		assert.Empty(t, errOut.String())
+	})
+
 	t.Run("non-200 response surfaces the broker body and exits non-zero", func(t *testing.T) {
 		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
 		httpmock.ActivateNonDefault(httpClient.StdClient())

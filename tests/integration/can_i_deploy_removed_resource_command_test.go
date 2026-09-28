@@ -61,7 +61,7 @@ func TestCanIDeployCommandRemovedResourceStillConsumed(t *testing.T) {
 	err := command.Execute()
 
 	require.ErrorIs(t, err, can_i_deploy.ErrSilent)
-	assert.Equal(t, `❌ orders-api cannot be deployed to production
+	assert.Equal(t, `orders-api cannot be deployed to production
 
 orders-web (v7):
   GET /users
