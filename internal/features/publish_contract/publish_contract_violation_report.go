@@ -19,11 +19,11 @@ func formatValidationFailedReport(brush paint.Brush, message string, violations 
 		if violation.Source != "" {
 			report.WriteString(violation.Source + ": ")
 		}
-		report.WriteString(headline + "\n")
-
+		report.WriteString(headline)
 		if explanation != "" {
-			report.WriteString("      " + explanation + "\n")
+			report.WriteString(", " + explanation)
 		}
+		report.WriteString("\n")
 	}
 
 	return report.String()
@@ -31,26 +31,28 @@ func formatValidationFailedReport(brush paint.Brush, message string, violations 
 
 func formatViolationLine(violation Violation) (headline, explanation string) {
 	details := violation.Details
-	path := violation.Path
+	keyAt := at(location(violation.Path, details["key"]))
+	typeAt := at(location(violation.Path, "type"))
+	pathAt := at(location(violation.Path, ""))
 
 	switch violation.Code {
 	case "key.unknown":
-		return fmt.Sprintf("unknown key %q at %s", details["key"], path), ""
+		return fmt.Sprintf("unknown key %q%s", details["key"], keyAt), ""
 	case "value.invalid_kind":
-		return fmt.Sprintf("unexpected %s at %s, expected %s", details["got"], path, details["expected"]), ""
+		return fmt.Sprintf("unexpected %s%s, expected %s", details["got"], pathAt, details["expected"]), ""
 	case "endpoint.syntax":
-		return fmt.Sprintf("invalid endpoint %q at %s", details["key"], path), details["error"]
+		return fmt.Sprintf("invalid endpoint %q%s", details["key"], keyAt), details["error"]
 	case "service.name_syntax":
-		return fmt.Sprintf("invalid service name %q at %s", details["key"], path), details["error"]
+		return fmt.Sprintf("invalid service name %q%s", details["key"], keyAt), details["error"]
 	case "status.out_of_range":
-		return fmt.Sprintf("invalid status code %q at %s", details["key"], path), details["error"]
+		return fmt.Sprintf("invalid status code %q%s", details["key"], keyAt), details["error"]
 	case "schema.invalid_type":
 		if details["value"] == "" {
-			return fmt.Sprintf(`missing "type" at %s`, path), "expected one of: " + details["allowed"]
+			return `missing "type"` + typeAt, "expected one of: " + details["allowed"]
 		}
-		return fmt.Sprintf(`invalid value %q for "type" at %s`, details["value"], path), "expected one of: " + details["allowed"]
+		return fmt.Sprintf(`invalid value %q for "type"%s`, details["value"], typeAt), "expected one of: " + details["allowed"]
 	case "schema.array_without_items":
-		return "array schema without items at " + path, ""
+		return "array schema without items" + pathAt, ""
 	case "resource.duplicate":
 		if details["declaredIn"] == violation.Source {
 			return fmt.Sprintf("duplicate resource %q, declared twice", details["resource"]), ""
@@ -76,10 +78,7 @@ func formatViolationLine(violation Violation) (headline, explanation string) {
 }
 
 func fallbackViolationLine(violation Violation) string {
-	line := violation.Code
-	if violation.Path != "" {
-		line += " at " + violation.Path
-	}
+	line := violation.Code + at(location(violation.Path, ""))
 
 	if len(violation.Details) == 0 {
 		return line
@@ -97,4 +96,25 @@ func fallbackViolationLine(violation Violation) string {
 	}
 
 	return fmt.Sprintf("%s (%s)", line, strings.Join(pairs, ", "))
+}
+
+func location(path, quoted string) string {
+	if path == "" {
+		return ""
+	}
+
+	segments := strings.Split(path, ";")
+	if segments[len(segments)-1] == quoted {
+		segments = segments[:len(segments)-1]
+	}
+
+	return strings.Join(segments, " ")
+}
+
+func at(location string) string {
+	if location == "" {
+		return ""
+	}
+
+	return " at " + location
 }

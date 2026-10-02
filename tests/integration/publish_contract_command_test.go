@@ -255,7 +255,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		require.ErrorIs(t, err, publish_contract.ErrSilent)
 		assert.Equal(t, "contract validation failed\n"+
-			"  - api.yaml: array schema without items at schemas;Pets\n",
+			"  - api.yaml: array schema without items at schemas Pets\n",
 			errOut.String())
 		assert.Empty(t, out.String())
 	})
@@ -283,7 +283,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		require.ErrorIs(t, err, publish_contract.ErrSilent)
 		assert.Equal(t, "contract validation failed\n"+
-			"  - api.yaml: something.new at provides;rest;/pets (hint: x)\n",
+			"  - api.yaml: something.new at provides rest /pets (hint: x)\n",
 			errOut.String())
 		assert.Empty(t, out.String())
 	})
