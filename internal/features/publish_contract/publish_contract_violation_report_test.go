@@ -29,24 +29,20 @@ func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
 	})
 
 	assert.Equal(t, `contract validation failed
-  - api.yaml: unknown key "patch" at provides;rest;/pets;patch
-  - api.yaml: unexpected string at provides;rest;/pets;get, expected mapping
-  - api.yaml: invalid endpoint "/users/{userId}" at provides;rest;/users/{userId}
-      dynamic path segments must use *
-  - api.yaml: invalid service name "Payments-API" at consumes;Payments-API
-      must be snake_case
-  - api.yaml: invalid status code "999" at provides;rest;/pets;get;responses;999
-      must be between 100 and 599
-  - api.yaml: invalid value "strng" for "type" at schemas;Pet;properties;id;type
-      expected one of: object, array, string, integer, float, boolean
-  - api.yaml: array schema without items at schemas;Pets
+  - api.yaml: unknown key "patch" at provides rest /pets
+  - api.yaml: unexpected string at provides rest /pets get, expected mapping
+  - api.yaml: invalid endpoint "/users/{userId}" at provides rest, dynamic path segments must use *
+  - api.yaml: invalid service name "Payments-API" at consumes, must be snake_case
+  - api.yaml: invalid status code "999" at provides rest /pets get responses, must be between 100 and 599
+  - api.yaml: invalid value "strng" for "type" at schemas Pet properties id, expected one of: object, array, string, integer, float, boolean
+  - api.yaml: array schema without items at schemas Pets
   - store.yaml: duplicate resource "provides GET /pets 200", also declared in pets.yaml
   - b.yaml: conflicting type for property "$.id" of consumes payments GET /invoices 200: integer here, string in a.yaml
   - schemas.yaml: duplicate schema "Pet", also declared in billing.yaml
   - pets.yaml: unresolved schema "Pets" referenced by provides GET /pets 200
   - billing.yaml: unresolved ref "Payment" in Invoice.payment
   - schemas.yaml: schema "Owner" is deeper than 10 levels
-  - api.yaml: something.new at provides;rest;/pets (hint: x)
+  - api.yaml: something.new at provides rest /pets (hint: x)
 `, report)
 }
 
@@ -56,7 +52,7 @@ func TestFormatValidationFailedReportOmitsTheSourceWhenEmpty(t *testing.T) {
 	})
 
 	assert.Equal(t, `contract validation failed
-  - array schema without items at schemas;Pets
+  - array schema without items at schemas Pets
 `, report)
 }
 
@@ -69,7 +65,7 @@ func TestFormatValidationFailedReportPaintsTheHeadlineRed(t *testing.T) {
 	})
 
 	assert.Equal(t, "\x1b[31mcontract validation failed\x1b[0m\n"+
-		"  - array schema without items at schemas;Pets\n",
+		"  - array schema without items at schemas Pets\n",
 		report)
 }
 
@@ -84,7 +80,19 @@ func TestFormatViolationLine(t *testing.T) {
 			Details: map[string]string{"key": "patch"},
 		})
 
-		assert.Equal(t, `unknown key "patch" at provides;rest;/pets;patch`, headline)
+		assert.Equal(t, `unknown key "patch" at provides rest /pets`, headline)
+		assert.Empty(t, explanation)
+	})
+
+	t.Run("key.unknown at the root has no location", func(t *testing.T) {
+		headline, explanation := formatViolationLine(Violation{
+			Code:    "key.unknown",
+			Path:    "version",
+			Source:  "api.yaml",
+			Details: map[string]string{"key": "version"},
+		})
+
+		assert.Equal(t, `unknown key "version"`, headline)
 		assert.Empty(t, explanation)
 	})
 
@@ -96,7 +104,7 @@ func TestFormatViolationLine(t *testing.T) {
 			Details: map[string]string{"expected": "mapping", "got": "string"},
 		})
 
-		assert.Equal(t, `unexpected string at provides;rest;/pets;get, expected mapping`, headline)
+		assert.Equal(t, `unexpected string at provides rest /pets get, expected mapping`, headline)
 		assert.Empty(t, explanation)
 	})
 
@@ -108,7 +116,7 @@ func TestFormatViolationLine(t *testing.T) {
 			Details: map[string]string{"key": "/users/{userId}", "error": "dynamic path segments must use *"},
 		})
 
-		assert.Equal(t, `invalid endpoint "/users/{userId}" at provides;rest;/users/{userId}`, headline)
+		assert.Equal(t, `invalid endpoint "/users/{userId}" at provides rest`, headline)
 		assert.Equal(t, `dynamic path segments must use *`, explanation)
 	})
 
@@ -120,7 +128,7 @@ func TestFormatViolationLine(t *testing.T) {
 			Details: map[string]string{"key": "Payments-API", "error": "must be snake_case"},
 		})
 
-		assert.Equal(t, `invalid service name "Payments-API" at consumes;Payments-API`, headline)
+		assert.Equal(t, `invalid service name "Payments-API" at consumes`, headline)
 		assert.Equal(t, `must be snake_case`, explanation)
 	})
 
@@ -132,7 +140,7 @@ func TestFormatViolationLine(t *testing.T) {
 			Details: map[string]string{"key": "999", "error": "must be between 100 and 599"},
 		})
 
-		assert.Equal(t, `invalid status code "999" at provides;rest;/pets;get;responses;999`, headline)
+		assert.Equal(t, `invalid status code "999" at provides rest /pets get responses`, headline)
 		assert.Equal(t, `must be between 100 and 599`, explanation)
 	})
 
@@ -144,7 +152,7 @@ func TestFormatViolationLine(t *testing.T) {
 			Details: map[string]string{"value": "strng", "allowed": allowedTypes},
 		})
 
-		assert.Equal(t, `invalid value "strng" for "type" at schemas;Pet;properties;id;type`, headline)
+		assert.Equal(t, `invalid value "strng" for "type" at schemas Pet properties id`, headline)
 		assert.Equal(t, `expected one of: object, array, string, integer, float, boolean`, explanation)
 	})
 
@@ -156,7 +164,7 @@ func TestFormatViolationLine(t *testing.T) {
 			Details: map[string]string{"value": "", "allowed": allowedTypes},
 		})
 
-		assert.Equal(t, `missing "type" at schemas;Pet;properties;tags;items`, headline)
+		assert.Equal(t, `missing "type" at schemas Pet properties tags items`, headline)
 		assert.Equal(t, `expected one of: object, array, string, integer, float, boolean`, explanation)
 	})
 
@@ -167,7 +175,7 @@ func TestFormatViolationLine(t *testing.T) {
 			Source: "api.yaml",
 		})
 
-		assert.Equal(t, `array schema without items at schemas;Pets`, headline)
+		assert.Equal(t, `array schema without items at schemas Pets`, headline)
 		assert.Empty(t, explanation)
 	})
 
@@ -281,7 +289,7 @@ func TestFormatViolationLine(t *testing.T) {
 			Details: map[string]string{"hint": "x", "area": "y"},
 		})
 
-		assert.Equal(t, `something.new at provides;rest;/pets (area: y, hint: x)`, headline)
+		assert.Equal(t, `something.new at provides rest /pets (area: y, hint: x)`, headline)
 		assert.Empty(t, explanation)
 	})
 
@@ -292,7 +300,7 @@ func TestFormatViolationLine(t *testing.T) {
 			Source: "api.yaml",
 		})
 
-		assert.Equal(t, `something.new at provides;rest;/pets`, headline)
+		assert.Equal(t, `something.new at provides rest /pets`, headline)
 		assert.Empty(t, explanation)
 	})
 
