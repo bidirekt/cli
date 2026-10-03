@@ -5,8 +5,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func Register(rootCommand *cobra.Command, components *components.Components) {
-	client := NewCreateEnvironmentClient(components.HTTPClient)
+func Register(rootCommand *cobra.Command, dependencies *components.Components) {
+	client := NewCreateEnvironmentClient(dependencies.HTTPClient)
 	command := NewCreateEnvironmentCommand(client)
+	command.Annotations = map[string]string{components.TalksToBrokerAnnotation: "true"}
 	rootCommand.AddCommand(command)
 }
