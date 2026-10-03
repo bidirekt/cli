@@ -51,7 +51,7 @@ func TestCanIDeployCommand(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 1, httpmock.GetCallCountInfo()["POST "+endpoint])
 		assert.JSONEq(t, `{"participant":"front","version":"v1","environment":"production"}`, string(capturedBody))
-		assert.Equal(t, "front can be deployed to production\n", out.String())
+		assert.Equal(t, "front v1 can be deployed to production\n", out.String())
 		assert.Empty(t, errOut.String())
 	})
 
@@ -72,12 +72,16 @@ func TestCanIDeployCommand(t *testing.T) {
 		      "participantVersion": "v2",
 		      "endpoints": {
 		        "/payments/*": {
-		          "get": {
+		          "put": {
 		            "request": [
-		              { "reason": "property_missing_in_provider", "details": { "property": "currency" } }
+		              {
+		                "reason": "property_missing_in_consumer",
+		                "role": "consumer",
+		                "details": { "property": "$.currency", "propertyType": "string", "consumerName": "front", "providerName": "payments" }
+		              }
 		            ],
 		            "200": [
-		              { "reason": "some_future_reason", "details": { "property": "amount" } }
+		              { "reason": "some_future_reason", "role": "consumer", "details": { "property": "$.amount" } }
 		            ]
 		          }
 		        }
@@ -104,14 +108,14 @@ func TestCanIDeployCommand(t *testing.T) {
 		err := command.Execute()
 
 		require.Error(t, err)
-		assert.Equal(t, `front cannot be deployed to production
+		assert.Equal(t, `front v1 cannot be deployed to production
 
-payments (v2):
-  GET /payments/*
+payments (v2, deployed):
+  PUT /payments/*
     request:
-      - property "currency" is missing in provider
+      - front doesn't send "$.currency", but payments requires it → send it
     response 200:
-      - some_future_reason (property: amount)
+      - some_future_reason (property: $.amount)
 `, out.String())
 		assert.NotContains(t, errOut.String(), "Error:")
 	})
@@ -135,7 +139,7 @@ payments (v2):
 		        "/payments/*": {
 		          "get": {
 		            "200": [
-		              { "reason": "provider_resource_not_found" }
+		              { "reason": "provider_resource_not_found", "role": "consumer" }
 		            ]
 		          }
 		        }
@@ -159,7 +163,7 @@ payments (v2):
 		require.Error(t, err)
 		assert.Contains(t, out.String(), "\npayments:\n")
 		assert.NotContains(t, out.String(), "payments (")
-		assert.Contains(t, out.String(), "  GET /payments/*\n    response 200:\n      - no matching resource in provider")
+		assert.Contains(t, out.String(), "  GET /payments/*\n    response 200:\n      - front calls GET /payments/*, but payments doesn't provide it → stop calling it, or wait until payments publishes it\n")
 	})
 
 	t.Run("non-2xx response renders the broker message to stderr and exits non-zero", func(t *testing.T) {

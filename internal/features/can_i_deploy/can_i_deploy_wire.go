@@ -23,5 +23,6 @@ type CanIDeployResult struct {
 
 type ContractBreak struct {
 	Reason  string            `json:"reason"`
+	Role    string            `json:"role"`
 	Details map[string]string `json:"details"`
 }

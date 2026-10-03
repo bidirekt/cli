@@ -21,17 +21,29 @@ func TestCanIDeployResponseBodyUnmarshalsResults(t *testing.T) {
 	      "participantVersion": "3.1.0",
 	      "endpoints": {
 	        "/payments/*": {
-	          "get": {
+	          "put": {
 	            "request": [
-	              { "reason": "property_missing_in_provider", "details": { "property": "currency" } }
+	              {
+	                "reason": "property_missing_in_consumer",
+	                "role": "consumer",
+	                "details": {
+	                  "property": "$.currency",
+	                  "propertyType": "string",
+	                  "consumerName": "payments-web",
+	                  "providerName": "payments-api"
+	                }
+	              }
 	            ],
 	            "200": [
 	              {
 	                "reason": "property_type_mismatch",
+	                "role": "consumer",
 	                "details": {
-	                  "property": "amount",
+	                  "property": "$.amount",
 	                  "consumerPropertyType": "string",
-	                  "providerPropertyType": "number"
+	                  "providerPropertyType": "float",
+	                  "consumerName": "payments-web",
+	                  "providerName": "payments-api"
 	                }
 	              }
 	            ]
@@ -60,21 +72,30 @@ func TestCanIDeployResponseBodyUnmarshalsResults(t *testing.T) {
 	require.NotNil(t, payments.ParticipantVersion)
 	assert.Equal(t, "3.1.0", *payments.ParticipantVersion)
 
-	interactions := payments.Endpoints["/payments/*"]["get"]
+	interactions := payments.Endpoints["/payments/*"]["put"]
 	require.Len(t, interactions, 2)
 
 	requestBreaks := interactions["request"]
 	require.Len(t, requestBreaks, 1)
-	assert.Equal(t, "property_missing_in_provider", requestBreaks[0].Reason)
-	assert.Equal(t, map[string]string{"property": "currency"}, requestBreaks[0].Details)
+	assert.Equal(t, "property_missing_in_consumer", requestBreaks[0].Reason)
+	assert.Equal(t, "consumer", requestBreaks[0].Role)
+	assert.Equal(t, map[string]string{
+		"property":     "$.currency",
+		"propertyType": "string",
+		"consumerName": "payments-web",
+		"providerName": "payments-api",
+	}, requestBreaks[0].Details)
 
 	responseBreaks := interactions["200"]
 	require.Len(t, responseBreaks, 1)
 	assert.Equal(t, "property_type_mismatch", responseBreaks[0].Reason)
+	assert.Equal(t, "consumer", responseBreaks[0].Role)
 	assert.Equal(t, map[string]string{
-		"property":             "amount",
+		"property":             "$.amount",
 		"consumerPropertyType": "string",
-		"providerPropertyType": "number",
+		"providerPropertyType": "float",
+		"consumerName":         "payments-web",
+		"providerName":         "payments-api",
 	}, responseBreaks[0].Details)
 
 	users := body.Results["users"]

@@ -39,7 +39,7 @@ func TestCanIDeployCommandRemovedResourceStillConsumed(t *testing.T) {
 	        "/users": {
 	          "get": {
 	            "200": [
-	              { "reason": "provider_resource_removed_but_still_consumed" }
+	              { "reason": "provider_resource_removed_but_still_consumed", "role": "provider" }
 	            ]
 	          }
 	        }
@@ -61,12 +61,12 @@ func TestCanIDeployCommandRemovedResourceStillConsumed(t *testing.T) {
 	err := command.Execute()
 
 	require.ErrorIs(t, err, can_i_deploy.ErrSilent)
-	assert.Equal(t, `orders-api cannot be deployed to production
+	assert.Equal(t, `orders-api v2 cannot be deployed to production
 
-orders-web (v7):
+orders-web (v7, deployed):
   GET /users
     response 200:
-      - resource removed but still consumed
+      - orders-api removed GET /users, but orders-web still calls it → keep it until orders-web stops calling it
 `, out.String())
 	assert.NotContains(t, errOut.String(), "Error:")
 }
