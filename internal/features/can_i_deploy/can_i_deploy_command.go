@@ -53,15 +53,14 @@ func NewCanIDeployCommand(client *CanIDeployClient) *cobra.Command {
 
 		if !resp.Deployable {
 			writer := command.OutOrStdout()
-			if _, err := fmt.Fprint(writer, formatNotDeployableReport(paint.For(writer), participant, environment, resp.Results)); err != nil {
+			if _, err := fmt.Fprint(writer, formatNotDeployableReport(paint.For(writer), participant, version, environment, resp.Results)); err != nil {
 				return err
 			}
 			return ErrSilent
 		}
 
 		writer := command.OutOrStdout()
-		brush := paint.For(writer)
-		if _, err := fmt.Fprintln(writer, brush.Green(participant+" can be deployed to "+environment)); err != nil {
+		if _, err := fmt.Fprintln(writer, formatDeployableLine(paint.For(writer), participant, version, environment)); err != nil {
 			return err
 		}
 
@@ -83,9 +82,13 @@ func NewCanIDeployCommand(client *CanIDeployClient) *cobra.Command {
 	return command
 }
 
-func formatNotDeployableReport(brush paint.Brush, participant, environment string, results map[string]CanIDeployResult) string {
+func formatDeployableLine(brush paint.Brush, participant, version, environment string) string {
+	return brush.Green(participant + " " + version + " can be deployed to " + environment)
+}
+
+func formatNotDeployableReport(brush paint.Brush, participant, version, environment string, results map[string]CanIDeployResult) string {
 	var report strings.Builder
-	report.WriteString(brush.Red(participant+" cannot be deployed to "+environment) + "\n")
+	report.WriteString(brush.Red(participant+" "+version+" cannot be deployed to "+environment) + "\n")
 
 	counterparts := make([]string, 0, len(results))
 	for name, result := range results {
@@ -100,7 +103,7 @@ func formatNotDeployableReport(brush paint.Brush, participant, environment strin
 
 		report.WriteString("\n" + name)
 		if result.ParticipantVersion != nil {
-			fmt.Fprintf(&report, " (%s)", *result.ParticipantVersion)
+			fmt.Fprintf(&report, " (%s, deployed)", *result.ParticipantVersion)
 		}
 		report.WriteString(":\n")
 
@@ -112,14 +115,23 @@ func formatNotDeployableReport(brush paint.Brush, participant, environment strin
 
 				interactions := result.Endpoints[endpoint][method]
 				for _, interaction := range sortedInteractions(interactions) {
-					if interaction == "request" {
+					checked := checkedInteraction{
+						participant: participant,
+						counterpart: name,
+						environment: environment,
+						method:      strings.ToUpper(method),
+						endpoint:    endpoint,
+						isRequest:   interaction == "request",
+					}
+
+					if checked.isRequest {
 						report.WriteString("    request:\n")
 					} else {
 						fmt.Fprintf(&report, "    response %s:\n", interaction)
 					}
 
 					for _, contractBreak := range interactions[interaction] {
-						fmt.Fprintf(&report, "      - %s\n", formatBreakLine(environment, contractBreak))
+						fmt.Fprintf(&report, "      - %s\n", formatBreakLine(checked, contractBreak))
 					}
 				}
 			}
@@ -148,38 +160,66 @@ func sortedInteractions(interactions map[string][]ContractBreak) []string {
 	return keys
 }
 
-func formatBreakLine(environment string, contractBreak ContractBreak) string {
-	details := contractBreak.Details
+type checkedInteraction struct {
+	participant string
+	counterpart string
+	environment string
+	method      string
+	endpoint    string
+	isRequest   bool
+}
 
-	switch contractBreak.Reason {
-	case "provider_resource_not_deployed_in_environment":
-		line := fmt.Sprintf("provider is not deployed in %q", environment)
-		if deployedIn, ok := details["deployedEnvironments"]; ok {
-			line += fmt.Sprintf(" (deployed in: %s)", deployedIn)
+func formatBreakLine(interaction checkedInteraction, contractBreak ContractBreak) string {
+	me, other := interaction.participant, interaction.counterpart
+	resource := interaction.method + " " + interaction.endpoint
+	reason, details := contractBreak.Reason, contractBreak.Details
+	property := details["property"]
+	consumerType, providerType := details["consumerPropertyType"], details["providerPropertyType"]
+	asConsumer, asProvider := contractBreak.Role == "consumer", contractBreak.Role == "provider"
+	onRequest, onResponse := interaction.isRequest, !interaction.isRequest
+
+	switch {
+	case reason == "property_missing_in_provider" && asConsumer && onResponse:
+		return fmt.Sprintf("%s reads %q, but %s doesn't provide it → stop reading it, or mark it optional", me, property, other)
+	case reason == "property_missing_in_provider" && asProvider && onResponse:
+		return fmt.Sprintf("%s doesn't provide %q, but %s reads it → keep providing it", me, property, other)
+	case reason == "property_optional_in_provider_required_in_consumer" && asConsumer && onResponse:
+		return fmt.Sprintf("%s requires %q, but %s only sometimes provides it → mark it optional", me, property, other)
+	case reason == "property_optional_in_provider_required_in_consumer" && asProvider && onResponse:
+		return fmt.Sprintf("%s provides %q only sometimes, but %s requires it → keep it required", me, property, other)
+	case reason == "property_missing_in_consumer" && asConsumer && onRequest:
+		return fmt.Sprintf("%s doesn't send %q, but %s requires it → send it", me, property, other)
+	case reason == "property_missing_in_consumer" && asProvider && onRequest:
+		return fmt.Sprintf("%s requires %q, but %s doesn't send it → make it optional", me, property, other)
+	case reason == "property_optional_in_consumer_required_in_provider" && asConsumer && onRequest:
+		return fmt.Sprintf("%s sends %q only sometimes, but %s requires it → always send it", me, property, other)
+	case reason == "property_optional_in_consumer_required_in_provider" && asProvider && onRequest:
+		return fmt.Sprintf("%s requires %q, but %s sends it only sometimes → make it optional", me, property, other)
+	case reason == "property_type_mismatch" && asConsumer && onResponse:
+		return fmt.Sprintf("%s reads %q as %s, but %s provides %s → read it as %s", me, property, consumerType, other, providerType, providerType)
+	case reason == "property_type_mismatch" && asProvider && onResponse:
+		return fmt.Sprintf("%s provides %q as %s, but %s reads %s → provide %s", me, property, providerType, other, consumerType, consumerType)
+	case reason == "property_type_mismatch" && asConsumer && onRequest:
+		return fmt.Sprintf("%s sends %q as %s, but %s expects %s → send %s", me, property, consumerType, other, providerType, providerType)
+	case reason == "property_type_mismatch" && asProvider && onRequest:
+		return fmt.Sprintf("%s expects %q as %s, but %s sends %s → accept %s", me, property, providerType, other, consumerType, consumerType)
+	case reason == "provider_resource_not_found" && asConsumer:
+		return fmt.Sprintf("%s calls %s, but %s doesn't provide it → stop calling it, or wait until %s publishes it", me, resource, other, other)
+	case reason == "provider_resource_not_deployed_in_environment" && asConsumer:
+		deployedIn := ""
+		if environments, ok := details["deployedEnvironments"]; ok {
+			deployedIn = fmt.Sprintf(" (deployed in: %s)", environments)
 		}
-		return line
-	case "provider_resource_not_found":
-		return "no matching resource in provider"
-	case "provider_resource_removed_but_still_consumed":
-		return "resource removed but still consumed"
-	case "property_missing_in_provider":
-		return fmt.Sprintf("property %q is missing in provider", details["property"])
-	case "property_missing_in_consumer":
-		return fmt.Sprintf("property %q is missing in consumer", details["property"])
-	case "property_optional_in_provider_required_in_consumer":
-		return fmt.Sprintf("property %q is optional in provider but required in consumer", details["property"])
-	case "property_optional_in_consumer_required_in_provider":
-		return fmt.Sprintf("property %q is optional in consumer but required in provider", details["property"])
-	case "property_type_mismatch":
-		return fmt.Sprintf("property %q type mismatch — consumer has %s, provider has %s",
-			details["property"], details["consumerPropertyType"], details["providerPropertyType"])
+		return fmt.Sprintf("%s calls %s, but %s is not deployed in %s%s → deploy %s first", me, resource, other, interaction.environment, deployedIn, other)
+	case reason == "provider_resource_removed_but_still_consumed" && asProvider:
+		return fmt.Sprintf("%s removed %s, but %s still calls it → keep it until %s stops calling it", me, resource, other, other)
 	default:
-		return fallbackBreakLine(contractBreak.Reason, details)
+		return fallbackBreakLine(reason, details)
 	}
 }
 
-// fallbackBreakLine renders an unknown reason code verbatim with its details, so the
-// CLI never swallows a break it does not have a template for.
+// fallbackBreakLine renders a break verbatim with its details when no template matches its
+// reason, role and interaction, so the CLI never swallows a break.
 func fallbackBreakLine(reason string, details map[string]string) string {
 	if len(details) == 0 {
 		return reason
