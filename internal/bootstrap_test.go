@@ -59,12 +59,11 @@ type rootExecution struct {
 	err    error
 }
 
-func executeRoot(t *testing.T, dependencies *components.Components, stdinIsTerminal bool, stdin string, args ...string) rootExecution {
+func executeRoot(t *testing.T, dependencies *components.Components, args ...string) rootExecution {
 	t.Helper()
 
-	rootCommand := newRootCommand(dependencies, func(any) bool { return stdinIsTerminal })
+	rootCommand := newRootCommand(dependencies)
 	var stdout, stderr bytes.Buffer
-	rootCommand.SetIn(strings.NewReader(stdin))
 	rootCommand.SetOut(&stdout)
 	rootCommand.SetErr(&stderr)
 	rootCommand.SetArgs(args)
@@ -79,7 +78,7 @@ func TestVersionIsPrintedByTheFlagAndTheCommand(t *testing.T) {
 		t.Run(arg, func(t *testing.T) {
 			isolateEnvironment(t)
 
-			execution := executeRoot(t, components.New(), false, "", arg)
+			execution := executeRoot(t, components.New(), arg)
 
 			require.NoError(t, execution.err)
 			assert.Equal(t, "bidirekt version dev\n", execution.stdout)
@@ -102,7 +101,7 @@ func TestCommandsThatDoNotTalkToTheBrokerNeverResolveIt(t *testing.T) {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			isolateEnvironment(t)
 
-			execution := executeRoot(t, components.New(), true, "http://localhost:8080\n", args...)
+			execution := executeRoot(t, components.New(), args...)
 
 			require.NoError(t, execution.err)
 			assert.Empty(t, execution.stderr)
@@ -110,13 +109,13 @@ func TestCommandsThatDoNotTalkToTheBrokerNeverResolveIt(t *testing.T) {
 	}
 }
 
-func TestBrokerCommandOutsideATerminalWithoutABrokerFailsWithoutCallingIt(t *testing.T) {
+func TestBrokerCommandWithoutABrokerFailsWithoutCallingIt(t *testing.T) {
 	configFilePath := isolateEnvironment(t)
 	broker := startBrokerStub(t)
 	dependencies := components.New()
 	dependencies.HTTPClient.SetBaseURL(broker.url)
 
-	execution := executeRoot(t, dependencies, false, "", "create-participant", "pets")
+	execution := executeRoot(t, dependencies, "create-participant", "pets")
 
 	require.EqualError(t, execution.err, noBrokerConfigured)
 	assert.Empty(t, execution.stdout)
@@ -141,7 +140,7 @@ func TestUsageErrorsComeBeforeAnyBrokerResolution(t *testing.T) {
 			configFilePath := isolateEnvironment(t)
 			broker := startBrokerStub(t)
 
-			execution := executeRoot(t, components.New(), true, broker.url+"\n", test.args...)
+			execution := executeRoot(t, components.New(), test.args...)
 
 			require.EqualError(t, execution.err, test.err)
 			assert.Empty(t, execution.stderr)
@@ -213,7 +212,7 @@ func TestBrokerURLComesFromTheFirstSourceThatHasOneAndIsAnnouncedOnStderr(t *tes
 			t.Setenv("BIDIREKT_PROFILE", test.envProfile)
 			requestsBefore := test.broker.requests.Load()
 
-			execution := executeRoot(t, components.New(), false, "", append([]string{"create-participant", "pets"}, test.args...)...)
+			execution := executeRoot(t, components.New(), append([]string{"create-participant", "pets"}, test.args...)...)
 
 			require.NoError(t, execution.err)
 			assert.Equal(t, "pets participant created\n", execution.stdout)
@@ -228,15 +227,15 @@ func TestConfigFileIsReadOnlyWhenNoFlagOrEnvironmentHasAURL(t *testing.T) {
 	writeConfigFile(t, configFilePath, `{"profiles":`)
 	broker := startBrokerStub(t)
 
-	fromFlag := executeRoot(t, components.New(), false, "", "create-participant", "pets", "--broker-url", broker.url)
+	fromFlag := executeRoot(t, components.New(), "create-participant", "pets", "--broker-url", broker.url)
 	require.NoError(t, fromFlag.err)
 
 	t.Setenv("BIDIREKT_BROKER_URL", broker.url)
-	fromEnv := executeRoot(t, components.New(), false, "", "create-participant", "pets")
+	fromEnv := executeRoot(t, components.New(), "create-participant", "pets")
 	require.NoError(t, fromEnv.err)
 
 	t.Setenv("BIDIREKT_BROKER_URL", "")
-	fromProfile := executeRoot(t, components.New(), false, "", "create-participant", "pets")
+	fromProfile := executeRoot(t, components.New(), "create-participant", "pets")
 	assert.ErrorContains(t, fromProfile.err, "invalid config file "+configFilePath+":")
 	assert.Equal(t, int32(2), broker.requests.Load())
 }
@@ -246,7 +245,7 @@ func TestBrokerLineHidesThePassword(t *testing.T) {
 	broker := startBrokerStub(t)
 	brokerURL := strings.Replace(broker.url, "http://", "http://ci:segredo@", 1)
 
-	execution := executeRoot(t, components.New(), false, "", "create-participant", "pets", "--broker-url", brokerURL)
+	execution := executeRoot(t, components.New(), "create-participant", "pets", "--broker-url", brokerURL)
 
 	require.NoError(t, execution.err)
 	assert.Equal(t, "Broker: "+strings.Replace(broker.url, "http://", "http://ci:xxxxx@", 1)+" (from --broker-url)\n", execution.stderr)
@@ -296,7 +295,7 @@ func TestInvalidBrokerURLFailsNamingItsOrigin(t *testing.T) {
 			dependencies := components.New()
 			dependencies.HTTPClient.SetBaseURL(broker.url)
 
-			execution := executeRoot(t, dependencies, true, broker.url+"\n", append([]string{"create-participant", "pets"}, test.args...)...)
+			execution := executeRoot(t, dependencies, append([]string{"create-participant", "pets"}, test.args...)...)
 
 			require.EqualError(t, execution.err, test.err)
 			assert.Empty(t, execution.stderr)
@@ -305,14 +304,14 @@ func TestInvalidBrokerURLFailsNamingItsOrigin(t *testing.T) {
 	}
 }
 
-func TestProfileNamedOutsideATerminalMustExist(t *testing.T) {
+func TestProfileNamedByFlagOrEnvironmentMustExist(t *testing.T) {
 	tests := []struct {
 		name       string
 		envProfile string
 		args       []string
 	}{
-		{name: "named by --profile", args: []string{"--profile", "staging"}},
-		{name: "named by BIDIREKT_PROFILE", envProfile: "staging"},
+		{name: "named by --profile", args: []string{"--profile", "acme"}},
+		{name: "named by BIDIREKT_PROFILE", envProfile: "acme"},
 	}
 
 	for _, test := range tests {
@@ -324,66 +323,31 @@ func TestProfileNamedOutsideATerminalMustExist(t *testing.T) {
 			dependencies := components.New()
 			dependencies.HTTPClient.SetBaseURL(broker.url)
 
-			execution := executeRoot(t, dependencies, false, "", append([]string{"create-participant", "pets"}, test.args...)...)
+			execution := executeRoot(t, dependencies, append([]string{"create-participant", "pets"}, test.args...)...)
 
-			require.EqualError(t, execution.err, `profile "staging" not found in `+configFilePath)
+			require.EqualError(t, execution.err, `profile "acme" not found in `+configFilePath)
 			assert.Empty(t, execution.stderr)
 			assert.Zero(t, broker.requests.Load())
 		})
 	}
 }
 
-func TestMissingBrokerURLIsAskedInATerminalAndSavedToTheActiveProfile(t *testing.T) {
-	tests := []struct {
-		name       string
-		envProfile string
-		args       []string
-		profile    string
-	}{
-		{name: "the default profile", profile: "default"},
-		{name: "a profile named by --profile is created", args: []string{"--profile", "staging"}, profile: "staging"},
-		{name: "a profile named by BIDIREKT_PROFILE is created", envProfile: "staging", profile: "staging"},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			configFilePath := isolateEnvironment(t)
-			writeConfigFile(t, configFilePath, `{"profiles":{"other":{"brokerUrl":"http://other.internal"}}}`)
-			t.Setenv("BIDIREKT_PROFILE", test.envProfile)
-			broker := startBrokerStub(t)
-			args := append([]string{"create-participant", "pets"}, test.args...)
-
-			asked := executeRoot(t, components.New(), true, broker.url+"\n", args...)
-
-			require.NoError(t, asked.err)
-			assert.Equal(t, "Broker URL: Broker: "+broker.url+" (profile: "+test.profile+")\n", asked.stderr)
-			assert.Equal(t, "pets participant created\n", asked.stdout)
-			assert.Equal(t, int32(1), broker.requests.Load())
-			saved, err := os.ReadFile(configFilePath)
-			require.NoError(t, err)
-			assert.JSONEq(t, `{"profiles":{"other":{"brokerUrl":"http://other.internal"},"`+test.profile+`":{"brokerUrl":"`+broker.url+`"}}}`, string(saved))
-
-			reused := executeRoot(t, components.New(), true, "", args...)
-
-			require.NoError(t, reused.err)
-			assert.Equal(t, "Broker: "+broker.url+" (profile: "+test.profile+")\n", reused.stderr)
-			assert.Equal(t, int32(2), broker.requests.Load())
-		})
-	}
-}
-
-func TestPromptEndingWithoutAnswerFailsWithoutSaving(t *testing.T) {
+func TestMissingBrokerURLFailsWithoutWritingTheConfigFile(t *testing.T) {
 	configFilePath := isolateEnvironment(t)
+	const configFileContent = `{"profiles":{"acme":{"brokerUrl":"http://broker.acme.example"}}}`
+	writeConfigFile(t, configFilePath, configFileContent)
 	broker := startBrokerStub(t)
 	dependencies := components.New()
 	dependencies.HTTPClient.SetBaseURL(broker.url)
 
-	execution := executeRoot(t, dependencies, true, "", "create-participant", "pets")
+	execution := executeRoot(t, dependencies, "create-participant", "pets")
 
-	require.EqualError(t, execution.err, "no broker URL entered")
-	assert.Equal(t, "Broker URL: ", execution.stderr)
+	require.EqualError(t, execution.err, noBrokerConfigured)
+	assert.Empty(t, execution.stderr)
 	assert.Zero(t, broker.requests.Load())
-	assert.NoFileExists(t, configFilePath)
+	saved, err := os.ReadFile(configFilePath)
+	require.NoError(t, err)
+	assert.JSONEq(t, configFileContent, string(saved))
 }
 
 func TestDotEnvInTheWorkingDirectoryIsIgnored(t *testing.T) {
@@ -393,7 +357,7 @@ func TestDotEnvInTheWorkingDirectoryIsIgnored(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(workingDirectory, ".env"), []byte("BIDIREKT_BROKER_URL="+broker.url+"\n"), 0o600))
 	t.Chdir(workingDirectory)
 
-	execution := executeRoot(t, components.New(), false, "", "create-participant", "pets")
+	execution := executeRoot(t, components.New(), "create-participant", "pets")
 
 	require.EqualError(t, execution.err, noBrokerConfigured)
 	assert.Zero(t, broker.requests.Load())

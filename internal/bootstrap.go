@@ -23,7 +23,7 @@ var version = "dev"
 var errNoBrokerConfigured = errors.New(`no broker configured — pass --broker-url, set BIDIREKT_BROKER_URL, or run "bidirekt configure"`)
 
 func Run() {
-	rootCommand := newRootCommand(components.New(), components.IsTerminal)
+	rootCommand := newRootCommand(components.New())
 
 	if err := rootCommand.Execute(); err != nil {
 		if !errors.Is(err, can_i_deploy.ErrSilent) && !errors.Is(err, publish_contract.ErrSilent) {
@@ -35,7 +35,7 @@ func Run() {
 	}
 }
 
-func newRootCommand(dependencies *components.Components, isTerminal func(stream any) bool) *cobra.Command {
+func newRootCommand(dependencies *components.Components) *cobra.Command {
 	rootCommand := &cobra.Command{
 		Use:           "bidirekt",
 		Short:         "CLI for Bidirekt",
@@ -54,7 +54,7 @@ func newRootCommand(dependencies *components.Components, isTerminal func(stream 
 				return err
 			}
 
-			broker, err := resolveBroker(command, dependencies.Config, isTerminal)
+			broker, err := resolveBroker(command, dependencies.Config)
 			if err != nil {
 				return err
 			}
@@ -89,7 +89,7 @@ func newRootCommand(dependencies *components.Components, isTerminal func(stream 
 	return rootCommand
 }
 
-func resolveBroker(command *cobra.Command, config *components.Config, isTerminal func(stream any) bool) (components.ResolvedBrokerURL, error) {
+func resolveBroker(command *cobra.Command, config *components.Config) (components.ResolvedBrokerURL, error) {
 	flagBrokerURL, err := command.Flags().GetString("broker-url")
 	if err != nil {
 		return components.ResolvedBrokerURL{}, err
@@ -116,22 +116,9 @@ func resolveBroker(command *cobra.Command, config *components.Config, isTerminal
 		return resolved, err
 	}
 
-	stdin := command.InOrStdin()
-	if !isTerminal(stdin) {
-		if resolved.ProfileNotFound {
-			return components.ResolvedBrokerURL{}, fmt.Errorf("profile %q not found in %s", resolved.Profile, configFile.Path)
-		}
-		return components.ResolvedBrokerURL{}, errNoBrokerConfigured
+	if resolved.ProfileNotFound {
+		return components.ResolvedBrokerURL{}, fmt.Errorf("profile %q not found in %s", resolved.Profile, configFile.Path)
 	}
 
-	resolved.BrokerURL, err = components.PromptBrokerURL(stdin, command.ErrOrStderr(), "")
-	if err != nil {
-		return components.ResolvedBrokerURL{}, err
-	}
-
-	if err := configFile.WriteProfile(resolved.Profile, components.Profile{BrokerURL: resolved.BrokerURL}); err != nil {
-		return components.ResolvedBrokerURL{}, err
-	}
-
-	return resolved, nil
+	return components.ResolvedBrokerURL{}, errNoBrokerConfigured
 }
