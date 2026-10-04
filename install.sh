@@ -24,7 +24,7 @@ os=$(uname -s)
 case $os in
   Linux) os=linux ;;
   Darwin) os=darwin ;;
-  *) fail "no build for OS $os: install.sh supports Linux and macOS, the other builds are at $releases" ;;
+  *) fail "no build for OS $os: bidirekt is built for Linux and macOS" ;;
 esac
 arch=$(uname -m)
 case $arch in
