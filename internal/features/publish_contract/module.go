@@ -5,8 +5,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func Register(rootCommand *cobra.Command, components *components.Components) {
-	publishContractClient := NewPublishContractClient(components.HTTPClient)
+func Register(rootCommand *cobra.Command, dependencies *components.Components) {
+	publishContractClient := NewPublishContractClient(dependencies.HTTPClient)
 	publishCommand := NewPublishCommand(publishContractClient)
+	publishCommand.Annotations = map[string]string{components.TalksToBrokerAnnotation: "true"}
 	rootCommand.AddCommand(publishCommand)
 }

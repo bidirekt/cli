@@ -1,11 +1,7 @@
 package main
 
-import (
-	"github.com/bidirekt/cli/internal"
-	"github.com/joho/godotenv"
-)
+import "github.com/bidirekt/cli/internal"
 
 func main() {
-	_ = godotenv.Load()
 	internal.Run()
 }
