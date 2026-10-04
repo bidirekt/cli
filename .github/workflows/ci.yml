@@ -61,3 +61,9 @@ jobs:
           go-version-file: go.mod
           cache: true
       - run: go run github.com/fe3dback/go-arch-lint@v1.18.0 check --project-path .
+
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: shellcheck install.sh
