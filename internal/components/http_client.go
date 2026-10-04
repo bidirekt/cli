@@ -12,14 +12,8 @@ type HTTPClient struct {
 }
 
 func NewHTTPClient(config *Config) *HTTPClient {
-	brokerURL := config.BrokerURL
-
-	if brokerURL == "" {
-		brokerURL = "http://localhost:8080"
-	}
-
 	httpClient := &HTTPClient{
-		restClient: resty.New().SetBaseURL(brokerURL),
+		restClient: resty.New().SetBaseURL(config.BrokerURL),
 	}
 
 	httpClient.

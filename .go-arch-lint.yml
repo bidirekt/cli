@@ -7,8 +7,6 @@ vendors:
     in: github.com/spf13/cobra
   resty:
     in: resty.dev/v3
-  godotenv:
-    in: github.com/joho/godotenv
   testify:
     in: github.com/stretchr/testify/**
   httpmock:
@@ -30,8 +28,6 @@ deps:
   cmd:
     mayDependOn:
       - bootstrap
-    canUse:
-      - godotenv
   bootstrap:
     mayDependOn:
       - components
@@ -50,6 +46,9 @@ deps:
   components:
     canUse:
       - resty
+  paint:
+    mayDependOn:
+      - components
   tests:
     anyProjectDeps: true
     canUse:

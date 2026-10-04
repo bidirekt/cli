@@ -3,6 +3,8 @@ package paint
 import (
 	"io"
 	"os"
+
+	"github.com/bidirekt/cli/internal/components"
 )
 
 const (
@@ -41,17 +43,5 @@ func colorEnabledFor(writer io.Writer) bool {
 	if force := os.Getenv("CLICOLOR_FORCE"); force != "" && force != "0" {
 		return true
 	}
-	return isTerminal(writer)
-}
-
-func isTerminal(writer io.Writer) bool {
-	file, ok := writer.(*os.File)
-	if !ok {
-		return false
-	}
-	info, err := file.Stat()
-	if err != nil {
-		return false
-	}
-	return info.Mode()&os.ModeCharDevice != 0
+	return components.IsTerminal(writer)
 }
