@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/bidirekt/cli/internal/components"
+	"github.com/bidirekt/cli/internal/reports"
 )
 
 type PublishContractClient struct {
@@ -37,7 +38,7 @@ func (this *PublishContractClient) PublishContract(ctx context.Context, requestB
 
 	if response.StatusCode() != http.StatusOK {
 		if len(responseBody.Violations) > 0 {
-			return "", &ValidationFailedError{Message: responseBody.Message, Violations: responseBody.Violations}
+			return "", &reports.ValidationFailedError{Message: responseBody.Message, Violations: responseBody.Violations}
 		}
 
 		return "", fmt.Errorf("cannot post contract to broker: %s", responseBody.Message)

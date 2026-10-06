@@ -1,4 +1,4 @@
-package can_i_deploy
+package reports
 
 import (
 	"bytes"
@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestFormatDeployableLineNamesTheVersionUnderCheck(t *testing.T) {
-	line := formatDeployableLine(paint.For(&bytes.Buffer{}), "petstore_web", "3.0.0", "production")
+func TestFormatDeployableLineNamesTheCheckedSide(t *testing.T) {
+	line := FormatDeployableLine(paint.For(&bytes.Buffer{}), "petstore_web 3.0.0", "production")
 
 	assert.Equal(t, "petstore_web 3.0.0 can be deployed to production", line)
 }
@@ -18,7 +18,7 @@ func TestFormatDeployableLinePaintsItGreen(t *testing.T) {
 	t.Setenv("NO_COLOR", "")
 	t.Setenv("CLICOLOR_FORCE", "1")
 
-	line := formatDeployableLine(paint.For(&bytes.Buffer{}), "petstore_web", "3.0.0", "production")
+	line := FormatDeployableLine(paint.For(&bytes.Buffer{}), "petstore_web 3.0.0", "production")
 
 	assert.Equal(t, "\x1b[32mpetstore_web 3.0.0 can be deployed to production\x1b[0m", line)
 }
@@ -77,7 +77,7 @@ func TestFormatNotDeployableReportWalksTheTree(t *testing.T) {
 		},
 	}
 
-	report := formatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web", "2.0.0", "production", results)
+	report := FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 2.0.0", "petstore_web", "production", results)
 
 	assert.Equal(t, `petstore_web 2.0.0 cannot be deployed to production
 
@@ -118,7 +118,7 @@ func TestFormatNotDeployableReportSpeaksFromTheProviderSide(t *testing.T) {
 		},
 	}
 
-	report := formatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_api", "3.0.0", "production", results)
+	report := FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_api 3.0.0", "petstore_api", "production", results)
 
 	assert.Equal(t, `petstore_api 3.0.0 cannot be deployed to production
 
@@ -145,7 +145,7 @@ func TestFormatNotDeployableReportOmitsVersionWhenNull(t *testing.T) {
 		},
 	}
 
-	report := formatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web", "2.0.0", "production", results)
+	report := FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 2.0.0", "petstore_web", "production", results)
 
 	assert.Equal(t, `petstore_web 2.0.0 cannot be deployed to production
 
@@ -175,7 +175,7 @@ func TestFormatNotDeployableReportPaintsTheHeadlineRed(t *testing.T) {
 		},
 	}
 
-	report := formatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web", "2.0.0", "production", results)
+	report := FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 2.0.0", "petstore_web", "production", results)
 
 	assert.Equal(t, "\x1b[31mpetstore_web 2.0.0 cannot be deployed to production\x1b[0m\n"+
 		"\n"+

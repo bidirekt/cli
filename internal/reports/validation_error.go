@@ -1,4 +1,4 @@
-package publish_contract
+package reports
 
 type ValidationFailedError struct {
 	Message    string

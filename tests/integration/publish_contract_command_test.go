@@ -12,6 +12,7 @@ import (
 
 	"github.com/bidirekt/cli/internal/components"
 	"github.com/bidirekt/cli/internal/features/publish_contract"
+	"github.com/bidirekt/cli/internal/reports"
 	"github.com/jarcoal/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -224,7 +225,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		err := command.Execute()
 
-		require.ErrorIs(t, err, publish_contract.ErrSilent)
+		require.ErrorIs(t, err, reports.ErrSilent)
 		assert.Equal(t, "contract validation failed\n"+
 			"  - billing.yaml: unresolved ref \"Payment\" in Invoice.payment\n"+
 			"  - pets.yaml: unresolved schema \"Pets\" referenced by provides GET /pets 200\n",
@@ -253,7 +254,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		err := command.Execute()
 
-		require.ErrorIs(t, err, publish_contract.ErrSilent)
+		require.ErrorIs(t, err, reports.ErrSilent)
 		assert.Equal(t, "contract validation failed\n"+
 			"  - api.yaml: array schema without items at schemas Pets\n",
 			errOut.String())
@@ -281,7 +282,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		err := command.Execute()
 
-		require.ErrorIs(t, err, publish_contract.ErrSilent)
+		require.ErrorIs(t, err, reports.ErrSilent)
 		assert.Equal(t, "contract validation failed\n"+
 			"  - api.yaml: something.new at provides rest /pets (hint: x)\n",
 			errOut.String())
@@ -310,7 +311,7 @@ func TestPublishContractCommand(t *testing.T) {
 		err := command.Execute()
 
 		require.Error(t, err)
-		assert.NotErrorIs(t, err, publish_contract.ErrSilent)
+		assert.NotErrorIs(t, err, reports.ErrSilent)
 		assert.Equal(t, "cannot post contract to broker: participant not found", err.Error())
 		assert.Empty(t, errOut.String())
 	})
