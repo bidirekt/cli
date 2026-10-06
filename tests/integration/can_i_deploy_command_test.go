@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"net/http"
 	"testing"
@@ -194,6 +195,7 @@ payments (v2, deployed):
 		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
+		httpmock.RegisterNoResponder(httpmock.NewErrorResponder(errors.New("unexpected request to the broker")))
 
 		command := can_i_deploy.NewCanIDeployCommand(
 			can_i_deploy.NewCanIDeployClient(httpClient),

@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"net/http"
 	"testing"
@@ -58,6 +59,7 @@ func TestRenameParticipantCommand(t *testing.T) {
 		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
+		httpmock.RegisterNoResponder(httpmock.NewErrorResponder(errors.New("unexpected request to the broker")))
 
 		command := rename_participant.NewRenameParticipantCommand(
 			rename_participant.NewRenameParticipantClient(httpClient),

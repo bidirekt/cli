@@ -3,6 +3,7 @@ package integration_test
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -132,6 +133,7 @@ func TestPublishContractCommand(t *testing.T) {
 		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
+		httpmock.RegisterNoResponder(httpmock.NewErrorResponder(errors.New("unexpected request to the broker")))
 
 		directory := t.TempDir()
 		contract := filepath.Join(directory, "contract.yaml")
@@ -158,6 +160,7 @@ func TestPublishContractCommand(t *testing.T) {
 		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
+		httpmock.RegisterNoResponder(httpmock.NewErrorResponder(errors.New("unexpected request to the broker")))
 
 		contract := filepath.Join(t.TempDir(), "contract.json")
 		require.NoError(t, os.WriteFile(contract, []byte(`{"provides":{"rest":{}}}`), 0o600))
@@ -183,6 +186,7 @@ func TestPublishContractCommand(t *testing.T) {
 		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
+		httpmock.RegisterNoResponder(httpmock.NewErrorResponder(errors.New("unexpected request to the broker")))
 
 		directory := t.TempDir()
 		contract := filepath.Join(directory, "contract.yaml")
@@ -320,6 +324,7 @@ func TestPublishContractCommand(t *testing.T) {
 		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
+		httpmock.RegisterNoResponder(httpmock.NewErrorResponder(errors.New("unexpected request to the broker")))
 
 		file := filepath.Join(t.TempDir(), "contract.yaml")
 		require.NoError(t, os.WriteFile(file, []byte(`{}`), 0o600))
