@@ -17,13 +17,13 @@ func NewCreateParticipantClient(httpClient *components.HTTPClient) *CreatePartic
 	return &CreateParticipantClient{httpClient: httpClient}
 }
 
-func (c *CreateParticipantClient) Create(ctx context.Context, requestBody *CreateParticipantRequestBody) (string, error) {
+func (this *CreateParticipantClient) Create(ctx context.Context, requestBody *CreateParticipantRequestBody) (string, error) {
 	bodyJSON, err := json.Marshal(requestBody)
 	if err != nil {
 		return "", fmt.Errorf("cannot serialize participant to JSON: %w", err)
 	}
 
-	response, err := c.httpClient.Post(ctx, "/api/participants", bodyJSON)
+	response, err := this.httpClient.Post(ctx, "/api/participants", bodyJSON)
 	if err != nil {
 		return "", fmt.Errorf("cannot post participant to broker: %w", err)
 	}

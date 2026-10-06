@@ -17,13 +17,13 @@ func NewRecordDeploymentClient(httpClient *components.HTTPClient) *RecordDeploym
 	return &RecordDeploymentClient{httpClient: httpClient}
 }
 
-func (c *RecordDeploymentClient) Record(ctx context.Context, requestBody *RecordDeploymentRequestBody) (string, error) {
+func (this *RecordDeploymentClient) Record(ctx context.Context, requestBody *RecordDeploymentRequestBody) (string, error) {
 	bodyJSON, err := json.Marshal(requestBody)
 	if err != nil {
 		return "", fmt.Errorf("cannot serialize deployment to JSON: %w", err)
 	}
 
-	response, err := c.httpClient.Post(ctx, "/api/deployments", bodyJSON)
+	response, err := this.httpClient.Post(ctx, "/api/deployments", bodyJSON)
 	if err != nil {
 		return "", fmt.Errorf("cannot post deployment to broker: %w", err)
 	}
