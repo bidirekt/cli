@@ -10,6 +10,8 @@ import (
 	"github.com/bidirekt/cli/internal/features/configure"
 	"github.com/bidirekt/cli/internal/features/create_environment"
 	"github.com/bidirekt/cli/internal/features/create_participant"
+	"github.com/bidirekt/cli/internal/features/list_environments"
+	"github.com/bidirekt/cli/internal/features/list_participants"
 	"github.com/bidirekt/cli/internal/features/publish_contract"
 	"github.com/bidirekt/cli/internal/features/record_deployment"
 	"github.com/bidirekt/cli/internal/features/rename_participant"
@@ -80,6 +82,8 @@ func newRootCommand(dependencies *components.Components) *cobra.Command {
 	can_i_deploy.Register(rootCommand, dependencies)
 	validate_contract.Register(rootCommand, dependencies)
 	rename_participant.Register(rootCommand, dependencies)
+	list_participants.Register(rootCommand, dependencies)
+	list_environments.Register(rootCommand, dependencies)
 	configure.Register(rootCommand, dependencies)
 	rootCommand.AddCommand(&cobra.Command{
 		Use:   "version",
