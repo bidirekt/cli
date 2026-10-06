@@ -2,12 +2,10 @@ package validate_contract
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/bidirekt/cli/internal/contractfiles"
-	"github.com/bidirekt/cli/internal/paint"
 	"github.com/bidirekt/cli/internal/reports"
 	"github.com/spf13/cobra"
 )
@@ -45,35 +43,12 @@ func NewValidateCommand(validateContractClient *ValidateContractClient) *cobra.C
 
 		response, err := validateContractClient.ValidateContract(ctx, requestBody)
 		if err != nil {
-			var validationFailed *reports.ValidationFailedError
-			if errors.As(err, &validationFailed) {
-				errWriter := command.ErrOrStderr()
-				if _, err := fmt.Fprint(errWriter, reports.FormatValidationFailedReport(paint.For(errWriter), validationFailed.Message, validationFailed.Violations)); err != nil {
-					return err
-				}
-
-				return reports.ErrSilent
-			}
-
-			return err
+			return reports.WriteValidationFailed(command.ErrOrStderr(), err)
 		}
 
 		checkedSideLabel := participant + " local contract"
-		writer := command.OutOrStdout()
 
-		if !response.Deployable {
-			if _, err := fmt.Fprint(writer, reports.FormatNotDeployableReport(paint.For(writer), checkedSideLabel, participant, environment, response.Results)); err != nil {
-				return err
-			}
-
-			return reports.ErrSilent
-		}
-
-		if _, err := fmt.Fprintln(writer, reports.FormatDeployableLine(paint.For(writer), checkedSideLabel, environment)); err != nil {
-			return err
-		}
-
-		return nil
+		return reports.WriteVerdict(command.OutOrStdout(), checkedSideLabel, participant, environment, response.Deployable, response.Results)
 	}
 
 	command := &cobra.Command{

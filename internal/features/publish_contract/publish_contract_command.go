@@ -2,7 +2,6 @@ package publish_contract
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -46,17 +45,7 @@ func NewPublishCommand(publishContractClient *PublishContractClient) *cobra.Comm
 
 		message, err := publishContractClient.PublishContract(ctx, requestBody)
 		if err != nil {
-			var validationFailed *reports.ValidationFailedError
-			if errors.As(err, &validationFailed) {
-				errWriter := command.ErrOrStderr()
-				if _, err := fmt.Fprint(errWriter, reports.FormatValidationFailedReport(paint.For(errWriter), validationFailed.Message, validationFailed.Violations)); err != nil {
-					return err
-				}
-
-				return reports.ErrSilent
-			}
-
-			return err
+			return reports.WriteValidationFailed(command.ErrOrStderr(), err)
 		}
 
 		writer := command.OutOrStdout()
