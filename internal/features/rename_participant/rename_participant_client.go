@@ -17,13 +17,13 @@ func NewRenameParticipantClient(httpClient *components.HTTPClient) *RenamePartic
 	return &RenameParticipantClient{httpClient: httpClient}
 }
 
-func (c *RenameParticipantClient) Rename(ctx context.Context, requestBody *RenameParticipantRequestBody) (string, error) {
+func (this *RenameParticipantClient) Rename(ctx context.Context, requestBody *RenameParticipantRequestBody) (string, error) {
 	body, err := json.Marshal(requestBody)
 	if err != nil {
 		return "", fmt.Errorf("cannot serialize participant rename to JSON: %w", err)
 	}
 
-	resp, err := c.httpClient.Post(ctx, "/api/participants/rename", body)
+	resp, err := this.httpClient.Post(ctx, "/api/participants/rename", body)
 	if err != nil {
 		return "", fmt.Errorf("cannot post participant rename to broker: %w", err)
 	}

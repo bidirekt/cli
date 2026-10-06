@@ -17,7 +17,7 @@ func NewCreateEnvironmentClient(httpClient *components.HTTPClient) *CreateEnviro
 	return &CreateEnvironmentClient{httpClient: httpClient}
 }
 
-func (c *CreateEnvironmentClient) Create(
+func (this *CreateEnvironmentClient) Create(
 	ctx context.Context,
 	requestBody *CreateEnvironmentRequestBody,
 ) (string, error) {
@@ -26,7 +26,7 @@ func (c *CreateEnvironmentClient) Create(
 		return "", fmt.Errorf("cannot serialize environment to JSON: %w", err)
 	}
 
-	response, err := c.httpClient.Post(ctx, "/api/environments", bodyJSON)
+	response, err := this.httpClient.Post(ctx, "/api/environments", bodyJSON)
 	if err != nil {
 		return "", fmt.Errorf("cannot post environment to broker: %w", err)
 	}
