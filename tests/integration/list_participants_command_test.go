@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"bytes"
+	"errors"
 	"net/http"
 	"testing"
 
@@ -85,6 +86,7 @@ func TestListParticipantsCommand(t *testing.T) {
 		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
+		httpmock.RegisterNoResponder(httpmock.NewErrorResponder(errors.New("unexpected request to the broker")))
 
 		command := list_participants.NewListParticipantsCommand(list_participants.NewListParticipantsClient(httpClient))
 		var out, errOut bytes.Buffer
