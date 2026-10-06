@@ -49,20 +49,7 @@ func NewCanIDeployCommand(client *CanIDeployClient) *cobra.Command {
 
 		checkedSideLabel := participant + " " + version
 
-		if !resp.Deployable {
-			writer := command.OutOrStdout()
-			if _, err := fmt.Fprint(writer, reports.FormatNotDeployableReport(paint.For(writer), checkedSideLabel, participant, environment, resp.Results)); err != nil {
-				return err
-			}
-			return reports.ErrSilent
-		}
-
-		writer := command.OutOrStdout()
-		if _, err := fmt.Fprintln(writer, reports.FormatDeployableLine(paint.For(writer), checkedSideLabel, environment)); err != nil {
-			return err
-		}
-
-		return nil
+		return reports.WriteVerdict(command.OutOrStdout(), checkedSideLabel, participant, environment, resp.Deployable, resp.Results)
 	}
 
 	command := &cobra.Command{

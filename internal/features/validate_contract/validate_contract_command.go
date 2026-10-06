@@ -1,4 +1,4 @@
-package publish_contract
+package validate_contract
 
 import (
 	"context"
@@ -6,15 +6,13 @@ import (
 	"time"
 
 	"github.com/bidirekt/cli/internal/contractfiles"
-	"github.com/bidirekt/cli/internal/paint"
 	"github.com/bidirekt/cli/internal/reports"
 	"github.com/spf13/cobra"
 )
 
 const requestTimeout = 30 * time.Second
 
-func NewPublishCommand(publishContractClient *PublishContractClient) *cobra.Command {
-
+func NewValidateCommand(validateContractClient *ValidateContractClient) *cobra.Command {
 	commandHandler := func(command *cobra.Command, args []string) error {
 		command.SilenceUsage = true
 		command.SilenceErrors = true
@@ -29,45 +27,41 @@ func NewPublishCommand(publishContractClient *PublishContractClient) *cobra.Comm
 			return fmt.Errorf("get participant: %w", err)
 		}
 
-		version, err := command.Flags().GetString("version")
+		environment, err := command.Flags().GetString("environment")
 		if err != nil {
-			return fmt.Errorf("get version: %w", err)
+			return fmt.Errorf("get environment: %w", err)
 		}
 
 		ctx, cancel := context.WithTimeout(command.Context(), requestTimeout)
 		defer cancel()
 
-		requestBody := &PublishContractRequestBody{
+		requestBody := &ValidateContractRequestBody{
 			Participant: participant,
-			Version:     version,
+			Environment: environment,
 			Contracts:   contracts,
 		}
 
-		message, err := publishContractClient.PublishContract(ctx, requestBody)
+		response, err := validateContractClient.ValidateContract(ctx, requestBody)
 		if err != nil {
 			return reports.WriteValidationFailed(command.ErrOrStderr(), err)
 		}
 
-		writer := command.OutOrStdout()
-		brush := paint.For(writer)
-		if _, err := fmt.Fprintln(writer, brush.Green(participant+" "+message)); err != nil {
-			return err
-		}
+		checkedSideLabel := participant + " local contract"
 
-		return nil
+		return reports.WriteVerdict(command.OutOrStdout(), checkedSideLabel, participant, environment, response.Deployable, response.Results)
 	}
 
 	command := &cobra.Command{
-		Use:   "publish [file...]",
-		Short: "Publish one or more contract YAML files to the broker",
+		Use:   "validate [file...]",
+		Short: "Validate contract YAML files against an environment without publishing them",
 		Args:  cobra.MinimumNArgs(1),
 		RunE:  commandHandler,
 	}
 
 	command.Flags().String("participant", "", "Participant name (required)")
-	command.Flags().String("version", "", "Contract version, e.g. a commit hash or semver tag (required)")
-	_ = command.MarkFlagRequired("participant")
-	_ = command.MarkFlagRequired("version")
+	command.Flags().String("environment", "", "Target environment name (required)")
+	cobra.CheckErr(command.MarkFlagRequired("participant"))
+	cobra.CheckErr(command.MarkFlagRequired("environment"))
 
 	return command
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/bidirekt/cli/internal/features/publish_contract"
 	"github.com/bidirekt/cli/internal/features/record_deployment"
 	"github.com/bidirekt/cli/internal/features/rename_participant"
+	"github.com/bidirekt/cli/internal/features/validate_contract"
 	"github.com/bidirekt/cli/internal/paint"
 	"github.com/bidirekt/cli/internal/reports"
 	"github.com/spf13/cobra"
@@ -77,6 +78,7 @@ func newRootCommand(dependencies *components.Components) *cobra.Command {
 	publish_contract.Register(rootCommand, dependencies)
 	record_deployment.Register(rootCommand, dependencies)
 	can_i_deploy.Register(rootCommand, dependencies)
+	validate_contract.Register(rootCommand, dependencies)
 	rename_participant.Register(rootCommand, dependencies)
 	configure.Register(rootCommand, dependencies)
 	rootCommand.AddCommand(&cobra.Command{
