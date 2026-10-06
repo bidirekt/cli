@@ -7,6 +7,7 @@ import (
 
 	"github.com/bidirekt/cli/internal/components"
 	"github.com/bidirekt/cli/internal/features/can_i_deploy"
+	"github.com/bidirekt/cli/internal/reports"
 	"github.com/jarcoal/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -60,7 +61,7 @@ func TestCanIDeployCommandRemovedResourceStillConsumed(t *testing.T) {
 
 	err := command.Execute()
 
-	require.ErrorIs(t, err, can_i_deploy.ErrSilent)
+	require.ErrorIs(t, err, reports.ErrSilent)
 	assert.Equal(t, `orders-api v2 cannot be deployed to production
 
 orders-web (v7, deployed):

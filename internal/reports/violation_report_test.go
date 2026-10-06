@@ -1,4 +1,4 @@
-package publish_contract
+package reports
 
 import (
 	"bytes"
@@ -11,7 +11,7 @@ import (
 func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
 	const allowedTypes = "object, array, string, integer, float, boolean"
 
-	report := formatValidationFailedReport(paint.For(&bytes.Buffer{}), "contract validation failed", []Violation{
+	report := FormatValidationFailedReport(paint.For(&bytes.Buffer{}), "contract validation failed", []Violation{
 		{Code: "key.unknown", Path: "provides;rest;/pets;patch", Source: "api.yaml", Details: map[string]string{"key": "patch"}},
 		{Code: "value.invalid_kind", Path: "provides;rest;/pets;get", Source: "api.yaml", Details: map[string]string{"expected": "mapping", "got": "string"}},
 		{Code: "endpoint.syntax", Path: "provides;rest;/users/{userId}", Source: "api.yaml", Details: map[string]string{"key": "/users/{userId}", "error": "dynamic path segments must use *"}},
@@ -47,7 +47,7 @@ func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
 }
 
 func TestFormatValidationFailedReportOmitsTheSourceWhenEmpty(t *testing.T) {
-	report := formatValidationFailedReport(paint.For(&bytes.Buffer{}), "contract validation failed", []Violation{
+	report := FormatValidationFailedReport(paint.For(&bytes.Buffer{}), "contract validation failed", []Violation{
 		{Code: "schema.array_without_items", Path: "schemas;Pets"},
 	})
 
@@ -60,7 +60,7 @@ func TestFormatValidationFailedReportPaintsTheHeadlineRed(t *testing.T) {
 	t.Setenv("NO_COLOR", "")
 	t.Setenv("CLICOLOR_FORCE", "1")
 
-	report := formatValidationFailedReport(paint.For(&bytes.Buffer{}), "contract validation failed", []Violation{
+	report := FormatValidationFailedReport(paint.For(&bytes.Buffer{}), "contract validation failed", []Violation{
 		{Code: "schema.array_without_items", Path: "schemas;Pets"},
 	})
 
@@ -73,7 +73,7 @@ func TestFormatViolationLine(t *testing.T) {
 	const allowedTypes = "object, array, string, integer, float, boolean"
 
 	t.Run("key.unknown", func(t *testing.T) {
-		headline, explanation := formatViolationLine(Violation{
+		headline, explanation := FormatViolationLine(Violation{
 			Code:    "key.unknown",
 			Path:    "provides;rest;/pets;patch",
 			Source:  "api.yaml",
@@ -85,7 +85,7 @@ func TestFormatViolationLine(t *testing.T) {
 	})
 
 	t.Run("key.unknown at the root has no location", func(t *testing.T) {
-		headline, explanation := formatViolationLine(Violation{
+		headline, explanation := FormatViolationLine(Violation{
 			Code:    "key.unknown",
 			Path:    "version",
 			Source:  "api.yaml",
@@ -97,7 +97,7 @@ func TestFormatViolationLine(t *testing.T) {
 	})
 
 	t.Run("value.invalid_kind", func(t *testing.T) {
-		headline, explanation := formatViolationLine(Violation{
+		headline, explanation := FormatViolationLine(Violation{
 			Code:    "value.invalid_kind",
 			Path:    "provides;rest;/pets;get",
 			Source:  "api.yaml",
@@ -109,7 +109,7 @@ func TestFormatViolationLine(t *testing.T) {
 	})
 
 	t.Run("endpoint.syntax", func(t *testing.T) {
-		headline, explanation := formatViolationLine(Violation{
+		headline, explanation := FormatViolationLine(Violation{
 			Code:    "endpoint.syntax",
 			Path:    "provides;rest;/users/{userId}",
 			Source:  "api.yaml",
@@ -121,7 +121,7 @@ func TestFormatViolationLine(t *testing.T) {
 	})
 
 	t.Run("service.name_syntax", func(t *testing.T) {
-		headline, explanation := formatViolationLine(Violation{
+		headline, explanation := FormatViolationLine(Violation{
 			Code:    "service.name_syntax",
 			Path:    "consumes;Payments-API",
 			Source:  "api.yaml",
@@ -133,7 +133,7 @@ func TestFormatViolationLine(t *testing.T) {
 	})
 
 	t.Run("status.out_of_range", func(t *testing.T) {
-		headline, explanation := formatViolationLine(Violation{
+		headline, explanation := FormatViolationLine(Violation{
 			Code:    "status.out_of_range",
 			Path:    "provides;rest;/pets;get;responses;999",
 			Source:  "api.yaml",
@@ -145,7 +145,7 @@ func TestFormatViolationLine(t *testing.T) {
 	})
 
 	t.Run("schema.invalid_type", func(t *testing.T) {
-		headline, explanation := formatViolationLine(Violation{
+		headline, explanation := FormatViolationLine(Violation{
 			Code:    "schema.invalid_type",
 			Path:    "schemas;Pet;properties;id;type",
 			Source:  "api.yaml",
@@ -157,7 +157,7 @@ func TestFormatViolationLine(t *testing.T) {
 	})
 
 	t.Run("schema.invalid_type without a value reports the type as missing", func(t *testing.T) {
-		headline, explanation := formatViolationLine(Violation{
+		headline, explanation := FormatViolationLine(Violation{
 			Code:    "schema.invalid_type",
 			Path:    "schemas;Pet;properties;tags;items",
 			Source:  "api.yaml",
@@ -169,7 +169,7 @@ func TestFormatViolationLine(t *testing.T) {
 	})
 
 	t.Run("schema.array_without_items", func(t *testing.T) {
-		headline, explanation := formatViolationLine(Violation{
+		headline, explanation := FormatViolationLine(Violation{
 			Code:   "schema.array_without_items",
 			Path:   "schemas;Pets",
 			Source: "api.yaml",
@@ -180,7 +180,7 @@ func TestFormatViolationLine(t *testing.T) {
 	})
 
 	t.Run("resource.duplicate", func(t *testing.T) {
-		headline, explanation := formatViolationLine(Violation{
+		headline, explanation := FormatViolationLine(Violation{
 			Code:    "resource.duplicate",
 			Path:    "provides;rest;/pets;get;responses;200",
 			Source:  "store.yaml",
@@ -192,7 +192,7 @@ func TestFormatViolationLine(t *testing.T) {
 	})
 
 	t.Run("resource.duplicate in the same file", func(t *testing.T) {
-		headline, explanation := formatViolationLine(Violation{
+		headline, explanation := FormatViolationLine(Violation{
 			Code:    "resource.duplicate",
 			Path:    "provides;rest;/pets;get;responses;200",
 			Source:  "pets.yaml",
@@ -204,7 +204,7 @@ func TestFormatViolationLine(t *testing.T) {
 	})
 
 	t.Run("resource.type_conflict", func(t *testing.T) {
-		headline, explanation := formatViolationLine(Violation{
+		headline, explanation := FormatViolationLine(Violation{
 			Code:   "resource.type_conflict",
 			Path:   "consumes;payments;rest;/invoices;get;responses;200",
 			Source: "b.yaml",
@@ -222,7 +222,7 @@ func TestFormatViolationLine(t *testing.T) {
 	})
 
 	t.Run("schema.duplicate", func(t *testing.T) {
-		headline, explanation := formatViolationLine(Violation{
+		headline, explanation := FormatViolationLine(Violation{
 			Code:    "schema.duplicate",
 			Path:    "schemas;Pet",
 			Source:  "schemas.yaml",
@@ -234,7 +234,7 @@ func TestFormatViolationLine(t *testing.T) {
 	})
 
 	t.Run("schema.duplicate in the same file", func(t *testing.T) {
-		headline, explanation := formatViolationLine(Violation{
+		headline, explanation := FormatViolationLine(Violation{
 			Code:    "schema.duplicate",
 			Path:    "schemas;Pet",
 			Source:  "schemas.yaml",
@@ -246,7 +246,7 @@ func TestFormatViolationLine(t *testing.T) {
 	})
 
 	t.Run("schema.unresolved_name", func(t *testing.T) {
-		headline, explanation := formatViolationLine(Violation{
+		headline, explanation := FormatViolationLine(Violation{
 			Code:    "schema.unresolved_name",
 			Path:    "provides;rest;/pets;get;responses;200",
 			Source:  "pets.yaml",
@@ -258,7 +258,7 @@ func TestFormatViolationLine(t *testing.T) {
 	})
 
 	t.Run("schema.unresolved_ref", func(t *testing.T) {
-		headline, explanation := formatViolationLine(Violation{
+		headline, explanation := FormatViolationLine(Violation{
 			Code:    "schema.unresolved_ref",
 			Path:    "schemas;Invoice;properties;payment",
 			Source:  "billing.yaml",
@@ -270,7 +270,7 @@ func TestFormatViolationLine(t *testing.T) {
 	})
 
 	t.Run("schema.too_deep", func(t *testing.T) {
-		headline, explanation := formatViolationLine(Violation{
+		headline, explanation := FormatViolationLine(Violation{
 			Code:    "schema.too_deep",
 			Path:    "schemas;Owner",
 			Source:  "schemas.yaml",
@@ -282,7 +282,7 @@ func TestFormatViolationLine(t *testing.T) {
 	})
 
 	t.Run("unknown code falls back to the code with its sorted details", func(t *testing.T) {
-		headline, explanation := formatViolationLine(Violation{
+		headline, explanation := FormatViolationLine(Violation{
 			Code:    "something.new",
 			Path:    "provides;rest;/pets",
 			Source:  "api.yaml",
@@ -294,7 +294,7 @@ func TestFormatViolationLine(t *testing.T) {
 	})
 
 	t.Run("unknown code without details", func(t *testing.T) {
-		headline, explanation := formatViolationLine(Violation{
+		headline, explanation := FormatViolationLine(Violation{
 			Code:   "something.new",
 			Path:   "provides;rest;/pets",
 			Source: "api.yaml",
@@ -305,7 +305,7 @@ func TestFormatViolationLine(t *testing.T) {
 	})
 
 	t.Run("unknown code without path", func(t *testing.T) {
-		headline, explanation := formatViolationLine(Violation{
+		headline, explanation := FormatViolationLine(Violation{
 			Code:    "something.new",
 			Source:  "api.yaml",
 			Details: map[string]string{"hint": "x"},
@@ -316,7 +316,7 @@ func TestFormatViolationLine(t *testing.T) {
 	})
 
 	t.Run("unknown code without path or details", func(t *testing.T) {
-		headline, explanation := formatViolationLine(Violation{
+		headline, explanation := FormatViolationLine(Violation{
 			Code:   "something.new",
 			Source: "api.yaml",
 		})

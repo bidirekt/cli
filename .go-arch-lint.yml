@@ -20,6 +20,10 @@ components:
     in: internal/components
   paint:
     in: internal/paint
+  reports:
+    in: internal/reports
+  contractfiles:
+    in: internal/contractfiles
   features:
     in: internal/features/*
   tests:
@@ -32,6 +36,7 @@ deps:
     mayDependOn:
       - components
       - paint
+      - reports
       - features
     canUse:
       - cobra
@@ -40,6 +45,8 @@ deps:
     mayDependOn:
       - components
       - paint
+      - reports
+      - contractfiles
     canUse:
       - cobra
       - testify
@@ -49,6 +56,11 @@ deps:
   paint:
     mayDependOn:
       - components
+  reports:
+    mayDependOn:
+      - paint
+    canUse:
+      - testify
   tests:
     anyProjectDeps: true
     canUse:

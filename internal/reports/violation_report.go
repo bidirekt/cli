@@ -1,4 +1,4 @@
-package publish_contract
+package reports
 
 import (
 	"fmt"
@@ -8,12 +8,19 @@ import (
 	"github.com/bidirekt/cli/internal/paint"
 )
 
-func formatValidationFailedReport(brush paint.Brush, message string, violations []Violation) string {
+type Violation struct {
+	Code    string            `json:"code"`
+	Path    string            `json:"path"`
+	Source  string            `json:"source"`
+	Details map[string]string `json:"details"`
+}
+
+func FormatValidationFailedReport(brush paint.Brush, message string, violations []Violation) string {
 	var report strings.Builder
 	report.WriteString(brush.Red(message) + "\n")
 
 	for _, violation := range violations {
-		headline, explanation := formatViolationLine(violation)
+		headline, explanation := FormatViolationLine(violation)
 
 		report.WriteString("  - ")
 		if violation.Source != "" {
@@ -29,7 +36,7 @@ func formatValidationFailedReport(brush paint.Brush, message string, violations 
 	return report.String()
 }
 
-func formatViolationLine(violation Violation) (headline, explanation string) {
+func FormatViolationLine(violation Violation) (headline, explanation string) {
 	details := violation.Details
 	keyAt := at(location(violation.Path, details["key"]))
 	typeAt := at(location(violation.Path, "type"))

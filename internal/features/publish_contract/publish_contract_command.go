@@ -4,20 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 	"time"
 
+	"github.com/bidirekt/cli/internal/contractfiles"
 	"github.com/bidirekt/cli/internal/paint"
+	"github.com/bidirekt/cli/internal/reports"
 	"github.com/spf13/cobra"
 )
 
 const requestTimeout = 30 * time.Second
-
-var ErrSilent = errors.New("failure already reported")
-
-var supportedFileExtensions = map[string]bool{".yaml": true, ".yml": true}
 
 func NewPublishCommand(publishContractClient *PublishContractClient) *cobra.Command {
 
@@ -25,22 +20,9 @@ func NewPublishCommand(publishContractClient *PublishContractClient) *cobra.Comm
 		command.SilenceUsage = true
 		command.SilenceErrors = true
 
-		contracts := make([]ContractFragment, 0, len(args))
-
-		for _, filePath := range args {
-			if !supportedFileExtensions[strings.ToLower(filepath.Ext(filePath))] {
-				return fmt.Errorf("unsupported contract file extension: %q", filePath)
-			}
-
-			contractFileContent, err := os.ReadFile(filePath)
-			if err != nil {
-				return fmt.Errorf("read contract file: %w", err)
-			}
-
-			contracts = append(contracts, ContractFragment{
-				Source:  filePath,
-				Content: string(contractFileContent),
-			})
+		contracts, err := contractfiles.ToContractFragments(args)
+		if err != nil {
+			return err
 		}
 
 		participant, err := command.Flags().GetString("participant")
@@ -64,14 +46,14 @@ func NewPublishCommand(publishContractClient *PublishContractClient) *cobra.Comm
 
 		message, err := publishContractClient.PublishContract(ctx, requestBody)
 		if err != nil {
-			var validationFailed *ValidationFailedError
+			var validationFailed *reports.ValidationFailedError
 			if errors.As(err, &validationFailed) {
 				errWriter := command.ErrOrStderr()
-				if _, err := fmt.Fprint(errWriter, formatValidationFailedReport(paint.For(errWriter), validationFailed.Message, validationFailed.Violations)); err != nil {
+				if _, err := fmt.Fprint(errWriter, reports.FormatValidationFailedReport(paint.For(errWriter), validationFailed.Message, validationFailed.Violations)); err != nil {
 					return err
 				}
 
-				return ErrSilent
+				return reports.ErrSilent
 			}
 
 			return err
