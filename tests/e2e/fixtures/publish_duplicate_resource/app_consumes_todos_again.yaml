@@ -1,0 +1,7 @@
+consumes:
+  ${API}:
+    rest:
+      "/todos":
+        get:
+          responses:
+            "200": Todos

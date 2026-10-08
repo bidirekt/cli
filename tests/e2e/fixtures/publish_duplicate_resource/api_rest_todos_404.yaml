@@ -1,0 +1,6 @@
+provides:
+  rest:
+    "/todos":
+      post:
+        responses:
+          "404": Message

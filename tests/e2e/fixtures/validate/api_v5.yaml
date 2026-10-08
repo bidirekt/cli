@@ -1,0 +1,23 @@
+provides:
+  rest:
+    /pets/*:
+      get:
+        responses:
+          200: Pet
+
+schemas:
+  Pet:
+    type: object
+    properties:
+      petId:
+        type: integer
+      name:
+        type: string
+      status:
+        type: string
+      weight:
+        type: float
+      tags:
+        type: array
+        items:
+          type: string

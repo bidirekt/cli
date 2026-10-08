@@ -1,0 +1,33 @@
+consumes:
+  ${API}:
+    rest:
+      /pets/*:
+        get:
+          responses:
+            200: Pet
+      /pets:
+        post:
+          request: NewPet
+          responses:
+            201: CreatedPet
+
+schemas:
+  Pet:
+    type: object
+    properties:
+      name:
+        type: string
+      status:
+        type: string
+  NewPet:
+    type: object
+    properties:
+      name:
+        type: string
+      ownerId:
+        type: integer
+  CreatedPet:
+    type: object
+    properties:
+      petId:
+        type: integer

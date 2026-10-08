@@ -1,0 +1,8 @@
+schemas:
+  Loop:
+    type: object
+    properties:
+      title:
+        type: string
+      next:
+        ref: Loop

@@ -1,0 +1,6 @@
+schemas:
+  Message:
+    type: object
+    properties:
+      message:
+        type: string
