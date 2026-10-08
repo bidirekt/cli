@@ -1,0 +1,7 @@
+provides:
+  rest:
+    "/todos":
+      post:
+        request: NewTodo
+        responses:
+          "200": Todo

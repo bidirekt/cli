@@ -1,0 +1,8 @@
+schemas:
+  Team:
+    type: object
+    properties:
+      name:
+        type: string
+      owner:
+        ref: Person

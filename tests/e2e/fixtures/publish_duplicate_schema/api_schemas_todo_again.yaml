@@ -1,0 +1,10 @@
+schemas:
+  Todo:
+    type: object
+    properties:
+      todoId:
+        type: integer
+      title:
+        type: string
+      archived:
+        type: boolean

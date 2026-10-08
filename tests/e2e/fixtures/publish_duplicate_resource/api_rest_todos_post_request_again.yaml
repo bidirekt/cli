@@ -1,0 +1,5 @@
+provides:
+  rest:
+    "/todos":
+      post:
+        request: CreateTodoRequest

@@ -1,0 +1,75 @@
+provides:
+  rest:
+    "/todos":
+      get:
+        responses:
+          "200": Todos
+      post:
+        request: CreateTodoRequest
+        responses:
+          "200": Todo
+      put:
+        request: UpdateTodoRequest
+        responses:
+          "200": Todo
+    "/todos/stats":
+      get:
+        responses:
+          "200": Stats
+    "/todos/*":
+      get:
+        responses:
+          "200": Todo
+      put:
+        request: UpdateTodoRequest
+        responses:
+          "200": Todo
+      delete:
+        responses:
+          "200": Message
+
+schemas:
+  Todo:
+    type: object
+    properties:
+      todoId:
+        type: integer
+      title:
+        type: string
+      completed:
+        type: boolean
+      tags:
+        type: array
+        items:
+          type: string
+
+  Todos:
+    type: array
+    items:
+      ref: Todo
+
+  Stats:
+    type: object
+    properties:
+      total:
+        type: integer
+
+  CreateTodoRequest:
+    type: object
+    properties:
+      title:
+        type: string
+
+  UpdateTodoRequest:
+    type: object
+    properties:
+      title:
+        type: string
+      completed:
+        type: boolean
+
+  Message:
+    type: object
+    properties:
+      message:
+        type: string

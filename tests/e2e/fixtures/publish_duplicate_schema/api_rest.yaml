@@ -1,0 +1,14 @@
+provides:
+  rest:
+    "/todos":
+      get:
+        responses:
+          "200": Todos
+      post:
+        request: CreateTodoRequest
+        responses:
+          "200": Todo
+    "/todos/*":
+      delete:
+        responses:
+          "200": Message

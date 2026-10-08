@@ -1,0 +1,35 @@
+provides:
+  rest:
+    /pets/*:
+      get:
+        responses:
+          200: Pets
+    /pets:
+      post:
+        request: NewPet
+        responses:
+          201: Pet
+
+schemas:
+  Pet:
+    type: object
+    properties:
+      petId:
+        type: integer
+      name:
+        type: string
+      status:
+        type: string
+      weight:
+        type: float
+      tags:
+        type: array
+        items:
+          type: string
+  NewPet:
+    type: object
+    properties:
+      name:
+        type: string
+      ownerId:
+        type: integer

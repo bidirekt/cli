@@ -1,0 +1,6 @@
+provides:
+  rest:
+    "/todos":
+      get:
+        responses:
+          "200": TodoList

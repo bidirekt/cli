@@ -1,0 +1,6 @@
+provides:
+  rest:
+    "/loops":
+      get:
+        responses:
+          "200": Loop

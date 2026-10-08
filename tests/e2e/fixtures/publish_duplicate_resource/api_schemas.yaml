@@ -1,0 +1,27 @@
+schemas:
+  Todo:
+    type: object
+    properties:
+      todoId:
+        type: integer
+      title:
+        type: string
+      completed:
+        type: boolean
+
+  Todos:
+    type: array
+    items:
+      ref: Todo
+
+  CreateTodoRequest:
+    type: object
+    properties:
+      title:
+        type: string
+
+  Message:
+    type: object
+    properties:
+      message:
+        type: string

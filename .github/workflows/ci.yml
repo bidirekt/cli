@@ -67,3 +67,26 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - run: shellcheck install.sh
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: |
+          go build -o "$RUNNER_TEMP/bin/bidirekt" ./cmd/bidirekt
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - run: docker compose -f tests/e2e/compose.yaml up -d --wait
+      - uses: bats-core/bats-action@4.0.0
+        id: bats
+        with:
+          bats-version: 1.14.0
+      - run: bats tests/e2e
+        env:
+          BIDIREKT_BROKER_URL: http://localhost:8080
+          BATS_LIB_PATH: ${{ steps.bats.outputs.lib-path }}
+      - if: failure()
+        run: docker compose -f tests/e2e/compose.yaml logs broker

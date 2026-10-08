@@ -1,0 +1,7 @@
+provides:
+  rest:
+    "/todos/*":
+      put:
+        request: UpdateTodoRequest
+        responses:
+          "200": Todo
