@@ -10,7 +10,7 @@ The `pre-push` hook runs the same gates as CI (`gofmt`, `go vet`, `golangci-lint
 
 ## E2E tests
 
-The end-to-end suite in `tests/e2e` runs the CLI against the released broker image, `ghcr.io/bidirekt/broker:latest`. It needs Docker, bats, bats-support, bats-assert and gettext (for `envsubst`).
+The end-to-end suite in `tests/e2e` runs the CLI against a released broker image, `ghcr.io/bidirekt/broker:0.1.0-rc.1`. It needs Docker, bats, bats-support, bats-assert and gettext (for `envsubst`).
 
 On macOS, Homebrew installs bats and gettext but has no bats-support or bats-assert, so clone those at the versions CI uses into one folder and point `BATS_LIB_PATH` at it:
 
