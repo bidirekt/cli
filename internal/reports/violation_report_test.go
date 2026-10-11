@@ -19,6 +19,8 @@ func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
 		{Code: "status.out_of_range", Path: "provides;rest;/pets;get;responses;999", Source: "api.yaml", Details: map[string]string{"key": "999", "error": "must be between 100 and 599"}},
 		{Code: "schema.invalid_type", Path: "schemas;Pet;properties;id;type", Source: "api.yaml", Details: map[string]string{"value": "strng", "allowed": allowedTypes}},
 		{Code: "schema.array_without_items", Path: "schemas;Pets", Source: "api.yaml"},
+		{Code: "schema.values_with_properties", Path: "schemas;Inventory", Source: "api.yaml"},
+		{Code: "schema.values_without_object", Path: "schemas;Owner;properties;pets", Source: "api.yaml"},
 		{Code: "resource.duplicate", Path: "provides;rest;/pets;get;responses;200", Source: "store.yaml", Details: map[string]string{"resource": "provides GET /pets 200", "declaredIn": "pets.yaml"}},
 		{Code: "resource.type_conflict", Path: "consumes;payments;rest;/invoices;get;responses;200", Source: "b.yaml", Details: map[string]string{"resource": "consumes payments GET /invoices 200", "property": "$.id", "type": "integer", "declaredIn": "a.yaml", "declaredType": "string"}},
 		{Code: "schema.duplicate", Path: "schemas;Pet", Source: "schemas.yaml", Details: map[string]string{"schema": "Pet", "declaredIn": "billing.yaml"}},
@@ -36,6 +38,8 @@ func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
   - api.yaml: invalid status code "999" at provides rest /pets get responses, must be between 100 and 599
   - api.yaml: invalid value "strng" for "type" at schemas Pet properties id, expected one of: object, array, string, integer, float, boolean
   - api.yaml: array schema without items at schemas Pets
+  - api.yaml: object schema has both "values" and "properties" at schemas Inventory
+  - api.yaml: "values" on a non-object schema at schemas Owner properties pets
   - store.yaml: duplicate resource "provides GET /pets 200", also declared in pets.yaml
   - b.yaml: conflicting type for property "$.id" of consumes payments GET /invoices 200: integer here, string in a.yaml
   - schemas.yaml: duplicate schema "Pet", also declared in billing.yaml
@@ -176,6 +180,28 @@ func TestFormatViolationLine(t *testing.T) {
 		})
 
 		assert.Equal(t, `array schema without items at schemas Pets`, headline)
+		assert.Empty(t, explanation)
+	})
+
+	t.Run("schema.values_with_properties", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:   "schema.values_with_properties",
+			Path:   "schemas;Inventory",
+			Source: "api.yaml",
+		})
+
+		assert.Equal(t, `object schema has both "values" and "properties" at schemas Inventory`, headline)
+		assert.Empty(t, explanation)
+	})
+
+	t.Run("schema.values_without_object", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:   "schema.values_without_object",
+			Path:   "schemas;Owner;properties;pets",
+			Source: "api.yaml",
+		})
+
+		assert.Equal(t, `"values" on a non-object schema at schemas Owner properties pets`, headline)
 		assert.Empty(t, explanation)
 	})
 
