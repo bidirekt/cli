@@ -192,6 +192,7 @@ func TestFormatBreakLine(t *testing.T) {
 	webPostsPet := checkedInteraction{participant: "petstore_web", counterpart: "petstore_api", environment: "production", method: "POST", endpoint: "/pets", isRequest: true}
 	apiReceivesPet := checkedInteraction{participant: "petstore_api", counterpart: "petstore_web", environment: "production", method: "POST", endpoint: "/pets", isRequest: true}
 	webGetsReview := checkedInteraction{participant: "petstore_web", counterpart: "petstore_reviews", environment: "production", method: "GET", endpoint: "/reviews/*"}
+	spaGetsFiles := checkedInteraction{participant: "spa", counterpart: "api", environment: "production", method: "GET", endpoint: "/files"}
 
 	tests := []struct {
 		name          string
@@ -332,6 +333,23 @@ func TestFormatBreakLine(t *testing.T) {
 			line: `petstore_api doesn't accept null at "$.birthDate", but petstore_web may send it → mark it nullable`,
 		},
 		{
+			name:        "property_missing_in_provider at the root path names the body",
+			interaction: spaGetsFiles,
+			contractBreak: ContractBreak{Reason: "property_missing_in_provider", Role: "consumer", Details: map[string]string{
+				"property": "$", "propertyType": "object", "consumerName": "spa", "providerName": "api",
+			}},
+			line: `spa reads the body, but api doesn't provide it → stop reading it, or mark it optional`,
+		},
+		{
+			name:        "property_type_mismatch at the root path names the body",
+			interaction: spaGetsFiles,
+			contractBreak: ContractBreak{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
+				"property": "$", "consumerPropertyType": "object", "providerPropertyType": "array<object>",
+				"consumerName": "spa", "providerName": "api",
+			}},
+			line: `spa reads the body as object, but api provides array<object> → read it as array<object>`,
+		},
+		{
 			name:          "provider_resource_not_found as consumer",
 			interaction:   webGetsReview,
 			contractBreak: ContractBreak{Reason: "provider_resource_not_found", Role: "consumer"},
@@ -372,6 +390,14 @@ func TestFormatBreakLine(t *testing.T) {
 				"property": "$.photoUrl", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
 			}},
 			line: `property_missing_in_provider (consumerName: petstore_web, property: $.photoUrl, propertyType: string, providerName: petstore_api)`,
+		},
+		{
+			name:        "fallback keeps the raw root path",
+			interaction: spaGetsFiles,
+			contractBreak: ContractBreak{Reason: "property_missing_in_provider", Role: "observer", Details: map[string]string{
+				"property": "$", "propertyType": "object", "consumerName": "spa", "providerName": "api",
+			}},
+			line: `property_missing_in_provider (consumerName: spa, property: $, propertyType: object, providerName: api)`,
 		},
 		{
 			name:          "unknown reason falls back to the bare reason",
