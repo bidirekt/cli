@@ -5,6 +5,8 @@ import (
 	"github.com/bidirekt/cli/internal/reports"
 )
 
+const contractParticipantNotFound = "contract participant not found"
+
 type PublishContractRequestBody struct {
 	Participant string                           `json:"participant"`
 	Version     string                           `json:"version"`
