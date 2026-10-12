@@ -71,7 +71,7 @@ setup() {
 @test "todo_api v2 blocked: title optional in the provider, required by the consumer" {
   run bidirekt can-i-deploy "$API" --version v2 --environment "$PRODUCTION"
   assert_failure
-  assert_output --partial "$API provides \"\$.title\" only sometimes, but $APP requires it → keep it required"
+  assert_output --partial "$API provides \"\$.title\" (Todo.title) only sometimes, but $APP requires it → keep it required"
 }
 
 @test "publish todo_app v2 (accepts missing title)" {

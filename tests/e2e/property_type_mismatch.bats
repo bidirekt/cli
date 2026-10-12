@@ -71,13 +71,13 @@ setup() {
 @test "todo_app v2 blocked: type mismatch" {
   run bidirekt can-i-deploy "$APP" --version v2 --environment "$PRODUCTION"
   assert_failure
-  assert_output --partial "$APP sends \"\$.title\" as integer, but $API expects string → send string"
+  assert_output --partial "$APP sends \"\$.title\" (CreateTodoRequest.title) as integer, but $API expects string → send string"
 }
 
 @test "todo_app v2 blocked: consumer integer vs provider string" {
   run bidirekt can-i-deploy "$APP" --version v2 --environment "$PRODUCTION"
   assert_failure
-  assert_output --partial "$APP sends \"\$.title\" as integer, but $API expects string → send string"
+  assert_output --partial "$APP sends \"\$.title\" (CreateTodoRequest.title) as integer, but $API expects string → send string"
 }
 
 @test "publish todo_app v3 (title back to string)" {
@@ -103,13 +103,13 @@ setup() {
 @test "todo_api v2 blocked: type mismatch" {
   run bidirekt can-i-deploy "$API" --version v2 --environment "$PRODUCTION"
   assert_failure
-  assert_output --partial "$API provides \"\$.tags\" as string, but $APP reads array<string> → provide array<string>"
+  assert_output --partial "$API provides \"\$.tags\" (Todo.tags) as string, but $APP reads array<string> → provide array<string>"
 }
 
 @test "todo_api v2 blocked: consumer array<string> vs provider string" {
   run bidirekt can-i-deploy "$API" --version v2 --environment "$PRODUCTION"
   assert_failure
-  assert_output --partial "$API provides \"\$.tags\" as string, but $APP reads array<string> → provide array<string>"
+  assert_output --partial "$API provides \"\$.tags\" (Todo.tags) as string, but $APP reads array<string> → provide array<string>"
 }
 
 @test "publish todo_api v3 (tags back to array of strings)" {

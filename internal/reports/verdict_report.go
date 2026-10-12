@@ -114,9 +114,13 @@ func formatBreakLine(interaction checkedInteraction, contractBreak ContractBreak
 	me, other := interaction.participant, interaction.counterpart
 	resource := interaction.method + " " + interaction.endpoint
 	reason, details := contractBreak.Reason, contractBreak.Details
-	property := propertyPathPhrase(details["property"])
 	consumerType, providerType := details["consumerPropertyType"], details["providerPropertyType"]
 	asConsumer, asProvider := contractBreak.Role == "consumer", contractBreak.Role == "provider"
+	readerField := details["providerField"]
+	if asConsumer {
+		readerField = details["consumerField"]
+	}
+	property := propertyPathPhrase(details["property"], readerField)
 	onRequest, onResponse := interaction.isRequest, !interaction.isRequest
 
 	switch {
@@ -167,11 +171,15 @@ func formatBreakLine(interaction checkedInteraction, contractBreak ContractBreak
 	}
 }
 
-func propertyPathPhrase(path string) string {
+func propertyPathPhrase(path, readerField string) string {
+	phrase := strconv.Quote(path)
 	if path == "$" {
-		return "the body"
+		phrase = "the body"
 	}
-	return strconv.Quote(path)
+	if readerField != "" {
+		phrase += " (" + readerField + ")"
+	}
+	return phrase
 }
 
 // fallbackBreakLine renders a break verbatim with its details when no template matches its

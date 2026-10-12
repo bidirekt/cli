@@ -204,15 +204,15 @@ func TestFormatBreakLine(t *testing.T) {
 			name:        "property_missing_in_provider as consumer on a response",
 			interaction: webGetsPet,
 			contractBreak: ContractBreak{Reason: "property_missing_in_provider", Role: "consumer", Details: map[string]string{
-				"property": "$.photoUrl", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
+				"consumerField": "Pet.photoUrl", "property": "$.photoUrl", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
 			}},
-			line: `petstore_web reads "$.photoUrl", but petstore_api doesn't provide it → stop reading it, or mark it optional`,
+			line: `petstore_web reads "$.photoUrl" (Pet.photoUrl), but petstore_api doesn't provide it → stop reading it, or mark it optional`,
 		},
 		{
 			name:        "property_missing_in_provider as provider on a response",
 			interaction: apiServesPet,
 			contractBreak: ContractBreak{Reason: "property_missing_in_provider", Role: "provider", Details: map[string]string{
-				"property": "$.photoUrl", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
+				"consumerField": "Pet.photoUrl", "property": "$.photoUrl", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
 			}},
 			line: `petstore_api doesn't provide "$.photoUrl", but petstore_web reads it → keep providing it`,
 		},
@@ -220,23 +220,23 @@ func TestFormatBreakLine(t *testing.T) {
 			name:        "property_optional_in_provider_required_in_consumer as consumer on a response",
 			interaction: webGetsPet,
 			contractBreak: ContractBreak{Reason: "property_optional_in_provider_required_in_consumer", Role: "consumer", Details: map[string]string{
-				"property": "$.status", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
+				"consumerField": "Pet.status", "providerField": "PetRecord.status", "property": "$.status", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
 			}},
-			line: `petstore_web requires "$.status", but petstore_api only sometimes provides it → mark it optional`,
+			line: `petstore_web requires "$.status" (Pet.status), but petstore_api only sometimes provides it → mark it optional`,
 		},
 		{
 			name:        "property_optional_in_provider_required_in_consumer as provider on a response",
 			interaction: apiServesPet,
 			contractBreak: ContractBreak{Reason: "property_optional_in_provider_required_in_consumer", Role: "provider", Details: map[string]string{
-				"property": "$.status", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
+				"consumerField": "Pet.status", "providerField": "PetRecord.status", "property": "$.status", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
 			}},
-			line: `petstore_api provides "$.status" only sometimes, but petstore_web requires it → keep it required`,
+			line: `petstore_api provides "$.status" (PetRecord.status) only sometimes, but petstore_web requires it → keep it required`,
 		},
 		{
 			name:        "property_missing_in_consumer as consumer on a request",
 			interaction: webPostsPet,
 			contractBreak: ContractBreak{Reason: "property_missing_in_consumer", Role: "consumer", Details: map[string]string{
-				"property": "$.ownerId", "propertyType": "integer", "consumerName": "petstore_web", "providerName": "petstore_api",
+				"providerField": "NewPetRecord.ownerId", "property": "$.ownerId", "propertyType": "integer", "consumerName": "petstore_web", "providerName": "petstore_api",
 			}},
 			line: `petstore_web doesn't send "$.ownerId", but petstore_api requires it → send it`,
 		},
@@ -244,110 +244,110 @@ func TestFormatBreakLine(t *testing.T) {
 			name:        "property_missing_in_consumer as provider on a request",
 			interaction: apiReceivesPet,
 			contractBreak: ContractBreak{Reason: "property_missing_in_consumer", Role: "provider", Details: map[string]string{
-				"property": "$.ownerId", "propertyType": "integer", "consumerName": "petstore_web", "providerName": "petstore_api",
+				"providerField": "NewPetRecord.ownerId", "property": "$.ownerId", "propertyType": "integer", "consumerName": "petstore_web", "providerName": "petstore_api",
 			}},
-			line: `petstore_api requires "$.ownerId", but petstore_web doesn't send it → make it optional`,
+			line: `petstore_api requires "$.ownerId" (NewPetRecord.ownerId), but petstore_web doesn't send it → make it optional`,
 		},
 		{
 			name:        "property_optional_in_consumer_required_in_provider as consumer on a request",
 			interaction: webPostsPet,
 			contractBreak: ContractBreak{Reason: "property_optional_in_consumer_required_in_provider", Role: "consumer", Details: map[string]string{
-				"property": "$.name", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
+				"consumerField": "NewPet.name", "providerField": "NewPetRecord.name", "property": "$.name", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
 			}},
-			line: `petstore_web sends "$.name" only sometimes, but petstore_api requires it → always send it`,
+			line: `petstore_web sends "$.name" (NewPet.name) only sometimes, but petstore_api requires it → always send it`,
 		},
 		{
 			name:        "property_optional_in_consumer_required_in_provider as provider on a request",
 			interaction: apiReceivesPet,
 			contractBreak: ContractBreak{Reason: "property_optional_in_consumer_required_in_provider", Role: "provider", Details: map[string]string{
-				"property": "$.name", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
+				"consumerField": "NewPet.name", "providerField": "NewPetRecord.name", "property": "$.name", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
 			}},
-			line: `petstore_api requires "$.name", but petstore_web sends it only sometimes → make it optional`,
+			line: `petstore_api requires "$.name" (NewPetRecord.name), but petstore_web sends it only sometimes → make it optional`,
 		},
 		{
 			name:        "property_type_mismatch as consumer on a response",
 			interaction: webGetsPet,
 			contractBreak: ContractBreak{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-				"property": "$.weight", "consumerPropertyType": "integer", "providerPropertyType": "float",
+				"consumerField": "Pet.weight", "providerField": "PetRecord.weight", "property": "$.weight", "consumerPropertyType": "integer", "providerPropertyType": "float",
 				"consumerName": "petstore_web", "providerName": "petstore_api",
 			}},
-			line: `petstore_web reads "$.weight" as integer, but petstore_api provides float → read it as float`,
+			line: `petstore_web reads "$.weight" (Pet.weight) as integer, but petstore_api provides float → read it as float`,
 		},
 		{
 			name:        "property_type_mismatch as provider on a response",
 			interaction: apiServesPet,
 			contractBreak: ContractBreak{Reason: "property_type_mismatch", Role: "provider", Details: map[string]string{
-				"property": "$.weight", "consumerPropertyType": "integer", "providerPropertyType": "float",
+				"consumerField": "Pet.weight", "providerField": "PetRecord.weight", "property": "$.weight", "consumerPropertyType": "integer", "providerPropertyType": "float",
 				"consumerName": "petstore_web", "providerName": "petstore_api",
 			}},
-			line: `petstore_api provides "$.weight" as float, but petstore_web reads integer → provide integer`,
+			line: `petstore_api provides "$.weight" (PetRecord.weight) as float, but petstore_web reads integer → provide integer`,
 		},
 		{
 			name:        "property_type_mismatch as consumer on a request",
 			interaction: webPostsPet,
 			contractBreak: ContractBreak{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-				"property": "$.age", "consumerPropertyType": "string", "providerPropertyType": "integer",
+				"consumerField": "NewPet.age", "providerField": "NewPetRecord.age", "property": "$.age", "consumerPropertyType": "string", "providerPropertyType": "integer",
 				"consumerName": "petstore_web", "providerName": "petstore_api",
 			}},
-			line: `petstore_web sends "$.age" as string, but petstore_api expects integer → send integer`,
+			line: `petstore_web sends "$.age" (NewPet.age) as string, but petstore_api expects integer → send integer`,
 		},
 		{
 			name:        "property_type_mismatch as provider on a request",
 			interaction: apiReceivesPet,
 			contractBreak: ContractBreak{Reason: "property_type_mismatch", Role: "provider", Details: map[string]string{
-				"property": "$.age", "consumerPropertyType": "string", "providerPropertyType": "integer",
+				"consumerField": "NewPet.age", "providerField": "NewPetRecord.age", "property": "$.age", "consumerPropertyType": "string", "providerPropertyType": "integer",
 				"consumerName": "petstore_web", "providerName": "petstore_api",
 			}},
-			line: `petstore_api expects "$.age" as integer, but petstore_web sends string → accept string`,
+			line: `petstore_api expects "$.age" (NewPetRecord.age) as integer, but petstore_web sends string → accept string`,
 		},
 		{
 			name:        "property_nullable_in_provider_not_nullable_in_consumer as consumer on a response",
 			interaction: webGetsPet,
 			contractBreak: ContractBreak{Reason: "property_nullable_in_provider_not_nullable_in_consumer", Role: "consumer", Details: map[string]string{
-				"property": "$.tag", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
+				"consumerField": "Pet.tag", "providerField": "PetRecord.tag", "property": "$.tag", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
 			}},
-			line: `petstore_web doesn't accept null at "$.tag", but petstore_api may provide null → mark it nullable`,
+			line: `petstore_web doesn't accept null at "$.tag" (Pet.tag), but petstore_api may provide null → mark it nullable`,
 		},
 		{
 			name:        "property_nullable_in_provider_not_nullable_in_consumer as provider on a response",
 			interaction: apiServesPet,
 			contractBreak: ContractBreak{Reason: "property_nullable_in_provider_not_nullable_in_consumer", Role: "provider", Details: map[string]string{
-				"property": "$.tag", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
+				"consumerField": "Pet.tag", "providerField": "PetRecord.tag", "property": "$.tag", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
 			}},
-			line: `petstore_api may provide null at "$.tag", but petstore_web doesn't accept it → never provide null`,
+			line: `petstore_api may provide null at "$.tag" (PetRecord.tag), but petstore_web doesn't accept it → never provide null`,
 		},
 		{
 			name:        "property_nullable_in_consumer_not_nullable_in_provider as consumer on a request",
 			interaction: webPostsPet,
 			contractBreak: ContractBreak{Reason: "property_nullable_in_consumer_not_nullable_in_provider", Role: "consumer", Details: map[string]string{
-				"property": "$.birthDate", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
+				"consumerField": "NewPet.birthDate", "providerField": "NewPetRecord.birthDate", "property": "$.birthDate", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
 			}},
-			line: `petstore_web may send null at "$.birthDate", but petstore_api doesn't accept it → never send null`,
+			line: `petstore_web may send null at "$.birthDate" (NewPet.birthDate), but petstore_api doesn't accept it → never send null`,
 		},
 		{
 			name:        "property_nullable_in_consumer_not_nullable_in_provider as provider on a request",
 			interaction: apiReceivesPet,
 			contractBreak: ContractBreak{Reason: "property_nullable_in_consumer_not_nullable_in_provider", Role: "provider", Details: map[string]string{
-				"property": "$.birthDate", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
+				"consumerField": "NewPet.birthDate", "providerField": "NewPetRecord.birthDate", "property": "$.birthDate", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
 			}},
-			line: `petstore_api doesn't accept null at "$.birthDate", but petstore_web may send it → mark it nullable`,
+			line: `petstore_api doesn't accept null at "$.birthDate" (NewPetRecord.birthDate), but petstore_web may send it → mark it nullable`,
 		},
 		{
 			name:        "property_missing_in_provider at the root path names the body",
 			interaction: spaGetsFiles,
 			contractBreak: ContractBreak{Reason: "property_missing_in_provider", Role: "consumer", Details: map[string]string{
-				"property": "$", "propertyType": "object", "consumerName": "spa", "providerName": "api",
+				"consumerField": "Order", "property": "$", "propertyType": "object", "consumerName": "spa", "providerName": "api",
 			}},
-			line: `spa reads the body, but api doesn't provide it → stop reading it, or mark it optional`,
+			line: `spa reads the body (Order), but api doesn't provide it → stop reading it, or mark it optional`,
 		},
 		{
 			name:        "property_type_mismatch at the root path names the body",
 			interaction: spaGetsFiles,
 			contractBreak: ContractBreak{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-				"property": "$", "consumerPropertyType": "object", "providerPropertyType": "array<object>",
+				"consumerField": "Order", "providerField": "Orders", "property": "$", "consumerPropertyType": "object", "providerPropertyType": "array<object>",
 				"consumerName": "spa", "providerName": "api",
 			}},
-			line: `spa reads the body as object, but api provides array<object> → read it as array<object>`,
+			line: `spa reads the body (Order) as object, but api provides array<object> → read it as array<object>`,
 		},
 		{
 			name:          "provider_resource_not_found as consumer",
@@ -398,6 +398,23 @@ func TestFormatBreakLine(t *testing.T) {
 				"property": "$", "propertyType": "object", "consumerName": "spa", "providerName": "api",
 			}},
 			line: `property_missing_in_provider (consumerName: spa, property: $, propertyType: object, providerName: api)`,
+		},
+		{
+			name:        "fallback keeps the raw fields",
+			interaction: webGetsPet,
+			contractBreak: ContractBreak{Reason: "property_missing_in_provider", Role: "observer", Details: map[string]string{
+				"property": "$.photoUrl", "consumerField": "Pet.photoUrl", "consumerName": "petstore_web", "providerName": "petstore_api",
+			}},
+			line: `property_missing_in_provider (consumerField: Pet.photoUrl, consumerName: petstore_web, property: $.photoUrl, providerName: petstore_api)`,
+		},
+		{
+			name:        "reader side without a field keeps the bare path even when the other side has one",
+			interaction: webGetsPet,
+			contractBreak: ContractBreak{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
+				"property": "$.weight", "providerField": "PetRecord.weight", "consumerPropertyType": "integer", "providerPropertyType": "float",
+				"consumerName": "petstore_web", "providerName": "petstore_api",
+			}},
+			line: `petstore_web reads "$.weight" as integer, but petstore_api provides float → read it as float`,
 		},
 		{
 			name:          "unknown reason falls back to the bare reason",
