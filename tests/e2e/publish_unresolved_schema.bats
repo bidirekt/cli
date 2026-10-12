@@ -73,10 +73,9 @@ setup() {
   assert_output --partial "./api_schemas_dangling.yaml: unresolved ref \"Person\" in Team.owner"
 }
 
-@test "v5 rejected: cyclic schema" {
+@test "publish todo_api v5 with a recursive schema" {
   run bidirekt publish ./api_schemas_cycle.yaml ./api_rest_cycle.yaml --participant "$API" --version v5
-  assert_failure
-  assert_output --partial "./api_schemas_cycle.yaml: schema \"Loop\" is deeper than 10 levels"
+  assert_success
 }
 
 @test "todo_app rejected: typo in a single-file publish" {

@@ -71,7 +71,7 @@ setup() {
 @test "todo_api v2 blocked: todo_app doesn't send priority" {
   run bidirekt can-i-deploy "$API" --version v2 --environment "$PRODUCTION"
   assert_failure
-  assert_output --partial "$API requires \"\$.priority\", but $APP doesn't send it → make it optional"
+  assert_output --partial "$API requires \"\$.priority\" (CreateTodoRequest.priority), but $APP doesn't send it → make it optional"
 }
 
 @test "publish todo_app v2 (sends priority)" {
