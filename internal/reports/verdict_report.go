@@ -143,6 +143,14 @@ func formatBreakLine(interaction checkedInteraction, contractBreak ContractBreak
 		return fmt.Sprintf("%s sends %q as %s, but %s expects %s → send %s", me, property, consumerType, other, providerType, providerType)
 	case reason == "property_type_mismatch" && asProvider && onRequest:
 		return fmt.Sprintf("%s expects %q as %s, but %s sends %s → accept %s", me, property, providerType, other, consumerType, consumerType)
+	case reason == "property_nullable_in_provider_not_nullable_in_consumer" && asConsumer && onResponse:
+		return fmt.Sprintf("%s doesn't accept null at %q, but %s may provide null → mark it nullable", me, property, other)
+	case reason == "property_nullable_in_provider_not_nullable_in_consumer" && asProvider && onResponse:
+		return fmt.Sprintf("%s may provide null at %q, but %s doesn't accept it → never provide null", me, property, other)
+	case reason == "property_nullable_in_consumer_not_nullable_in_provider" && asConsumer && onRequest:
+		return fmt.Sprintf("%s may send null at %q, but %s doesn't accept it → never send null", me, property, other)
+	case reason == "property_nullable_in_consumer_not_nullable_in_provider" && asProvider && onRequest:
+		return fmt.Sprintf("%s doesn't accept null at %q, but %s may send it → mark it nullable", me, property, other)
 	case reason == "provider_resource_not_found" && asConsumer:
 		return fmt.Sprintf("%s calls %s, but %s doesn't provide it → stop calling it, or wait until %s publishes it", me, resource, other, other)
 	case reason == "provider_resource_not_deployed_in_environment" && asConsumer:

@@ -300,6 +300,38 @@ func TestFormatBreakLine(t *testing.T) {
 			line: `petstore_api expects "$.age" as integer, but petstore_web sends string → accept string`,
 		},
 		{
+			name:        "property_nullable_in_provider_not_nullable_in_consumer as consumer on a response",
+			interaction: webGetsPet,
+			contractBreak: ContractBreak{Reason: "property_nullable_in_provider_not_nullable_in_consumer", Role: "consumer", Details: map[string]string{
+				"property": "$.tag", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
+			}},
+			line: `petstore_web doesn't accept null at "$.tag", but petstore_api may provide null → mark it nullable`,
+		},
+		{
+			name:        "property_nullable_in_provider_not_nullable_in_consumer as provider on a response",
+			interaction: apiServesPet,
+			contractBreak: ContractBreak{Reason: "property_nullable_in_provider_not_nullable_in_consumer", Role: "provider", Details: map[string]string{
+				"property": "$.tag", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
+			}},
+			line: `petstore_api may provide null at "$.tag", but petstore_web doesn't accept it → never provide null`,
+		},
+		{
+			name:        "property_nullable_in_consumer_not_nullable_in_provider as consumer on a request",
+			interaction: webPostsPet,
+			contractBreak: ContractBreak{Reason: "property_nullable_in_consumer_not_nullable_in_provider", Role: "consumer", Details: map[string]string{
+				"property": "$.birthDate", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
+			}},
+			line: `petstore_web may send null at "$.birthDate", but petstore_api doesn't accept it → never send null`,
+		},
+		{
+			name:        "property_nullable_in_consumer_not_nullable_in_provider as provider on a request",
+			interaction: apiReceivesPet,
+			contractBreak: ContractBreak{Reason: "property_nullable_in_consumer_not_nullable_in_provider", Role: "provider", Details: map[string]string{
+				"property": "$.birthDate", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
+			}},
+			line: `petstore_api doesn't accept null at "$.birthDate", but petstore_web may send it → mark it nullable`,
+		},
+		{
 			name:          "provider_resource_not_found as consumer",
 			interaction:   webGetsReview,
 			contractBreak: ContractBreak{Reason: "provider_resource_not_found", Role: "consumer"},
