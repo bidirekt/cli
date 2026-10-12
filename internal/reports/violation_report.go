@@ -60,6 +60,10 @@ func FormatViolationLine(violation Violation) (headline, explanation string) {
 		return fmt.Sprintf(`invalid value %q for "type"%s`, details["value"], typeAt), "expected one of: " + details["allowed"]
 	case "schema.array_without_items":
 		return "array schema without items" + pathAt, ""
+	case "schema.values_with_properties":
+		return `object schema has both "values" and "properties"` + pathAt, ""
+	case "schema.values_without_object":
+		return `"values" on a non-object schema` + pathAt, ""
 	case "resource.duplicate":
 		if details["declaredIn"] == violation.Source {
 			return fmt.Sprintf("duplicate resource %q, declared twice", details["resource"]), ""
