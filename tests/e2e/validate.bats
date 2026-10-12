@@ -186,8 +186,8 @@ $APP (1.0.0, deployed):
 
 @test "validate with nonexistent participant: blocked" {
   run bidirekt validate ./api_v4.yaml --participant "ghost_$RUN" --environment "$PRODUCTION"
-  assert_failure
-  assert_output --partial "cannot validate contract on broker: participant not found"
+  assert_failure 1
+  assert_output --partial "participant \"ghost_$RUN\" not found → create it with: bidirekt create-participant ghost_$RUN"
 }
 
 @test "validate with nonexistent environment: blocked" {

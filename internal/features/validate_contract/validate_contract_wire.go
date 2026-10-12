@@ -5,6 +5,8 @@ import (
 	"github.com/bidirekt/cli/internal/reports"
 )
 
+const participantNotFound = "participant not found"
+
 type ValidateContractRequestBody struct {
 	Participant string                           `json:"participant"`
 	Environment string                           `json:"environment"`

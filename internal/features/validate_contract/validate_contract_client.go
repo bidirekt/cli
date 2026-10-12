@@ -39,6 +39,10 @@ func (this *ValidateContractClient) ValidateContract(ctx context.Context, reques
 			return ValidateContractResponseBody{}, &reports.ValidationFailedError{Message: responseBody.Message, Violations: responseBody.Violations}
 		}
 
+		if responseBody.Message == participantNotFound {
+			return ValidateContractResponseBody{}, reports.NewParticipantNotFoundError(requestBody.Participant)
+		}
+
 		return ValidateContractResponseBody{}, fmt.Errorf("cannot validate contract on broker: %s", responseBody.Message)
 	}
 

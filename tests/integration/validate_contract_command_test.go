@@ -165,7 +165,7 @@ payments (v2, deployed):
 		assert.Empty(t, out.String())
 	})
 
-	t.Run("unknown participant returns the broker message as the error", func(t *testing.T) {
+	t.Run("unknown participant suggests creating it with create-participant", func(t *testing.T) {
 		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
@@ -187,7 +187,7 @@ payments (v2, deployed):
 
 		require.Error(t, err)
 		assert.NotErrorIs(t, err, reports.ErrSilent)
-		assert.Equal(t, "cannot validate contract on broker: participant not found", err.Error())
+		assert.Equal(t, `participant "ghost" not found → create it with: bidirekt create-participant ghost`, err.Error())
 		assert.Empty(t, out.String())
 		assert.Empty(t, errOut.String())
 	})

@@ -293,7 +293,7 @@ func TestPublishContractCommand(t *testing.T) {
 		assert.Empty(t, out.String())
 	})
 
-	t.Run("failure without violations keeps the single-line message", func(t *testing.T) {
+	t.Run("unknown participant suggests creating it with create-participant", func(t *testing.T) {
 		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
@@ -302,7 +302,7 @@ func TestPublishContractCommand(t *testing.T) {
 		require.NoError(t, os.WriteFile(file, []byte("provides:\n  rest: {}\n"), 0o600))
 
 		httpmock.RegisterResponder(http.MethodPost, endpoint,
-			httpmock.NewStringResponder(http.StatusNotFound, `{"message":"participant not found"}`))
+			httpmock.NewStringResponder(http.StatusNotFound, `{"message":"contract participant not found"}`))
 
 		command := publish_contract.NewPublishCommand(
 			publish_contract.NewPublishContractClient(httpClient),
@@ -316,7 +316,35 @@ func TestPublishContractCommand(t *testing.T) {
 
 		require.Error(t, err)
 		assert.NotErrorIs(t, err, reports.ErrSilent)
-		assert.Equal(t, "cannot post contract to broker: participant not found", err.Error())
+		assert.Equal(t, `participant "pets-service" not found → create it with: bidirekt create-participant pets-service`, err.Error())
+		assert.Empty(t, out.String())
+		assert.Empty(t, errOut.String())
+	})
+
+	t.Run("failure without violations keeps the single-line message", func(t *testing.T) {
+		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpmock.ActivateNonDefault(httpClient.StdClient())
+		defer httpmock.DeactivateAndReset()
+
+		file := filepath.Join(t.TempDir(), "contract.yaml")
+		require.NoError(t, os.WriteFile(file, []byte("provides:\n  rest: {}\n"), 0o600))
+
+		httpmock.RegisterResponder(http.MethodPost, endpoint,
+			httpmock.NewStringResponder(http.StatusConflict, `{"message":"contract version already exists with different content"}`))
+
+		command := publish_contract.NewPublishCommand(
+			publish_contract.NewPublishContractClient(httpClient),
+		)
+		var out, errOut bytes.Buffer
+		command.SetOut(&out)
+		command.SetErr(&errOut)
+		command.SetArgs([]string{file, "--participant", participant, "--version", version})
+
+		err := command.Execute()
+
+		require.Error(t, err)
+		assert.NotErrorIs(t, err, reports.ErrSilent)
+		assert.Equal(t, "cannot post contract to broker: contract version already exists with different content", err.Error())
 		assert.Empty(t, errOut.String())
 	})
 

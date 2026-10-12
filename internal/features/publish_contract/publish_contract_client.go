@@ -41,6 +41,10 @@ func (this *PublishContractClient) PublishContract(ctx context.Context, requestB
 			return "", &reports.ValidationFailedError{Message: responseBody.Message, Violations: responseBody.Violations}
 		}
 
+		if responseBody.Message == contractParticipantNotFound {
+			return "", reports.NewParticipantNotFoundError(requestBody.Participant)
+		}
+
 		return "", fmt.Errorf("cannot post contract to broker: %s", responseBody.Message)
 	}
 
