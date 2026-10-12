@@ -3,6 +3,7 @@ package reports
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/bidirekt/cli/internal/paint"
@@ -113,44 +114,44 @@ func formatBreakLine(interaction checkedInteraction, contractBreak ContractBreak
 	me, other := interaction.participant, interaction.counterpart
 	resource := interaction.method + " " + interaction.endpoint
 	reason, details := contractBreak.Reason, contractBreak.Details
-	property := details["property"]
+	property := propertyPathPhrase(details["property"])
 	consumerType, providerType := details["consumerPropertyType"], details["providerPropertyType"]
 	asConsumer, asProvider := contractBreak.Role == "consumer", contractBreak.Role == "provider"
 	onRequest, onResponse := interaction.isRequest, !interaction.isRequest
 
 	switch {
 	case reason == "property_missing_in_provider" && asConsumer && onResponse:
-		return fmt.Sprintf("%s reads %q, but %s doesn't provide it → stop reading it, or mark it optional", me, property, other)
+		return fmt.Sprintf("%s reads %s, but %s doesn't provide it → stop reading it, or mark it optional", me, property, other)
 	case reason == "property_missing_in_provider" && asProvider && onResponse:
-		return fmt.Sprintf("%s doesn't provide %q, but %s reads it → keep providing it", me, property, other)
+		return fmt.Sprintf("%s doesn't provide %s, but %s reads it → keep providing it", me, property, other)
 	case reason == "property_optional_in_provider_required_in_consumer" && asConsumer && onResponse:
-		return fmt.Sprintf("%s requires %q, but %s only sometimes provides it → mark it optional", me, property, other)
+		return fmt.Sprintf("%s requires %s, but %s only sometimes provides it → mark it optional", me, property, other)
 	case reason == "property_optional_in_provider_required_in_consumer" && asProvider && onResponse:
-		return fmt.Sprintf("%s provides %q only sometimes, but %s requires it → keep it required", me, property, other)
+		return fmt.Sprintf("%s provides %s only sometimes, but %s requires it → keep it required", me, property, other)
 	case reason == "property_missing_in_consumer" && asConsumer && onRequest:
-		return fmt.Sprintf("%s doesn't send %q, but %s requires it → send it", me, property, other)
+		return fmt.Sprintf("%s doesn't send %s, but %s requires it → send it", me, property, other)
 	case reason == "property_missing_in_consumer" && asProvider && onRequest:
-		return fmt.Sprintf("%s requires %q, but %s doesn't send it → make it optional", me, property, other)
+		return fmt.Sprintf("%s requires %s, but %s doesn't send it → make it optional", me, property, other)
 	case reason == "property_optional_in_consumer_required_in_provider" && asConsumer && onRequest:
-		return fmt.Sprintf("%s sends %q only sometimes, but %s requires it → always send it", me, property, other)
+		return fmt.Sprintf("%s sends %s only sometimes, but %s requires it → always send it", me, property, other)
 	case reason == "property_optional_in_consumer_required_in_provider" && asProvider && onRequest:
-		return fmt.Sprintf("%s requires %q, but %s sends it only sometimes → make it optional", me, property, other)
+		return fmt.Sprintf("%s requires %s, but %s sends it only sometimes → make it optional", me, property, other)
 	case reason == "property_type_mismatch" && asConsumer && onResponse:
-		return fmt.Sprintf("%s reads %q as %s, but %s provides %s → read it as %s", me, property, consumerType, other, providerType, providerType)
+		return fmt.Sprintf("%s reads %s as %s, but %s provides %s → read it as %s", me, property, consumerType, other, providerType, providerType)
 	case reason == "property_type_mismatch" && asProvider && onResponse:
-		return fmt.Sprintf("%s provides %q as %s, but %s reads %s → provide %s", me, property, providerType, other, consumerType, consumerType)
+		return fmt.Sprintf("%s provides %s as %s, but %s reads %s → provide %s", me, property, providerType, other, consumerType, consumerType)
 	case reason == "property_type_mismatch" && asConsumer && onRequest:
-		return fmt.Sprintf("%s sends %q as %s, but %s expects %s → send %s", me, property, consumerType, other, providerType, providerType)
+		return fmt.Sprintf("%s sends %s as %s, but %s expects %s → send %s", me, property, consumerType, other, providerType, providerType)
 	case reason == "property_type_mismatch" && asProvider && onRequest:
-		return fmt.Sprintf("%s expects %q as %s, but %s sends %s → accept %s", me, property, providerType, other, consumerType, consumerType)
+		return fmt.Sprintf("%s expects %s as %s, but %s sends %s → accept %s", me, property, providerType, other, consumerType, consumerType)
 	case reason == "property_nullable_in_provider_not_nullable_in_consumer" && asConsumer && onResponse:
-		return fmt.Sprintf("%s doesn't accept null at %q, but %s may provide null → mark it nullable", me, property, other)
+		return fmt.Sprintf("%s doesn't accept null at %s, but %s may provide null → mark it nullable", me, property, other)
 	case reason == "property_nullable_in_provider_not_nullable_in_consumer" && asProvider && onResponse:
-		return fmt.Sprintf("%s may provide null at %q, but %s doesn't accept it → never provide null", me, property, other)
+		return fmt.Sprintf("%s may provide null at %s, but %s doesn't accept it → never provide null", me, property, other)
 	case reason == "property_nullable_in_consumer_not_nullable_in_provider" && asConsumer && onRequest:
-		return fmt.Sprintf("%s may send null at %q, but %s doesn't accept it → never send null", me, property, other)
+		return fmt.Sprintf("%s may send null at %s, but %s doesn't accept it → never send null", me, property, other)
 	case reason == "property_nullable_in_consumer_not_nullable_in_provider" && asProvider && onRequest:
-		return fmt.Sprintf("%s doesn't accept null at %q, but %s may send it → mark it nullable", me, property, other)
+		return fmt.Sprintf("%s doesn't accept null at %s, but %s may send it → mark it nullable", me, property, other)
 	case reason == "provider_resource_not_found" && asConsumer:
 		return fmt.Sprintf("%s calls %s, but %s doesn't provide it → stop calling it, or wait until %s publishes it", me, resource, other, other)
 	case reason == "provider_resource_not_deployed_in_environment" && asConsumer:
@@ -164,6 +165,13 @@ func formatBreakLine(interaction checkedInteraction, contractBreak ContractBreak
 	default:
 		return fallbackBreakLine(reason, details)
 	}
+}
+
+func propertyPathPhrase(path string) string {
+	if path == "$" {
+		return "the body"
+	}
+	return strconv.Quote(path)
 }
 
 // fallbackBreakLine renders a break verbatim with its details when no template matches its
