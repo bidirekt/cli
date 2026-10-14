@@ -52,8 +52,8 @@ func NewValidateCommand(validateContractClient *ValidateContractClient) *cobra.C
 	}
 
 	command := &cobra.Command{
-		Use:   "validate [file...]",
-		Short: "Validate contract YAML files against an environment without publishing them",
+		Use:   "validate [file or folder...]",
+		Short: "Validate contract YAML files or folders against an environment without publishing them",
 		Args:  cobra.MinimumNArgs(1),
 		RunE:  commandHandler,
 	}

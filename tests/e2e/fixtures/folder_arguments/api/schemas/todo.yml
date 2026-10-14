@@ -1,0 +1,13 @@
+schemas:
+  Todo:
+    type: object
+    properties:
+      todoId:
+        type: integer
+      title:
+        type: string
+
+  Todos:
+    type: array
+    items:
+      ref: Todo

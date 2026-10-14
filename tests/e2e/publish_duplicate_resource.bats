@@ -76,11 +76,10 @@ setup() {
   assert_output --partial "./api_rest_todos_trailing_slash.yaml: duplicate resource \"provides GET /todos 200\", also declared in ./api_rest_todos.yaml"
 }
 
-@test "v5 rejected: the same file passed twice" {
+@test "publish todo_api v5 with the same file passed twice: it is read once" {
   run bidirekt publish ./api_schemas.yaml ./api_rest_todos_404.yaml ./api_rest_todos_404.yaml \
     --participant "$API" --version v5
-  assert_failure
-  assert_output --partial "./api_rest_todos_404.yaml: duplicate resource \"provides POST /todos 404\", declared twice"
+  assert_success
 }
 
 @test "publish todo_app v1 merging the repeated consumed resource by union" {
