@@ -72,8 +72,8 @@ setup() {
   run bidirekt can-i-deploy "$API" --version v2 --environment "$PRODUCTION"
   assert_failure
   assert_output --partial "but $APP still calls it
-        → $API: keep it until $APP stops calling it
-        → $APP: stop calling it"
+      → $API: keep it until $APP stops calling it
+      → $APP: stop calling it"
   assert_equal "$(grep -cF -- "but $APP still calls it" <<< "$output")" 2
 }
 

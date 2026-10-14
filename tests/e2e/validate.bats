@@ -159,14 +159,9 @@ $APP (1.0.0, deployed):
 
 $APP (1.0.0, deployed):
   POST /pets
-    request:
-      - $API removed POST /pets, but $APP still calls it
-        → $API: keep it until $APP stops calling it
-        → $APP: stop calling it
-    response 201:
-      - $API removed POST /pets, but $APP still calls it
-        → $API: keep it until $APP stops calling it
-        → $APP: stop calling it"
+    - $API removed POST /pets, but $APP still calls it
+      → $API: keep it until $APP stops calling it
+      → $APP: stop calling it"
 }
 
 @test "publish todo_api 5.0.0 (without POST /pets)" {
@@ -181,14 +176,9 @@ $APP (1.0.0, deployed):
 
 $APP (1.0.0, deployed):
   POST /pets
-    request:
-      - $API removed POST /pets, but $APP still calls it
-        → $API: keep it until $APP stops calling it
-        → $APP: stop calling it
-    response 201:
-      - $API removed POST /pets, but $APP still calls it
-        → $API: keep it until $APP stops calling it
-        → $APP: stop calling it"
+    - $API removed POST /pets, but $APP still calls it
+      → $API: keep it until $APP stops calling it
+      → $APP: stop calling it"
 }
 
 @test "validate api_typo.yaml: blocked, unresolved schema" {

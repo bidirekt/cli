@@ -54,16 +54,21 @@ func FormatNotDeployableReport(brush paint.Brush, checkedSideLabel, participant,
 			for _, method := range methods {
 				fmt.Fprintf(&report, "  %s %s\n", strings.ToUpper(method), endpoint)
 
-				interactions := result.Endpoints[endpoint][method]
+				checked := checkedInteraction{
+					participant: participant,
+					counterpart: name,
+					environment: environment,
+					method:      strings.ToUpper(method),
+					endpoint:    endpoint,
+				}
+
+				removed, interactions := splitRemovedBreak(result.Endpoints[endpoint][method])
+				if removed != nil {
+					writeBreakLine(&report, "    ", formatBreakLine(checked, *removed))
+				}
+
 				for _, interaction := range sortedInteractions(interactions) {
-					checked := checkedInteraction{
-						participant: participant,
-						counterpart: name,
-						environment: environment,
-						method:      strings.ToUpper(method),
-						endpoint:    endpoint,
-						isRequest:   interaction == "request",
-					}
+					checked.isRequest = interaction == "request"
 
 					if checked.isRequest {
 						report.WriteString("    request:\n")
@@ -89,6 +94,27 @@ func sortedKeys[V any](m map[string]V) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+// splitRemovedBreak takes the removed-endpoint break out of a method's interactions: the broker sends it once per
+// consumed interaction, but it is about the whole endpoint. Interactions left without breaks are dropped.
+func splitRemovedBreak(interactions map[string][]ContractBreak) (*ContractBreak, map[string][]ContractBreak) {
+	var removed *ContractBreak
+	remaining := make(map[string][]ContractBreak, len(interactions))
+	for _, interaction := range sortedInteractions(interactions) {
+		var kept []ContractBreak
+		for _, contractBreak := range interactions[interaction] {
+			if contractBreak.Reason != "provider_resource_removed_but_still_consumed" {
+				kept = append(kept, contractBreak)
+			} else if removed == nil {
+				removed = &contractBreak
+			}
+		}
+		if len(kept) > 0 {
+			remaining[interaction] = kept
+		}
+	}
+	return removed, remaining
 }
 
 // sortedInteractions orders a method's interaction keys as "request" first, then the

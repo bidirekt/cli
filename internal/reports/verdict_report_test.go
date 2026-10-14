@@ -141,6 +141,106 @@ petstore_web (1.0.0, deployed):
 `, report)
 }
 
+func TestFormatNotDeployableReportPrintsARemovedEndpointOnce(t *testing.T) {
+	results := map[string]CanIDeployResult{
+		"petstore_web": {
+			Deployable: false,
+			Endpoints: map[string]map[string]map[string][]ContractBreak{
+				"/pets": {
+					"post": {
+						"request": {{Reason: "provider_resource_removed_but_still_consumed", Role: "provider"}},
+						"201":     {{Reason: "provider_resource_removed_but_still_consumed", Role: "provider"}},
+						"400":     {{Reason: "provider_resource_removed_but_still_consumed", Role: "provider"}},
+					},
+				},
+			},
+		},
+	}
+
+	report := FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_api 3.0.0", "petstore_api", "production", results)
+
+	assert.Equal(t, `petstore_api 3.0.0 cannot be deployed to production
+
+petstore_web:
+  POST /pets
+    - petstore_api removed POST /pets, but petstore_web still calls it
+      → petstore_api: keep it until petstore_web stops calling it
+      → petstore_web: stop calling it
+`, report)
+}
+
+func TestFormatNotDeployableReportKeepsOtherBreaksOfARemovedEndpointUnderTheirBody(t *testing.T) {
+	results := map[string]CanIDeployResult{
+		"petstore_web": {
+			Deployable: false,
+			Endpoints: map[string]map[string]map[string][]ContractBreak{
+				"/pets": {
+					"post": {
+						"request": {{Reason: "provider_resource_removed_but_still_consumed", Role: "provider"}},
+						"201": {
+							{Reason: "provider_resource_removed_but_still_consumed", Role: "provider"},
+							{Reason: "property_optional_in_provider_required_in_consumer", Role: "provider", Details: map[string]string{
+								"property": "$.status", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
+							}},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	report := FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_api 3.0.0", "petstore_api", "production", results)
+
+	assert.Equal(t, `petstore_api 3.0.0 cannot be deployed to production
+
+petstore_web:
+  POST /pets
+    - petstore_api removed POST /pets, but petstore_web still calls it
+      → petstore_api: keep it until petstore_web stops calling it
+      → petstore_web: stop calling it
+    response 201:
+      - petstore_api provides "$.status" only sometimes, but petstore_web requires it
+        → petstore_api: always provide it
+        → petstore_web: handle its absence in the code, then mark it optional
+`, report)
+}
+
+func TestFormatNotDeployableReportPrintsEachRemovedEndpointOnce(t *testing.T) {
+	results := map[string]CanIDeployResult{
+		"petstore_web": {
+			Deployable: false,
+			Endpoints: map[string]map[string]map[string][]ContractBreak{
+				"/pets": {
+					"post": {
+						"request": {{Reason: "provider_resource_removed_but_still_consumed", Role: "provider"}},
+						"201":     {{Reason: "provider_resource_removed_but_still_consumed", Role: "provider"}},
+					},
+				},
+				"/pets/*": {
+					"delete": {
+						"204": {{Reason: "provider_resource_removed_but_still_consumed", Role: "provider"}},
+					},
+				},
+			},
+		},
+	}
+
+	report := FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_api 3.0.0", "petstore_api", "production", results)
+
+	assert.Equal(t, `petstore_api 3.0.0 cannot be deployed to production
+
+petstore_web:
+  POST /pets
+    - petstore_api removed POST /pets, but petstore_web still calls it
+      → petstore_api: keep it until petstore_web stops calling it
+      → petstore_web: stop calling it
+  DELETE /pets/*
+    - petstore_api removed DELETE /pets/*, but petstore_web still calls it
+      → petstore_api: keep it until petstore_web stops calling it
+      → petstore_web: stop calling it
+`, report)
+}
+
 func TestFormatNotDeployableReportOmitsVersionWhenNull(t *testing.T) {
 	results := map[string]CanIDeployResult{
 		"petstore_reviews": {
