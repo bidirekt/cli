@@ -82,7 +82,7 @@ func TestPublishContractCommand(t *testing.T) {
 		assert.Empty(t, errOut.String())
 	})
 
-	t.Run("publishes many YAML files as one request with a fragment per file, content verbatim", func(t *testing.T) {
+	t.Run("publishes many YAML files as one request with a fragment per file in path order, content verbatim", func(t *testing.T) {
 		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
@@ -124,8 +124,8 @@ func TestPublishContractCommand(t *testing.T) {
 		assert.Equal(t, 1, httpmock.GetCallCountInfo()["POST "+endpoint])
 		assert.JSONEq(t, expectedBody(t,
 			[2]string{pets, petsContent},
-			[2]string{store, storeContent},
 			[2]string{schemas, schemasContent},
+			[2]string{store, storeContent},
 		), string(capturedBody))
 	})
 

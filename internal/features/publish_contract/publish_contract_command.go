@@ -58,8 +58,8 @@ func NewPublishCommand(publishContractClient *PublishContractClient) *cobra.Comm
 	}
 
 	command := &cobra.Command{
-		Use:   "publish [file...]",
-		Short: "Publish one or more contract YAML files to the broker",
+		Use:   "publish [file or folder...]",
+		Short: "Publish one or more contract YAML files or folders to the broker",
 		Args:  cobra.MinimumNArgs(1),
 		RunE:  commandHandler,
 	}
