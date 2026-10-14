@@ -1,0 +1,23 @@
+provides:
+  rest:
+    "/todos":
+      get:
+        responses:
+          "200": Todos
+
+schemas:
+  Todo:
+    type: object
+    properties:
+      todoId:
+        type: integer
+      title:
+        type: string
+      description:
+        type: string
+        optional: true
+
+  Todos:
+    type: array
+    items:
+      ref: Todo
