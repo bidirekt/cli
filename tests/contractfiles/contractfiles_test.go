@@ -141,6 +141,16 @@ func TestToContractFragmentsFails(t *testing.T) {
 		assert.Nil(t, fragments)
 	})
 
+	t.Run("a folder that does not exist fails naming it", func(t *testing.T) {
+		t.Chdir(t.TempDir())
+		writeFiles(t, map[string]string{"contracts/spa/pets.yaml": "# pets\n"})
+
+		fragments, err := contractfiles.ToContractFragments([]string{"contracts/sap"})
+
+		require.EqualError(t, err, `contract file or folder not found: "contracts/sap"`)
+		assert.Nil(t, fragments)
+	})
+
 	t.Run("a file passed directly still needs a .yaml or .yml extension", func(t *testing.T) {
 		t.Chdir(t.TempDir())
 		writeFiles(t, map[string]string{

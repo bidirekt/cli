@@ -1,6 +1,7 @@
 package contractfiles
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -66,11 +67,16 @@ func toContractFilePaths(paths []string) ([]string, error) {
 }
 
 func pathToContractFilePaths(path string) ([]string, error) {
-	if info, err := os.Stat(path); err == nil && info.IsDir() {
+	info, err := os.Stat(path)
+	if err == nil && info.IsDir() {
 		return folderToContractFilePaths(path)
 	}
 
 	if !isContractFile(path) {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, fmt.Errorf("contract file or folder not found: %q", path)
+		}
+
 		return nil, fmt.Errorf("unsupported contract file extension: %q", path)
 	}
 
