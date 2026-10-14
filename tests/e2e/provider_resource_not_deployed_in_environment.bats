@@ -51,7 +51,8 @@ setup() {
 @test "todo_app v1 blocked: todo_api not deployed anywhere" {
   run bidirekt can-i-deploy "$APP" --version v1 --environment "$PRODUCTION"
   assert_failure
-  assert_output --partial "$APP calls GET /todos, but $API is not deployed in $PRODUCTION → deploy $API first"
+  assert_output --partial "$APP calls GET /todos, but $API is not deployed in $PRODUCTION
+        → $API: deploy it to $PRODUCTION first"
   refute_output --partial "deployed in:"
 }
 
@@ -68,7 +69,8 @@ setup() {
 @test "todo_app v1 blocked: todo_api only in staging" {
   run bidirekt can-i-deploy "$APP" --version v1 --environment "$PRODUCTION"
   assert_failure
-  assert_output --partial "$APP calls GET /todos, but $API is not deployed in $PRODUCTION (deployed in: $STAGING) → deploy $API first"
+  assert_output --partial "$APP calls GET /todos, but $API is not deployed in $PRODUCTION (deployed in: $STAGING)
+        → $API: deploy it to $PRODUCTION first"
 }
 
 @test "todo_api v1 can be deployed to production" {

@@ -67,6 +67,8 @@ func TestWriteVerdictPrintsTheReportAndSilencesTheError(t *testing.T) {
 petstore_reviews:
   GET /reviews/*
     response 200:
-      - petstore_web calls GET /reviews/*, but petstore_reviews doesn't provide it → stop calling it, or wait until petstore_reviews publishes it
+      - petstore_web calls GET /reviews/*, but petstore_reviews doesn't provide it
+        → petstore_web: stop calling it
+        → petstore_reviews: publish it
 `, writer.String())
 }

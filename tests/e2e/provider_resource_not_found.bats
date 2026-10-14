@@ -71,8 +71,10 @@ setup() {
 @test "todo_app v2 blocked: method and endpoint not provided" {
   run bidirekt can-i-deploy "$APP" --version v2 --environment "$PRODUCTION"
   assert_failure
-  assert_output --partial "but $API doesn't provide it → stop calling it, or wait until $API publishes it"
-  assert_equal "$(grep -cF -- "but $API doesn't provide it → stop calling it, or wait until $API publishes it" <<< "$output")" 3
+  assert_output --partial "but $API doesn't provide it
+        → $APP: stop calling it
+        → $API: publish it"
+  assert_equal "$(grep -cF -- "but $API doesn't provide it" <<< "$output")" 3
 }
 
 @test "publish todo_api v2 (provides PUT /todos + GET /todos/stats)" {
@@ -108,7 +110,9 @@ setup() {
 @test "todo_app v3 blocked: participant billing doesn't exist" {
   run bidirekt can-i-deploy "$APP" --version v3 --environment "$PRODUCTION"
   assert_failure
-  assert_output --partial "$APP calls GET /invoices, but billing doesn't provide it → stop calling it, or wait until billing publishes it"
+  assert_output --partial "$APP calls GET /invoices, but billing doesn't provide it
+        → $APP: stop calling it
+        → billing: publish it"
 }
 
 @test "publish todo_app v4 (without billing)" {

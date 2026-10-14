@@ -114,7 +114,9 @@ func TestCanIDeployCommand(t *testing.T) {
 payments (v2, deployed):
   PUT /payments/*
     request:
-      - front doesn't send "$.currency", but payments requires it → send it
+      - front doesn't send "$.currency", but payments requires it
+        → front: send it
+        → payments: stop requiring it, then mark it optional
     response 200:
       - some_future_reason (property: $.amount)
 `, out.String())
@@ -164,7 +166,7 @@ payments (v2, deployed):
 		require.Error(t, err)
 		assert.Contains(t, out.String(), "\npayments:\n")
 		assert.NotContains(t, out.String(), "payments (")
-		assert.Contains(t, out.String(), "  GET /payments/*\n    response 200:\n      - front calls GET /payments/*, but payments doesn't provide it → stop calling it, or wait until payments publishes it\n")
+		assert.Contains(t, out.String(), "  GET /payments/*\n    response 200:\n      - front calls GET /payments/*, but payments doesn't provide it\n        → front: stop calling it\n        → payments: publish it\n")
 	})
 
 	t.Run("non-2xx response renders the broker message to stderr and exits non-zero", func(t *testing.T) {
