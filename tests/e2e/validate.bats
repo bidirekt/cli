@@ -95,7 +95,9 @@ $APP"
 $APP (1.0.0, deployed):
   GET /pets/*
     response 200:
-      - $API doesn't provide \"\$.status\", but $APP reads it → keep providing it"
+      - $API doesn't provide \"\$.status\", but $APP reads it
+        → $API: provide it
+        → $APP: stop reading it, or handle its absence in the code and mark it optional at Pet.status"
 }
 
 @test "publish todo_api 2.0.0 (without status)" {
@@ -111,7 +113,9 @@ $APP (1.0.0, deployed):
 $APP (1.0.0, deployed):
   GET /pets/*
     response 200:
-      - $API doesn't provide \"\$.status\", but $APP reads it → keep providing it"
+      - $API doesn't provide \"\$.status\", but $APP reads it
+        → $API: provide it
+        → $APP: stop reading it, or handle its absence in the code and mark it optional at Pet.status"
 }
 
 @test "publish todo_api 3.0.0 (optional status)" {
@@ -122,7 +126,9 @@ $APP (1.0.0, deployed):
 @test "todo_api 3.0.0 blocked: status only sometimes" {
   run bidirekt can-i-deploy "$API" --version 3.0.0 --environment "$PRODUCTION"
   assert_failure
-  assert_output --partial "$API provides \"\$.status\" (Pet.status) only sometimes, but $APP requires it → keep it required"
+  assert_output --partial "$API provides \"\$.status\" (Pet.status) only sometimes, but $APP requires it
+        → $API: always provide it
+        → $APP: handle its absence in the code, then mark it optional at Pet.status"
 }
 
 @test "validate api_v4.yaml: can be deployed to production" {
@@ -154,9 +160,13 @@ $APP (1.0.0, deployed):
 $APP (1.0.0, deployed):
   POST /pets
     request:
-      - $API removed POST /pets, but $APP still calls it → keep it until $APP stops calling it
+      - $API removed POST /pets, but $APP still calls it
+        → $API: keep it until $APP stops calling it
+        → $APP: stop calling it
     response 201:
-      - $API removed POST /pets, but $APP still calls it → keep it until $APP stops calling it"
+      - $API removed POST /pets, but $APP still calls it
+        → $API: keep it until $APP stops calling it
+        → $APP: stop calling it"
 }
 
 @test "publish todo_api 5.0.0 (without POST /pets)" {
@@ -172,9 +182,13 @@ $APP (1.0.0, deployed):
 $APP (1.0.0, deployed):
   POST /pets
     request:
-      - $API removed POST /pets, but $APP still calls it → keep it until $APP stops calling it
+      - $API removed POST /pets, but $APP still calls it
+        → $API: keep it until $APP stops calling it
+        → $APP: stop calling it
     response 201:
-      - $API removed POST /pets, but $APP still calls it → keep it until $APP stops calling it"
+      - $API removed POST /pets, but $APP still calls it
+        → $API: keep it until $APP stops calling it
+        → $APP: stop calling it"
 }
 
 @test "validate api_typo.yaml: blocked, unresolved schema" {

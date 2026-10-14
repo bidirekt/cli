@@ -71,7 +71,9 @@ setup() {
 @test "todo_app v2 cannot be deployed to production" {
   run bidirekt can-i-deploy "$APP" --version v2 --environment "$PRODUCTION"
   assert_failure
-  assert_output --partial "$APP sends \"\$.title\" (CreateTodoRequest.title) only sometimes, but $API requires it → always send it"
+  assert_output --partial "$APP sends \"\$.title\" (CreateTodoRequest.title) only sometimes, but $API requires it
+        → $APP: always send it
+        → $API: handle its absence in the code, then mark it optional at CreateTodoRequest.title"
 }
 
 @test "publish todo_api v2 (optional title in the request)" {

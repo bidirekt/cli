@@ -67,7 +67,9 @@ func TestCanIDeployCommandRemovedResourceStillConsumed(t *testing.T) {
 orders-web (v7, deployed):
   GET /users
     response 200:
-      - orders-api removed GET /users, but orders-web still calls it → keep it until orders-web stops calling it
+      - orders-api removed GET /users, but orders-web still calls it
+        → orders-api: keep it until orders-web stops calling it
+        → orders-web: stop calling it
 `, out.String())
 	assert.NotContains(t, errOut.String(), "Error:")
 }

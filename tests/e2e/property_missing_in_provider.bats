@@ -71,13 +71,17 @@ setup() {
 @test "todo_api v2 blocked at the scalar path" {
   run bidirekt can-i-deploy "$API" --version v2 --environment "$PRODUCTION"
   assert_failure
-  assert_output --partial "$API doesn't provide \"\$.completed\", but $APP reads it → keep providing it"
+  assert_output --partial "$API doesn't provide \"\$.completed\", but $APP reads it
+        → $API: provide it
+        → $APP: stop reading it, or handle its absence in the code and mark it optional at Todo.completed"
 }
 
 @test "todo_api v2 blocked at the array item path" {
   run bidirekt can-i-deploy "$API" --version v2 --environment "$PRODUCTION"
   assert_failure
-  assert_output --partial "$API doesn't provide \"\$[].completed\", but $APP reads it → keep providing it"
+  assert_output --partial "$API doesn't provide \"\$[].completed\", but $APP reads it
+        → $API: provide it
+        → $APP: stop reading it, or handle its absence in the code and mark it optional at Todo.completed"
 }
 
 @test "publish todo_app v2 (stops requiring completed)" {

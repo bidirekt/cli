@@ -71,8 +71,10 @@ setup() {
 @test "todo_api v2 blocked: two removed resources still consumed by todo_app" {
   run bidirekt can-i-deploy "$API" --version v2 --environment "$PRODUCTION"
   assert_failure
-  assert_output --partial "but $APP still calls it → keep it until $APP stops calling it"
-  assert_equal "$(grep -cF -- "but $APP still calls it → keep it until $APP stops calling it" <<< "$output")" 2
+  assert_output --partial "but $APP still calls it
+        → $API: keep it until $APP stops calling it
+        → $APP: stop calling it"
+  assert_equal "$(grep -cF -- "but $APP still calls it" <<< "$output")" 2
 }
 
 @test "publish todo_app v2 (stops consuming DELETE /todos/* and /todos/search)" {

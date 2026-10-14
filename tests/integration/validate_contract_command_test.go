@@ -133,7 +133,9 @@ func TestValidateContractCommand(t *testing.T) {
 payments (v2, deployed):
   PUT /payments/*
     request:
-      - front doesn't send "$.currency", but payments requires it → send it
+      - front doesn't send "$.currency", but payments requires it
+        → front: send it
+        → payments: stop requiring it, then mark it optional
 `, out.String())
 		assert.Empty(t, errOut.String())
 	})
