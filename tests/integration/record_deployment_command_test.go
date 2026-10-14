@@ -56,6 +56,30 @@ func TestRecordDeploymentCommand(t *testing.T) {
 		assert.Empty(t, errOut.String())
 	})
 
+	t.Run("records a rollback, prints participant rolled back to version in environment, exits 0", func(t *testing.T) {
+		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpmock.ActivateNonDefault(httpClient.StdClient())
+		defer httpmock.DeactivateAndReset()
+
+		httpmock.RegisterResponder(http.MethodPost, endpoint,
+			httpmock.NewStringResponder(http.StatusOK, `{"message":"deployment rolled back"}`))
+
+		command := record_deployment.NewRecordDeploymentCommand(
+			record_deployment.NewRecordDeploymentClient(httpClient),
+		)
+		var out, errOut bytes.Buffer
+		command.SetOut(&out)
+		command.SetErr(&errOut)
+		command.SetArgs([]string{participant, "--version", version, "--environment", environment})
+
+		err := command.Execute()
+
+		require.NoError(t, err)
+		assert.Equal(t, 1, httpmock.GetCallCountInfo()["POST "+endpoint])
+		assert.Equal(t, participant+" rolled back to "+version+" in "+environment+"\n", out.String())
+		assert.Empty(t, errOut.String())
+	})
+
 	t.Run("missing --version fails before any request", func(t *testing.T) {
 		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
 		httpmock.ActivateNonDefault(httpClient.StdClient())

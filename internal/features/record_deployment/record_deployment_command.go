@@ -41,9 +41,14 @@ func NewRecordDeploymentCommand(client *RecordDeploymentClient) *cobra.Command {
 			return err
 		}
 
+		line := participant + " " + message + " to " + environment
+		if message == deploymentRolledBack {
+			line = participant + " rolled back to " + version + " in " + environment
+		}
+
 		writer := command.OutOrStdout()
 		brush := paint.For(writer)
-		if _, err := fmt.Fprintln(writer, brush.Green(participant+" "+message+" to "+environment)); err != nil {
+		if _, err := fmt.Fprintln(writer, brush.Green(line)); err != nil {
 			return err
 		}
 		return nil
