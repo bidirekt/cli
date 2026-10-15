@@ -33,13 +33,18 @@ func TestWriteValidationFailedReturnsAnyOtherErrorAsIs(t *testing.T) {
 	assert.Empty(t, errWriter.String())
 }
 
-func TestWriteVerdictPrintsTheDeployableLine(t *testing.T) {
+func TestWriteVerdictPrintsTheDeployableReport(t *testing.T) {
+	results := map[string]CanIDeployResult{
+		"petstore_api": {Deployable: true, Endpoints: map[string]map[string]map[string][]ContractBreak{}},
+	}
 	var writer bytes.Buffer
 
-	err := WriteVerdict(&writer, "petstore_web 3.0.0", "petstore_web", "production", true, map[string]CanIDeployResult{})
+	err := WriteVerdict(&writer, "petstore_web 3.0.0", "petstore_web", "production", true, results)
 
 	require.NoError(t, err)
-	assert.Equal(t, "petstore_web 3.0.0 can be deployed to production\n", writer.String())
+	assert.Equal(t, `petstore_web 3.0.0 can be deployed to production
+compared with: petstore_api
+`, writer.String())
 }
 
 func TestWriteVerdictPrintsTheReportAndSilencesTheError(t *testing.T) {

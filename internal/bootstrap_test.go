@@ -342,12 +342,59 @@ func TestMissingBrokerURLFailsWithoutWritingTheConfigFile(t *testing.T) {
 
 	execution := executeRoot(t, dependencies, "create-participant", "pets")
 
-	require.EqualError(t, execution.err, noBrokerConfigured)
+	require.EqualError(t, execution.err, noBrokerConfigured+"\nthe config file has the profile acme — pass --profile acme or set BIDIREKT_PROFILE=acme")
 	assert.Empty(t, execution.stderr)
 	assert.Zero(t, broker.requests.Load())
 	saved, err := os.ReadFile(configFilePath)
 	require.NoError(t, err)
 	assert.JSONEq(t, configFileContent, string(saved))
+}
+
+func TestMissingBrokerURLNamesTheProfilesOfTheConfigFile(t *testing.T) {
+	tests := []struct {
+		name              string
+		configFileContent string
+		err               string
+	}{
+		{
+			name: "no config file",
+			err:  noBrokerConfigured,
+		},
+		{
+			name:              "a config file without profiles",
+			configFileContent: `{"profiles":{}}`,
+			err:               noBrokerConfigured,
+		},
+		{
+			name:              "only the local profile",
+			configFileContent: `{"profiles":{"local":{"brokerUrl":"http://localhost:8080"}}}`,
+			err:               noBrokerConfigured + "\nthe config file has the profile local — pass --profile local or set BIDIREKT_PROFILE=local",
+		},
+		{
+			name:              "several profiles, in alphabetical order",
+			configFileContent: `{"profiles":{"local":{"brokerUrl":"http://localhost:8080"},"acme":{"brokerUrl":"https://broker.acme.example"}}}`,
+			err:               noBrokerConfigured + "\nthe config file has the profiles acme, local — pass --profile <name> or set BIDIREKT_PROFILE=<name>",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			configFilePath := isolateEnvironment(t)
+			if test.configFileContent != "" {
+				writeConfigFile(t, configFilePath, test.configFileContent)
+			}
+			broker := startBrokerStub(t)
+			dependencies := components.New()
+			dependencies.HTTPClient.SetBaseURL(broker.url)
+
+			execution := executeRoot(t, dependencies, "list-participants")
+
+			require.EqualError(t, execution.err, test.err)
+			assert.Empty(t, execution.stdout)
+			assert.Empty(t, execution.stderr)
+			assert.Zero(t, broker.requests.Load())
+		})
+	}
 }
 
 func TestDotEnvInTheWorkingDirectoryIsIgnored(t *testing.T) {

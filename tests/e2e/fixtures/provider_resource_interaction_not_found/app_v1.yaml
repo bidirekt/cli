@@ -1,0 +1,16 @@
+consumes:
+  ${API}:
+    rest:
+      "/todos/*/archive":
+        post:
+          responses:
+            "200": ~
+      "/todos/*/restore":
+        post:
+          request: ~
+          responses:
+            "204": ~
+      "/todos/*/attachments":
+        post:
+          responses:
+            "201": ~

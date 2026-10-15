@@ -42,25 +42,25 @@ func TestResolveBrokerURLTakesTheFirstSourceThatHasOne(t *testing.T) {
 		{
 			name:     "the default profile without --profile and BIDIREKT_PROFILE",
 			profiles: profiles,
-			resolved: components.ResolvedBrokerURL{BrokerURL: defaultURL, Origin: "profile: default", Profile: "default"},
+			resolved: components.ResolvedBrokerURL{BrokerURL: defaultURL, Origin: "profile: default", Profile: "default", OtherProfiles: []string{"staging"}},
 		},
 		{
 			name:     "--profile selects the profile",
 			sources:  components.BrokerURLSources{FlagProfile: "staging"},
 			profiles: profiles,
-			resolved: components.ResolvedBrokerURL{BrokerURL: stagingURL, Origin: "profile: staging", Profile: "staging"},
+			resolved: components.ResolvedBrokerURL{BrokerURL: stagingURL, Origin: "profile: staging", Profile: "staging", OtherProfiles: []string{"default"}},
 		},
 		{
 			name:     "BIDIREKT_PROFILE selects the profile",
 			sources:  components.BrokerURLSources{EnvProfile: "staging"},
 			profiles: profiles,
-			resolved: components.ResolvedBrokerURL{BrokerURL: stagingURL, Origin: "profile: staging", Profile: "staging"},
+			resolved: components.ResolvedBrokerURL{BrokerURL: stagingURL, Origin: "profile: staging", Profile: "staging", OtherProfiles: []string{"default"}},
 		},
 		{
 			name:     "--profile wins over BIDIREKT_PROFILE",
 			sources:  components.BrokerURLSources{FlagProfile: "staging", EnvProfile: "default"},
 			profiles: profiles,
-			resolved: components.ResolvedBrokerURL{BrokerURL: stagingURL, Origin: "profile: staging", Profile: "staging"},
+			resolved: components.ResolvedBrokerURL{BrokerURL: stagingURL, Origin: "profile: staging", Profile: "staging", OtherProfiles: []string{"default"}},
 		},
 		{
 			name:     "--broker-url wins over the selected profile, which stays the active one",
@@ -127,7 +127,7 @@ func TestResolveBrokerURLReportsAMissingURL(t *testing.T) {
 		{
 			name:     "the default profile missing is not a profile not found",
 			profiles: map[string]components.Profile{"staging": {BrokerURL: "http://staging.internal"}},
-			resolved: components.ResolvedBrokerURL{Origin: "profile: default", Profile: "default"},
+			resolved: components.ResolvedBrokerURL{Origin: "profile: default", Profile: "default", OtherProfiles: []string{"staging"}},
 		},
 		{
 			name:     "a profile named by --profile and missing from the file is not found",
@@ -146,6 +146,15 @@ func TestResolveBrokerURLReportsAMissingURL(t *testing.T) {
 			sources:  components.BrokerURLSources{FlagProfile: "staging"},
 			profiles: map[string]components.Profile{"staging": {}},
 			resolved: components.ResolvedBrokerURL{Origin: "profile: staging", Profile: "staging"},
+		},
+		{
+			name: "the other profiles of the file come in alphabetical order",
+			profiles: map[string]components.Profile{
+				"local":  {BrokerURL: "http://localhost:8080"},
+				"globex": {BrokerURL: "https://broker.globex.example"},
+				"acme":   {BrokerURL: "https://broker.acme.example"},
+			},
+			resolved: components.ResolvedBrokerURL{Origin: "profile: default", Profile: "default", OtherProfiles: []string{"acme", "globex", "local"}},
 		},
 	}
 

@@ -38,7 +38,8 @@ setup() {
 @test "validate the todo_api folder: its subfolder is read, its README is not" {
   run bidirekt validate ./api --participant "$API" --environment "$PRODUCTION"
   assert_success
-  assert_output --partial "$API local contract can be deployed to $PRODUCTION"
+  assert_output --partial "$API local contract can be deployed to $PRODUCTION
+nothing deployed in $PRODUCTION to compare with"
 }
 
 @test "publish todo_api v1 from its folder" {

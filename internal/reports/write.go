@@ -30,7 +30,7 @@ func WriteVerdict(writer io.Writer, checkedSideLabel, participant, environment s
 		return ErrSilent
 	}
 
-	if _, err := fmt.Fprintln(writer, FormatDeployableLine(paint.For(writer), checkedSideLabel, environment)); err != nil {
+	if _, err := fmt.Fprint(writer, FormatDeployableReport(paint.For(writer), checkedSideLabel, environment, results)); err != nil {
 		return err
 	}
 

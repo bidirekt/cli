@@ -48,7 +48,7 @@ func NewValidateCommand(validateContractClient *ValidateContractClient) *cobra.C
 
 		checkedSideLabel := participant + " local contract"
 
-		return reports.WriteVerdict(command.OutOrStdout(), checkedSideLabel, participant, environment, response.Deployable, response.Results)
+		return reports.WriteVerdict(command.OutOrStdout(), checkedSideLabel, participant, response.Environment, response.Deployable, response.Results)
 	}
 
 	command := &cobra.Command{

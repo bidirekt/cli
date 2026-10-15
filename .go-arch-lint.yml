@@ -11,6 +11,8 @@ vendors:
     in: github.com/stretchr/testify/**
   httpmock:
     in: github.com/jarcoal/httpmock
+  term:
+    in: golang.org/x/term
 components:
   cmd:
     in: cmd/**
@@ -53,6 +55,7 @@ deps:
   components:
     canUse:
       - resty
+      - term
   paint:
     mayDependOn:
       - components

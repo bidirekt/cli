@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/bidirekt/cli/internal/components"
 	"github.com/bidirekt/cli/internal/features/can_i_deploy"
@@ -127,5 +128,12 @@ func resolveBroker(command *cobra.Command, config *components.Config) (component
 		return components.ResolvedBrokerURL{}, fmt.Errorf("profile %q not found in %s", resolved.Profile, configFile.Path)
 	}
 
-	return components.ResolvedBrokerURL{}, errNoBrokerConfigured
+	switch len(resolved.OtherProfiles) {
+	case 0:
+		return components.ResolvedBrokerURL{}, errNoBrokerConfigured
+	case 1:
+		return components.ResolvedBrokerURL{}, fmt.Errorf("%w\nthe config file has the profile %[2]s — pass --profile %[2]s or set BIDIREKT_PROFILE=%[2]s", errNoBrokerConfigured, resolved.OtherProfiles[0])
+	default:
+		return components.ResolvedBrokerURL{}, fmt.Errorf("%w\nthe config file has the profiles %s — pass --profile <name> or set BIDIREKT_PROFILE=<name>", errNoBrokerConfigured, strings.Join(resolved.OtherProfiles, ", "))
+	}
 }

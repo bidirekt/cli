@@ -134,7 +134,8 @@ $APP (1.0.0, deployed):
 @test "validate api_v4.yaml: can be deployed to production" {
   run bidirekt validate ./api_v4.yaml --participant "$API" --environment "$PRODUCTION"
   assert_success
-  assert_output --partial "$API local contract can be deployed to $PRODUCTION"
+  assert_output --partial "$API local contract can be deployed to $PRODUCTION
+compared with: $APP"
 }
 
 @test "publish todo_api 4.0.0 (required status and tags)" {

@@ -49,7 +49,7 @@ func NewCanIDeployCommand(client *CanIDeployClient) *cobra.Command {
 
 		checkedSideLabel := participant + " " + version
 
-		return reports.WriteVerdict(command.OutOrStdout(), checkedSideLabel, participant, environment, resp.Deployable, resp.Results)
+		return reports.WriteVerdict(command.OutOrStdout(), checkedSideLabel, participant, resp.Environment, resp.Deployable, resp.Results)
 	}
 
 	command := &cobra.Command{

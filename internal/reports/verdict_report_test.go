@@ -8,19 +8,39 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestFormatDeployableLineNamesTheCheckedSide(t *testing.T) {
-	line := FormatDeployableLine(paint.For(&bytes.Buffer{}), "petstore_web 3.0.0", "production")
+func TestFormatDeployableReportNamesTheCounterpartsComparedWithInAlphabeticalOrder(t *testing.T) {
+	apiVersion := "4.0.0"
+	results := map[string]CanIDeployResult{
+		"petstore_reviews": {Deployable: true, Endpoints: map[string]map[string]map[string][]ContractBreak{}},
+		"petstore_api":     {Deployable: true, ParticipantVersion: &apiVersion, Endpoints: map[string]map[string]map[string][]ContractBreak{}},
+		"petstore_admin":   {Deployable: true, Endpoints: map[string]map[string]map[string][]ContractBreak{}},
+	}
 
-	assert.Equal(t, "petstore_web 3.0.0 can be deployed to production", line)
+	report := FormatDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 3.0.0", "production", results)
+
+	assert.Equal(t, `petstore_web 3.0.0 can be deployed to production
+compared with: petstore_admin, petstore_api, petstore_reviews
+`, report)
 }
 
-func TestFormatDeployableLinePaintsItGreen(t *testing.T) {
+func TestFormatDeployableReportSaysWhenNothingIsDeployedToCompareWith(t *testing.T) {
+	report := FormatDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 3.0.0", "production", map[string]CanIDeployResult{})
+
+	assert.Equal(t, `petstore_web 3.0.0 can be deployed to production
+nothing deployed in production to compare with
+`, report)
+}
+
+func TestFormatDeployableReportPaintsOnlyTheVerdictGreen(t *testing.T) {
 	t.Setenv("NO_COLOR", "")
 	t.Setenv("CLICOLOR_FORCE", "1")
+	results := map[string]CanIDeployResult{
+		"petstore_api": {Deployable: true, Endpoints: map[string]map[string]map[string][]ContractBreak{}},
+	}
 
-	line := FormatDeployableLine(paint.For(&bytes.Buffer{}), "petstore_web 3.0.0", "production")
+	report := FormatDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 3.0.0", "production", results)
 
-	assert.Equal(t, "\x1b[32mpetstore_web 3.0.0 can be deployed to production\x1b[0m", line)
+	assert.Equal(t, "\x1b[32mpetstore_web 3.0.0 can be deployed to production\x1b[0m\ncompared with: petstore_api\n", report)
 }
 
 func TestFormatNotDeployableReportWalksTheTree(t *testing.T) {
@@ -270,6 +290,57 @@ petstore_reviews:
 `, report)
 }
 
+func TestFormatNotDeployableReportSaysWhatTheProviderLacksOnAMethodItHas(t *testing.T) {
+	results := map[string]CanIDeployResult{
+		"api": {
+			Deployable: false,
+			Endpoints: map[string]map[string]map[string][]ContractBreak{
+				"/api/newsletter/unsubscribe": {
+					"post": {
+						"200": {
+							{Reason: "provider_resource_interaction_not_found", Role: "consumer", Details: map[string]string{"providerStatuses": "204"}},
+						},
+					},
+					"delete": {
+						"204": {
+							{Reason: "provider_resource_not_found", Role: "consumer"},
+						},
+					},
+				},
+				"/api/users/*/restore": {
+					"post": {
+						"request": {
+							{Reason: "provider_resource_interaction_not_found", Role: "consumer", Details: map[string]string{"providerStatuses": "204, 404"}},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	report := FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "site 1.0.0", "site", "production", results)
+
+	assert.Equal(t, `site 1.0.0 cannot be deployed to production
+
+api:
+  DELETE /api/newsletter/unsubscribe
+    response 204:
+      - site calls DELETE /api/newsletter/unsubscribe, but api doesn't provide it
+        → site: stop calling it
+        → api: publish it
+  POST /api/newsletter/unsubscribe
+    response 200:
+      - site reads response 200, but api answers only 204
+        → site: read response 204
+        → api: answer 200
+  POST /api/users/*/restore
+    request:
+      - site sends a request body, but api declares none
+        → site: stop sending it
+        → api: accept a request body
+`, report)
+}
+
 func TestFormatNotDeployableReportPaintsTheHeadlineRed(t *testing.T) {
 	t.Setenv("NO_COLOR", "")
 	t.Setenv("CLICOLOR_FORCE", "1")
@@ -313,6 +384,9 @@ func TestFormatBreakLine(t *testing.T) {
 	apiServesSession := checkedInteraction{participant: "api", counterpart: "spa", environment: "production", method: "GET", endpoint: "/session"}
 	spaPostsSession := checkedInteraction{participant: "spa", counterpart: "api", environment: "production", method: "POST", endpoint: "/session", isRequest: true}
 	apiReceivesSession := checkedInteraction{participant: "api", counterpart: "spa", environment: "production", method: "POST", endpoint: "/session", isRequest: true}
+	siteReadsUnsubscribe200 := checkedInteraction{participant: "site", counterpart: "api", environment: "production", method: "POST", endpoint: "/api/newsletter/unsubscribe", status: "200"}
+	siteReadsUpload201 := checkedInteraction{participant: "site", counterpart: "api", environment: "production", method: "POST", endpoint: "/api/files", status: "201"}
+	appSendsRestore := checkedInteraction{participant: "app", counterpart: "api", environment: "production", method: "POST", endpoint: "/api/users/*/restore", isRequest: true}
 
 	tests := []struct {
 		name          string
@@ -684,6 +758,74 @@ func TestFormatBreakLine(t *testing.T) {
 				fixes: []string{
 					"petstore_web: stop calling it",
 					"petstore_reviews: publish it",
+				},
+			},
+		},
+		{
+			name:        "provider_resource_interaction_not_found as consumer on a response names the status the provider answers",
+			interaction: siteReadsUnsubscribe200,
+			contractBreak: ContractBreak{Reason: "provider_resource_interaction_not_found", Role: "consumer", Details: map[string]string{
+				"providerStatuses": "204",
+			}},
+			line: breakLine{
+				text: "site reads response 200, but api answers only 204",
+				fixes: []string{
+					"site: read response 204",
+					"api: answer 200",
+				},
+			},
+		},
+		{
+			name:        "provider_resource_interaction_not_found as consumer on a response joins two statuses with or",
+			interaction: siteReadsUnsubscribe200,
+			contractBreak: ContractBreak{Reason: "provider_resource_interaction_not_found", Role: "consumer", Details: map[string]string{
+				"providerStatuses": "201, 204",
+			}},
+			line: breakLine{
+				text: "site reads response 200, but api answers only 201 or 204",
+				fixes: []string{
+					"site: read response 201 or 204",
+					"api: answer 200",
+				},
+			},
+		},
+		{
+			name:        "provider_resource_interaction_not_found as consumer on a response puts or before the last of several statuses",
+			interaction: siteReadsUnsubscribe200,
+			contractBreak: ContractBreak{Reason: "provider_resource_interaction_not_found", Role: "consumer", Details: map[string]string{
+				"providerStatuses": "201, 204, 404",
+			}},
+			line: breakLine{
+				text: "site reads response 200, but api answers only 201, 204 or 404",
+				fixes: []string{
+					"site: read response 201, 204 or 404",
+					"api: answer 200",
+				},
+			},
+		},
+		{
+			name:          "provider_resource_interaction_not_found as consumer on a response the provider declares none of",
+			interaction:   siteReadsUpload201,
+			contractBreak: ContractBreak{Reason: "provider_resource_interaction_not_found", Role: "consumer"},
+			line: breakLine{
+				text: "site reads response 201, but api declares no response",
+				fixes: []string{
+					"site: stop reading it",
+					"api: answer 201",
+				},
+			},
+		},
+		{
+			name:        "provider_resource_interaction_not_found as consumer on a request ignores the statuses the provider answers",
+			interaction: appSendsRestore,
+			contractBreak: ContractBreak{Reason: "provider_resource_interaction_not_found", Role: "consumer", Details: map[string]string{
+				"providerStatuses": "204, 404",
+			}},
+			line: breakLine{
+				text: "app sends a request body, but api declares none",
+				fixes: []string{
+					"app: stop sending it",
+					"api: accept a request body",
 				},
 			},
 		},

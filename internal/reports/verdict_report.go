@@ -23,8 +23,12 @@ type ContractBreak struct {
 	Details map[string]string `json:"details"`
 }
 
-func FormatDeployableLine(brush paint.Brush, checkedSideLabel, environment string) string {
-	return brush.Green(checkedSideLabel + " can be deployed to " + environment)
+func FormatDeployableReport(brush paint.Brush, checkedSideLabel, environment string, results map[string]CanIDeployResult) string {
+	report := brush.Green(checkedSideLabel+" can be deployed to "+environment) + "\n"
+	if len(results) == 0 {
+		return report + "nothing deployed in " + environment + " to compare with\n"
+	}
+	return report + "compared with: " + strings.Join(sortedKeys(results), ", ") + "\n"
 }
 
 func FormatNotDeployableReport(brush paint.Brush, checkedSideLabel, participant, environment string, results map[string]CanIDeployResult) string {
@@ -71,8 +75,10 @@ func FormatNotDeployableReport(brush paint.Brush, checkedSideLabel, participant,
 					checked.isRequest = interaction == "request"
 
 					if checked.isRequest {
+						checked.status = ""
 						report.WriteString("    request:\n")
 					} else {
+						checked.status = interaction
 						fmt.Fprintf(&report, "    response %s:\n", interaction)
 					}
 
@@ -134,6 +140,7 @@ type checkedInteraction struct {
 	method      string
 	endpoint    string
 	isRequest   bool
+	status      string
 }
 
 type breakLine struct {
@@ -238,6 +245,22 @@ func formatBreakLine(interaction checkedInteraction, contractBreak ContractBreak
 			text:  fmt.Sprintf("%s calls %s, but %s doesn't provide it", me, resource, other),
 			fixes: []string{me + ": stop calling it", other + ": publish it"},
 		}
+	case reason == "provider_resource_interaction_not_found" && asConsumer && onRequest:
+		return breakLine{
+			text:  fmt.Sprintf("%s sends a request body, but %s declares none", me, other),
+			fixes: []string{me + ": stop sending it", other + ": accept a request body"},
+		}
+	case reason == "provider_resource_interaction_not_found" && asConsumer && onResponse && details["providerStatuses"] == "":
+		return breakLine{
+			text:  fmt.Sprintf("%s reads response %s, but %s declares no response", me, interaction.status, other),
+			fixes: []string{me + ": stop reading it", other + ": answer " + interaction.status},
+		}
+	case reason == "provider_resource_interaction_not_found" && asConsumer && onResponse:
+		providerStatuses := orList(details["providerStatuses"])
+		return breakLine{
+			text:  fmt.Sprintf("%s reads response %s, but %s answers only %s", me, interaction.status, other, providerStatuses),
+			fixes: []string{me + ": read response " + providerStatuses, other + ": answer " + interaction.status},
+		}
 	case reason == "provider_resource_not_deployed_in_environment" && asConsumer:
 		deployedIn := ""
 		if environments, ok := details["deployedEnvironments"]; ok {
@@ -299,6 +322,14 @@ func (this propertyBreak) toBreakLine(phrases propertyBreakPhrases) breakLine {
 		return breakLine{text: phrases.consumerChecked, fixes: []string{consumerLine, providerLine + at(providerField)}}
 	}
 	return breakLine{text: phrases.providerChecked, fixes: []string{providerLine, consumerLine + at(consumerField)}}
+}
+
+func orList(commaList string) string {
+	last := strings.LastIndex(commaList, ", ")
+	if last < 0 {
+		return commaList
+	}
+	return commaList[:last] + " or " + commaList[last+len(", "):]
 }
 
 func propertyPathPhrase(path, field string) string {

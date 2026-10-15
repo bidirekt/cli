@@ -108,6 +108,25 @@ func TestConfigureCommand(t *testing.T) {
 		assert.NoFileExists(t, configFilePath)
 	})
 
+	t.Run("with stdin at /dev/null it fails asking for the flag", func(t *testing.T) {
+		configFilePath := isolateConfigFile(t, "")
+		nullDevice, err := os.Open(os.DevNull)
+		require.NoError(t, err)
+		t.Cleanup(func() { assert.NoError(t, nullDevice.Close()) })
+		command := configure.NewConfigureCommand(components.NewConfig(), components.IsTerminal)
+		var out, errOut bytes.Buffer
+		command.SetIn(nullDevice)
+		command.SetOut(&out)
+		command.SetErr(&errOut)
+		command.SetArgs([]string{})
+
+		err = command.Execute()
+
+		require.EqualError(t, err, "no terminal to ask for the broker URL — pass --broker-url")
+		assert.NotContains(t, errOut.String(), "Broker URL")
+		assert.NoFileExists(t, configFilePath)
+	})
+
 	t.Run("BIDIREKT_BROKER_URL is ignored", func(t *testing.T) {
 		configFilePath := isolateConfigFile(t, "")
 		t.Setenv("BIDIREKT_BROKER_URL", acmeURL)

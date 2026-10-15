@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -13,21 +12,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestIsTerminalReportsCharacterDevicesOnly(t *testing.T) {
+func TestIsTerminalReportsTerminalsOnly(t *testing.T) {
 	regularFile, err := os.Create(filepath.Join(t.TempDir(), "stdin.txt"))
 	require.NoError(t, err)
 	t.Cleanup(func() { assert.NoError(t, regularFile.Close()) })
+	nullDevice, err := os.Open(os.DevNull)
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, nullDevice.Close()) })
 
 	assert.False(t, components.IsTerminal(&bytes.Buffer{}))
 	assert.False(t, components.IsTerminal(strings.NewReader("")))
 	assert.False(t, components.IsTerminal(regularFile))
+	assert.False(t, components.IsTerminal(nullDevice))
 	assert.False(t, components.IsTerminal(nil))
-
-	if runtime.GOOS != "windows" {
-		characterDevice, err := os.Open(os.DevNull)
-		require.NoError(t, err)
-		t.Cleanup(func() { assert.NoError(t, characterDevice.Close()) })
-
-		assert.True(t, components.IsTerminal(characterDevice))
-	}
 }

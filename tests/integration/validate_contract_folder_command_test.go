@@ -80,7 +80,7 @@ func TestValidateContractFolderCommand(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.JSONEq(t, string(expectedBody), string(capturedBody))
-		assert.Equal(t, "front local contract can be deployed to production\n", out.String())
+		assert.Equal(t, "front local contract can be deployed to production\nnothing deployed in production to compare with\n", out.String())
 		assert.Empty(t, errOut.String())
 	})
 
