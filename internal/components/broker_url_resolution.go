@@ -1,5 +1,7 @@
 package components
 
+import "sort"
+
 const (
 	BrokerURLFlagOrigin = "from --broker-url"
 	brokerURLEnvOrigin  = "from BIDIREKT_BROKER_URL"
@@ -19,6 +21,7 @@ type ResolvedBrokerURL struct {
 	Profile   string
 	// True only for a profile named by --profile or BIDIREKT_PROFILE that the config file lacks.
 	ProfileNotFound bool
+	OtherProfiles   []string
 }
 
 func ActiveProfileName(flagProfile, envProfile string) string {
@@ -51,6 +54,7 @@ func ResolveBrokerURL(sources BrokerURLSources) (ResolvedBrokerURL, error) {
 			Origin:          "profile: " + profileName,
 			Profile:         profileName,
 			ProfileNotFound: !found && (sources.FlagProfile != "" || sources.EnvProfile != ""),
+			OtherProfiles:   otherProfileNames(profiles, profileName),
 		}
 	}
 
@@ -62,4 +66,15 @@ func ResolveBrokerURL(sources BrokerURLSources) (ResolvedBrokerURL, error) {
 	}
 
 	return resolved, nil
+}
+
+func otherProfileNames(profiles map[string]Profile, activeProfileName string) []string {
+	var names []string
+	for name := range profiles {
+		if name != activeProfileName {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	return names
 }

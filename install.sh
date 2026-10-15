@@ -2,10 +2,11 @@
 set -eu
 
 releases=https://github.com/bidirekt/cli/releases
+releases_api=https://api.github.com/repos/bidirekt/cli/releases
 usage="usage: install.sh [-b <dir>] [vX.Y.Z]"
 
 fail() {
-  printf '%s\n' "$1" >&2
+  printf '%s\n' "$@" >&2
   exit 1
 }
 
@@ -38,11 +39,20 @@ if [ -z "$version" ]; then
     fail "could not resolve the latest release from $releases/latest"
   case $latest in
     "$releases"/tag/*) version=${latest#"$releases"/tag/} ;;
-    *) fail "no release published at $releases" ;;
+    *)
+      # releases/latest skips pre-releases; the API lists them too, newest first.
+      newest_release=$(curl -sSfL "$releases_api?per_page=1") ||
+        fail "could not list the releases from $releases_api"
+      newest_tag=$(printf '%s' "$newest_release" | tr ',' '\n' | sed -n 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p')
+      [ -n "$newest_tag" ] || fail "no release published at $releases"
+      fail "only pre-releases are published at $releases. Install the newest one with:" \
+        "  curl -sSfL https://raw.githubusercontent.com/bidirekt/cli/main/install.sh | sh -s -- $newest_tag"
+      ;;
   esac
 fi
 case $version in
   v[0-9]*.[0-9]*.[0-9]*) ;;
+  [0-9]*.[0-9]*.[0-9]*) version=v$version ;;
   *) fail "invalid version \"$version\": expected vX.Y.Z" ;;
 esac
 

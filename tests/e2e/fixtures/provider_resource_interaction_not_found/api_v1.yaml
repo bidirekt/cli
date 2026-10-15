@@ -1,0 +1,15 @@
+provides:
+  rest:
+    "/todos/*/archive":
+      post:
+        responses:
+          "204": ~
+          "404": ~
+    "/todos/*/restore":
+      post:
+        responses:
+          "204": ~
+          "404": ~
+    "/todos/*/attachments":
+      post:
+        request: ~

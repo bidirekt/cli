@@ -73,7 +73,42 @@ func TestValidateContractCommand(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.JSONEq(t, string(expectedBody), string(capturedBody))
-		assert.Equal(t, "front local contract can be deployed to production\n", out.String())
+		assert.Equal(t, "front local contract can be deployed to production\nnothing deployed in production to compare with\n", out.String())
+		assert.Empty(t, errOut.String())
+	})
+
+	t.Run("compatible verdict names the counterparts it was compared with, in alphabetical order", func(t *testing.T) {
+		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpmock.ActivateNonDefault(httpClient.StdClient())
+		defer httpmock.DeactivateAndReset()
+
+		file := writeContract(t)
+
+		responseBody := `{
+		  "message": "contract validated successfully",
+		  "participant": "front",
+		  "environment": "production",
+		  "deployable": true,
+		  "results": {
+		    "site": { "deployable": true, "participantVersion": "v4", "endpoints": {} },
+		    "admin": { "deployable": true, "participantVersion": "v2", "endpoints": {} }
+		  }
+		}`
+		httpmock.RegisterResponder(http.MethodPost, endpoint,
+			httpmock.NewStringResponder(http.StatusOK, responseBody))
+
+		command := validate_contract.NewValidateCommand(
+			validate_contract.NewValidateContractClient(httpClient),
+		)
+		var out, errOut bytes.Buffer
+		command.SetOut(&out)
+		command.SetErr(&errOut)
+		command.SetArgs([]string{file, "--participant", participant, "--environment", environment})
+
+		err := command.Execute()
+
+		require.NoError(t, err)
+		assert.Equal(t, "front local contract can be deployed to production\ncompared with: admin, site\n", out.String())
 		assert.Empty(t, errOut.String())
 	})
 

@@ -51,6 +51,8 @@ setup() {
 @test "todo_api v1 can be deployed to staging" {
   run bidirekt can-i-deploy "$API" --version v1 --environment "$STAGING"
   assert_success
+  assert_output --partial "$API v1 can be deployed to $STAGING
+nothing deployed in $STAGING to compare with"
 }
 
 @test "record todo_api v1 deployed to staging" {
@@ -61,6 +63,8 @@ setup() {
 @test "todo_api v1 can be deployed to production" {
   run bidirekt can-i-deploy "$API" --version v1 --environment "$PRODUCTION"
   assert_success
+  assert_output --partial "$API v1 can be deployed to $PRODUCTION
+nothing deployed in $PRODUCTION to compare with"
 }
 
 @test "record todo_api v1 deployed to production" {
@@ -71,6 +75,8 @@ setup() {
 @test "todo_app v1 can be deployed to staging" {
   run bidirekt can-i-deploy "$APP" --version v1 --environment "$STAGING"
   assert_success
+  assert_output --partial "$APP v1 can be deployed to $STAGING
+compared with: $API"
 }
 
 @test "record todo_app v1 deployed to staging" {
@@ -81,6 +87,8 @@ setup() {
 @test "todo_app v1 can be deployed to production" {
   run bidirekt can-i-deploy "$APP" --version v1 --environment "$PRODUCTION"
   assert_success
+  assert_output --partial "$APP v1 can be deployed to $PRODUCTION
+compared with: $API"
 }
 
 @test "record todo_app v1 deployed to production" {
@@ -96,6 +104,8 @@ setup() {
 @test "todo_api v2 can be deployed to staging" {
   run bidirekt can-i-deploy "$API" --version v2 --environment "$STAGING"
   assert_success
+  assert_output --partial "$API v2 can be deployed to $STAGING
+compared with: $APP"
 }
 
 @test "record todo_api v2 deployed to staging" {
@@ -106,6 +116,8 @@ setup() {
 @test "todo_api v2 can be deployed to production" {
   run bidirekt can-i-deploy "$API" --version v2 --environment "$PRODUCTION"
   assert_success
+  assert_output --partial "$API v2 can be deployed to $PRODUCTION
+compared with: $APP"
 }
 
 @test "record todo_api v2 deployed to production" {
