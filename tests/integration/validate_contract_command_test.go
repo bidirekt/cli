@@ -135,7 +135,7 @@ func TestValidateContractCommand(t *testing.T) {
 		              {
 		                "reason": "property_missing_in_consumer",
 		                "role": "consumer",
-		                "details": { "property": "$.currency", "propertyType": "string", "consumerName": "front", "providerName": "payments" }
+		                "details": { "providerField": "UpdatePaymentRequest.currency", "property": "$.currency", "propertyType": "string", "consumerName": "front", "providerName": "payments" }
 		              }
 		            ]
 		          }
@@ -166,11 +166,10 @@ func TestValidateContractCommand(t *testing.T) {
 		assert.Equal(t, `front local contract cannot be deployed to production
 
 payments (v2, deployed):
-  PUT /payments/*
-    request:
-      - front doesn't send "$.currency", but payments requires it
-        → front: send it
-        → payments: stop requiring it, then mark it optional
+  UpdatePaymentRequest.currency — front doesn't send it, but payments requires it
+    → front: send it
+    → payments: stop requiring it, then mark it optional there
+      · PUT /payments/* request at "$.currency" (payments: UpdatePaymentRequest.currency)
 `, out.String())
 		assert.Empty(t, errOut.String())
 	})
