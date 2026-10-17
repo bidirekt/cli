@@ -21,6 +21,7 @@ func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
 		{Code: "schema.array_without_items", Path: "schemas;Pets", Source: "api.yaml"},
 		{Code: "schema.values_with_properties", Path: "schemas;Inventory", Source: "api.yaml"},
 		{Code: "schema.values_without_object", Path: "schemas;Owner;properties;pets", Source: "api.yaml"},
+		{Code: "schema.key_not_allowed", Path: "schemas;Owner;properties;pet", Source: "api.yaml", Details: map[string]string{"key": "type", "type": "ref"}},
 		{Code: "resource.duplicate", Path: "provides;rest;/pets;get;responses;200", Source: "store.yaml", Details: map[string]string{"resource": "provides GET /pets 200", "declaredIn": "pets.yaml"}},
 		{Code: "resource.type_conflict", Path: "consumes;payments;rest;/invoices;get;responses;200", Source: "b.yaml", Details: map[string]string{"resource": "consumes payments GET /invoices 200", "property": "$.id", "type": "integer", "declaredIn": "a.yaml", "declaredType": "string"}},
 		{Code: "schema.duplicate", Path: "schemas;Pet", Source: "schemas.yaml", Details: map[string]string{"schema": "Pet", "declaredIn": "billing.yaml"}},
@@ -40,6 +41,7 @@ func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
   - api.yaml: array schema without items at schemas Pets
   - api.yaml: object schema has both "values" and "properties" at schemas Inventory
   - api.yaml: "values" on a non-object schema at schemas Owner properties pets
+  - api.yaml: "type" is not allowed beside "ref" at schemas Owner properties pet
   - store.yaml: duplicate resource "provides GET /pets 200", also declared in pets.yaml
   - b.yaml: conflicting type for property "$.id" of consumes payments GET /invoices 200: integer here, string in a.yaml
   - schemas.yaml: duplicate schema "Pet", also declared in billing.yaml
@@ -202,6 +204,18 @@ func TestFormatViolationLine(t *testing.T) {
 		})
 
 		assert.Equal(t, `"values" on a non-object schema at schemas Owner properties pets`, headline)
+		assert.Empty(t, explanation)
+	})
+
+	t.Run("schema.key_not_allowed beside ref", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "schema.key_not_allowed",
+			Path:    "schemas;Owner;properties;pet",
+			Source:  "api.yaml",
+			Details: map[string]string{"key": "type", "type": "ref"},
+		})
+
+		assert.Equal(t, `"type" is not allowed beside "ref" at schemas Owner properties pet`, headline)
 		assert.Empty(t, explanation)
 	})
 
