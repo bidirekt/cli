@@ -64,6 +64,11 @@ func FormatViolationLine(violation Violation) (headline, explanation string) {
 		return `object schema has both "values" and "properties"` + pathAt, ""
 	case "schema.values_without_object":
 		return `"values" on a non-object schema` + pathAt, ""
+	case "schema.key_not_allowed":
+		if details["type"] == "ref" {
+			return fmt.Sprintf(`%q is not allowed beside "ref"%s`, details["key"], pathAt), ""
+		}
+		return fallbackViolationLine(violation), ""
 	case "resource.duplicate":
 		if details["declaredIn"] == violation.Source {
 			return fmt.Sprintf("duplicate resource %q, declared twice", details["resource"]), ""
