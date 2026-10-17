@@ -70,20 +70,16 @@ setup() {
   assert_success
 }
 
-@test "todo_api v2 blocked at the scalar path" {
+@test "todo_api v2 blocked: one Todo.completed block at the scalar and array item paths" {
   run bidirekt can-i-deploy "$API" --version v2 --environment "$PRODUCTION"
   assert_failure
-  assert_output --partial "$API doesn't provide \"\$.completed\", but $APP reads it
-        → $API: provide it
-        → $APP: stop reading it, or handle its absence in the code and mark it optional at Todo.completed"
-}
-
-@test "todo_api v2 blocked at the array item path" {
-  run bidirekt can-i-deploy "$API" --version v2 --environment "$PRODUCTION"
-  assert_failure
-  assert_output --partial "$API doesn't provide \"\$[].completed\", but $APP reads it
-        → $API: provide it
-        → $APP: stop reading it, or handle its absence in the code and mark it optional at Todo.completed"
+  assert_output --partial "Todo.completed — $API doesn't provide it, but $APP reads it (4 places)
+    → $API: provide it
+    → $APP: stop reading it, or handle its absence in the code and mark it optional there
+      · GET /todos response 200 at \"\$[].completed\" ($APP: Todo.completed)
+      · POST /todos response 200 at \"\$.completed\" ($APP: Todo.completed)
+      · GET /todos/* response 200 at \"\$.completed\" ($APP: Todo.completed)
+      · PUT /todos/* response 200 at \"\$.completed\" ($APP: Todo.completed)"
 }
 
 @test "publish todo_app v2 (stops requiring completed)" {
