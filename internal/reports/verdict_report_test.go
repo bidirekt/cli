@@ -600,6 +600,78 @@ petstore_api:
 `, report)
 }
 
+func TestFormatNotDeployableReportSplitsAFieldsBlocksByFix(t *testing.T) {
+	tests := []struct {
+		name                     string
+		participant, counterpart string
+		endpoints                map[string]map[string]map[string][]ContractBreak
+		blocks                   string
+	}{
+		{
+			name:        "an array's items the checked provider provides only sometimes to readers of two schemas",
+			participant: "api", counterpart: "spa",
+			endpoints: map[string]map[string]map[string][]ContractBreak{
+				"/a": {"get": {"200": {
+					{Reason: "property_optional_in_provider_required_in_consumer", Role: "provider", Details: map[string]string{
+						"consumerField": "A.tags[]", "providerField": "SessionRecord.tags[]", "property": "$.tags[]", "propertyType": "string", "consumerName": "spa", "providerName": "api",
+					}},
+				}}},
+				"/b": {"get": {"200": {
+					{Reason: "property_optional_in_provider_required_in_consumer", Role: "provider", Details: map[string]string{
+						"consumerField": "B.tags[]", "providerField": "SessionRecord.tags[]", "property": "$.tags[]", "propertyType": "string", "consumerName": "spa", "providerName": "api",
+					}},
+				}}},
+			},
+			blocks: `  SessionRecord.tags[] — api provides it only sometimes, but spa requires it
+    → api: always provide it
+    → spa: read A.tags the way api provides it
+      · GET /a response 200 at "$.tags[]" (spa: A.tags[])
+  SessionRecord.tags[] — api provides it only sometimes, but spa requires it
+    → api: always provide it
+    → spa: read B.tags the way api provides it
+      · GET /b response 200 at "$.tags[]" (spa: B.tags[])
+`,
+		},
+		{
+			name:        "a map's values the checked consumer sends only sometimes to readers of two schemas",
+			participant: "spa", counterpart: "api",
+			endpoints: map[string]map[string]map[string][]ContractBreak{
+				"/a": {"post": {"request": {
+					{Reason: "property_optional_in_consumer_required_in_provider", Role: "consumer", Details: map[string]string{
+						"consumerField": "NewSession.flags{}", "providerField": "ARecord.flags{}", "property": "$.flags{}", "propertyType": "boolean", "consumerName": "spa", "providerName": "api",
+					}},
+				}}},
+				"/b": {"post": {"request": {
+					{Reason: "property_optional_in_consumer_required_in_provider", Role: "consumer", Details: map[string]string{
+						"consumerField": "NewSession.flags{}", "providerField": "BRecord.flags{}", "property": "$.flags{}", "propertyType": "boolean", "consumerName": "spa", "providerName": "api",
+					}},
+				}}},
+			},
+			blocks: `  NewSession.flags{} — spa sends it only sometimes, but api requires it
+    → spa: always send it
+    → api: read ARecord.flags the way spa sends it
+      · POST /a request at "$.flags{}" (api: ARecord.flags{})
+  NewSession.flags{} — spa sends it only sometimes, but api requires it
+    → spa: always send it
+    → api: read BRecord.flags the way spa sends it
+      · POST /b request at "$.flags{}" (api: BRecord.flags{})
+`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			results := map[string]CanIDeployResult{
+				test.counterpart: {Deployable: false, Endpoints: test.endpoints},
+			}
+
+			report := FormatNotDeployableReport(paint.For(&bytes.Buffer{}), test.participant+" 2.0.0", test.participant, "production", results)
+
+			assert.Equal(t, test.participant+" 2.0.0 cannot be deployed to production\n\n"+test.counterpart+":\n"+test.blocks, report)
+		})
+	}
+}
+
 func TestFormatNotDeployableReportPrintsARepeatedPlaceOnce(t *testing.T) {
 	results := map[string]CanIDeployResult{
 		"petstore_api": {
