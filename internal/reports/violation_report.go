@@ -60,13 +60,15 @@ func FormatViolationLine(violation Violation) (headline, explanation string) {
 		return fmt.Sprintf(`invalid value %q for "type"%s`, details["value"], typeAt), "expected one of: " + details["allowed"]
 	case "schema.array_without_items":
 		return "array schema without items" + pathAt, ""
-	case "schema.values_with_properties":
-		return `object schema has both "values" and "properties"` + pathAt, ""
-	case "schema.values_without_object":
-		return `"values" on a non-object schema` + pathAt, ""
+	case "schema.map_without_values":
+		return "map schema without values" + pathAt, ""
 	case "schema.key_not_allowed":
 		if details["type"] == "ref" {
 			return fmt.Sprintf(`%q is not allowed beside "ref"%s`, details["key"], pathAt), ""
+		}
+		if rightType, known := typeOwningKey[details["key"]]; known {
+			return fmt.Sprintf(`%q is not allowed on %s schema%s`, details["key"], withArticle(details["type"]), pathAt),
+				fmt.Sprintf(`use it with "type: %s"`, rightType)
 		}
 		return fallbackViolationLine(violation), ""
 	case "resource.duplicate":
@@ -91,6 +93,20 @@ func FormatViolationLine(violation Violation) (headline, explanation string) {
 	default:
 		return fallbackViolationLine(violation), ""
 	}
+}
+
+var typeOwningKey = map[string]string{
+	"properties": "object",
+	"items":      "array",
+	"values":     "map",
+}
+
+func withArticle(schemaType string) string {
+	if strings.IndexAny(schemaType, "aeiou") == 0 {
+		return "an " + schemaType
+	}
+
+	return "a " + schemaType
 }
 
 func fallbackViolationLine(violation Violation) string {
