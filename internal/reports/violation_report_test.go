@@ -20,6 +20,7 @@ func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
 		{Code: "schema.invalid_type", Path: "schemas;Pet;properties;id;type", Source: "api.yaml", Details: map[string]string{"value": "strng", "allowed": allowedTypes}},
 		{Code: "schema.array_without_items", Path: "schemas;Pets", Source: "api.yaml"},
 		{Code: "schema.map_without_values", Path: "schemas;Inventory", Source: "api.yaml"},
+		{Code: "schema.object_without_properties", Path: "schemas;Owner;properties;tags", Source: "api.yaml"},
 		{Code: "schema.key_not_allowed", Path: "schemas;Owner;properties;pets", Source: "api.yaml", Details: map[string]string{"key": "values", "type": "object"}},
 		{Code: "schema.key_not_allowed", Path: "schemas;Owner;properties;pet", Source: "api.yaml", Details: map[string]string{"key": "type", "type": "ref"}},
 		{Code: "resource.duplicate", Path: "provides;rest;/pets;get;responses;200", Source: "store.yaml", Details: map[string]string{"resource": "provides GET /pets 200", "declaredIn": "pets.yaml"}},
@@ -40,6 +41,7 @@ func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
   - api.yaml: invalid value "strng" for "type" at schemas Pet properties id, expected one of: object, array, string, integer, float, boolean
   - api.yaml: array schema without items at schemas Pets
   - api.yaml: map schema without values at schemas Inventory
+  - api.yaml: object schema without properties at schemas Owner properties tags, declare the keys you read, or use "type: map" with "values" if the keys vary
   - api.yaml: "values" is not allowed on an object schema at schemas Owner properties pets, use it with "type: map"
   - api.yaml: "type" is not allowed beside "ref" at schemas Owner properties pet
   - store.yaml: duplicate resource "provides GET /pets 200", also declared in pets.yaml
@@ -194,6 +196,17 @@ func TestFormatViolationLine(t *testing.T) {
 
 		assert.Equal(t, `map schema without values at schemas Inventory`, headline)
 		assert.Empty(t, explanation)
+	})
+
+	t.Run("schema.object_without_properties suggests a map", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:   "schema.object_without_properties",
+			Path:   "schemas;Owner;properties;tags",
+			Source: "api.yaml",
+		})
+
+		assert.Equal(t, `object schema without properties at schemas Owner properties tags`, headline)
+		assert.Equal(t, `declare the keys you read, or use "type: map" with "values" if the keys vary`, explanation)
 	})
 
 	t.Run("schema.key_not_allowed values on an object", func(t *testing.T) {
