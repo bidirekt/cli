@@ -71,17 +71,19 @@ setup() {
 @test "todo_app v2 blocked: type mismatch" {
   run bidirekt can-i-deploy "$APP" --version v2 --environment "$PRODUCTION"
   assert_failure
-  assert_output --partial "$APP sends \"\$.title\" (CreateTodoRequest.title) as integer, but $API expects string
-        → $APP: send string
-        → $API: accept integer at CreateTodoRequest.title"
+  assert_output --partial "CreateTodoRequest.title — $APP sends it as integer, but $API expects string
+    → $APP: send string
+    → $API: accept integer there
+      · POST /todos request at \"\$.title\" ($API: CreateTodoRequest.title)"
 }
 
 @test "todo_app v2 blocked: consumer integer vs provider string" {
   run bidirekt can-i-deploy "$APP" --version v2 --environment "$PRODUCTION"
   assert_failure
-  assert_output --partial "$APP sends \"\$.title\" (CreateTodoRequest.title) as integer, but $API expects string
-        → $APP: send string
-        → $API: accept integer at CreateTodoRequest.title"
+  assert_output --partial "CreateTodoRequest.title — $APP sends it as integer, but $API expects string
+    → $APP: send string
+    → $API: accept integer there
+      · POST /todos request at \"\$.title\" ($API: CreateTodoRequest.title)"
 }
 
 @test "publish todo_app v3 (title back to string)" {
@@ -107,17 +109,25 @@ setup() {
 @test "todo_api v2 blocked: type mismatch" {
   run bidirekt can-i-deploy "$API" --version v2 --environment "$PRODUCTION"
   assert_failure
-  assert_output --partial "$API provides \"\$.tags\" (Todo.tags) as string, but $APP reads array<string>
-        → $API: provide it as array<string>
-        → $APP: read it as string at Todo.tags"
+  assert_output --partial "Todo.tags — $API provides it as string, but $APP reads array<string> (4 places)
+    → $API: provide it as array<string>
+    → $APP: read it as string there
+      · GET /todos response 200 at \"\$[].tags\" ($APP: Todo.tags)
+      · POST /todos response 200 at \"\$.tags\" ($APP: Todo.tags)
+      · GET /todos/* response 200 at \"\$.tags\" ($APP: Todo.tags)
+      · PUT /todos/* response 200 at \"\$.tags\" ($APP: Todo.tags)"
 }
 
 @test "todo_api v2 blocked: consumer array<string> vs provider string" {
   run bidirekt can-i-deploy "$API" --version v2 --environment "$PRODUCTION"
   assert_failure
-  assert_output --partial "$API provides \"\$.tags\" (Todo.tags) as string, but $APP reads array<string>
-        → $API: provide it as array<string>
-        → $APP: read it as string at Todo.tags"
+  assert_output --partial "Todo.tags — $API provides it as string, but $APP reads array<string> (4 places)
+    → $API: provide it as array<string>
+    → $APP: read it as string there
+      · GET /todos response 200 at \"\$[].tags\" ($APP: Todo.tags)
+      · POST /todos response 200 at \"\$.tags\" ($APP: Todo.tags)
+      · GET /todos/* response 200 at \"\$.tags\" ($APP: Todo.tags)
+      · PUT /todos/* response 200 at \"\$.tags\" ($APP: Todo.tags)"
 }
 
 @test "publish todo_api v3 (tags back to array of strings)" {

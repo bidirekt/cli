@@ -112,7 +112,7 @@ func TestCanIDeployCommand(t *testing.T) {
 		              {
 		                "reason": "property_missing_in_consumer",
 		                "role": "consumer",
-		                "details": { "property": "$.currency", "propertyType": "string", "consumerName": "front", "providerName": "payments" }
+		                "details": { "providerField": "UpdatePaymentRequest.currency", "property": "$.currency", "propertyType": "string", "consumerName": "front", "providerName": "payments" }
 		              }
 		            ],
 		            "200": [
@@ -147,12 +147,12 @@ func TestCanIDeployCommand(t *testing.T) {
 
 payments (v2, deployed):
   PUT /payments/*
-    request:
-      - front doesn't send "$.currency", but payments requires it
-        → front: send it
-        → payments: stop requiring it, then mark it optional
     response 200:
       - some_future_reason (property: $.amount)
+  UpdatePaymentRequest.currency — front doesn't send it, but payments requires it
+    → front: send it
+    → payments: stop requiring it, then mark it optional there
+      · PUT /payments/* request at "$.currency" (payments: UpdatePaymentRequest.currency)
 `, out.String())
 		assert.NotContains(t, errOut.String(), "Error:")
 	})
