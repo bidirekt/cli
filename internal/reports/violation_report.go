@@ -62,6 +62,8 @@ func FormatViolationLine(violation Violation) (headline, explanation string) {
 		return "array schema without items" + pathAt, ""
 	case "schema.map_without_values":
 		return "map schema without values" + pathAt, ""
+	case "schema.object_without_properties":
+		return "object schema without properties" + pathAt, `declare the keys you read, or use "type: map" with "values" if the keys vary`
 	case "schema.key_not_allowed":
 		if details["type"] == "ref" {
 			return fmt.Sprintf(`%q is not allowed beside "ref"%s`, details["key"], pathAt), ""
