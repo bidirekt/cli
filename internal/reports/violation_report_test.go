@@ -269,6 +269,18 @@ func TestFormatViolationLine(t *testing.T) {
 		assert.Empty(t, explanation)
 	})
 
+	t.Run("schema.key_not_allowed beside ref with a key another type owns", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "schema.key_not_allowed",
+			Path:    "schemas;Owner;properties;pet",
+			Source:  "api.yaml",
+			Details: map[string]string{"key": "values", "type": "ref"},
+		})
+
+		assert.Equal(t, `"values" is not allowed beside "ref" at schemas Owner properties pet`, headline)
+		assert.Empty(t, explanation)
+	})
+
 	t.Run("resource.duplicate", func(t *testing.T) {
 		headline, explanation := FormatViolationLine(Violation{
 			Code:    "resource.duplicate",
