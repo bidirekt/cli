@@ -19,8 +19,8 @@ func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
 		{Code: "status.out_of_range", Path: "provides;rest;/pets;get;responses;999", Source: "api.yaml", Details: map[string]string{"key": "999", "error": "must be between 100 and 599"}},
 		{Code: "schema.invalid_type", Path: "schemas;Pet;properties;id;type", Source: "api.yaml", Details: map[string]string{"value": "strng", "allowed": allowedTypes}},
 		{Code: "schema.array_without_items", Path: "schemas;Pets", Source: "api.yaml"},
-		{Code: "schema.values_with_properties", Path: "schemas;Inventory", Source: "api.yaml"},
-		{Code: "schema.values_without_object", Path: "schemas;Owner;properties;pets", Source: "api.yaml"},
+		{Code: "schema.map_without_values", Path: "schemas;Inventory", Source: "api.yaml"},
+		{Code: "schema.key_not_allowed", Path: "schemas;Owner;properties;pets", Source: "api.yaml", Details: map[string]string{"key": "values", "type": "object"}},
 		{Code: "schema.key_not_allowed", Path: "schemas;Owner;properties;pet", Source: "api.yaml", Details: map[string]string{"key": "type", "type": "ref"}},
 		{Code: "resource.duplicate", Path: "provides;rest;/pets;get;responses;200", Source: "store.yaml", Details: map[string]string{"resource": "provides GET /pets 200", "declaredIn": "pets.yaml"}},
 		{Code: "resource.type_conflict", Path: "consumes;payments;rest;/invoices;get;responses;200", Source: "b.yaml", Details: map[string]string{"resource": "consumes payments GET /invoices 200", "property": "$.id", "type": "integer", "declaredIn": "a.yaml", "declaredType": "string"}},
@@ -39,8 +39,8 @@ func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
   - api.yaml: invalid status code "999" at provides rest /pets get responses, must be between 100 and 599
   - api.yaml: invalid value "strng" for "type" at schemas Pet properties id, expected one of: object, array, string, integer, float, boolean
   - api.yaml: array schema without items at schemas Pets
-  - api.yaml: object schema has both "values" and "properties" at schemas Inventory
-  - api.yaml: "values" on a non-object schema at schemas Owner properties pets
+  - api.yaml: map schema without values at schemas Inventory
+  - api.yaml: "values" is not allowed on an object schema at schemas Owner properties pets, use it with "type: map"
   - api.yaml: "type" is not allowed beside "ref" at schemas Owner properties pet
   - store.yaml: duplicate resource "provides GET /pets 200", also declared in pets.yaml
   - b.yaml: conflicting type for property "$.id" of consumes payments GET /invoices 200: integer here, string in a.yaml
@@ -185,26 +185,63 @@ func TestFormatViolationLine(t *testing.T) {
 		assert.Empty(t, explanation)
 	})
 
-	t.Run("schema.values_with_properties", func(t *testing.T) {
+	t.Run("schema.map_without_values", func(t *testing.T) {
 		headline, explanation := FormatViolationLine(Violation{
-			Code:   "schema.values_with_properties",
+			Code:   "schema.map_without_values",
 			Path:   "schemas;Inventory",
 			Source: "api.yaml",
 		})
 
-		assert.Equal(t, `object schema has both "values" and "properties" at schemas Inventory`, headline)
+		assert.Equal(t, `map schema without values at schemas Inventory`, headline)
 		assert.Empty(t, explanation)
 	})
 
-	t.Run("schema.values_without_object", func(t *testing.T) {
+	t.Run("schema.key_not_allowed values on an object", func(t *testing.T) {
 		headline, explanation := FormatViolationLine(Violation{
-			Code:   "schema.values_without_object",
-			Path:   "schemas;Owner;properties;pets",
-			Source: "api.yaml",
+			Code:    "schema.key_not_allowed",
+			Path:    "schemas;Owner;properties;pets",
+			Source:  "api.yaml",
+			Details: map[string]string{"key": "values", "type": "object"},
 		})
 
-		assert.Equal(t, `"values" on a non-object schema at schemas Owner properties pets`, headline)
-		assert.Empty(t, explanation)
+		assert.Equal(t, `"values" is not allowed on an object schema at schemas Owner properties pets`, headline)
+		assert.Equal(t, `use it with "type: map"`, explanation)
+	})
+
+	t.Run("schema.key_not_allowed properties on a map", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "schema.key_not_allowed",
+			Path:    "schemas;Inventory",
+			Source:  "api.yaml",
+			Details: map[string]string{"key": "properties", "type": "map"},
+		})
+
+		assert.Equal(t, `"properties" is not allowed on a map schema at schemas Inventory`, headline)
+		assert.Equal(t, `use it with "type: object"`, explanation)
+	})
+
+	t.Run("schema.key_not_allowed items on a string", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "schema.key_not_allowed",
+			Path:    "schemas;Pet;properties;name",
+			Source:  "api.yaml",
+			Details: map[string]string{"key": "items", "type": "string"},
+		})
+
+		assert.Equal(t, `"items" is not allowed on a string schema at schemas Pet properties name`, headline)
+		assert.Equal(t, `use it with "type: array"`, explanation)
+	})
+
+	t.Run("schema.key_not_allowed values on an integer", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "schema.key_not_allowed",
+			Path:    "schemas;Pet;properties;age",
+			Source:  "api.yaml",
+			Details: map[string]string{"key": "values", "type": "integer"},
+		})
+
+		assert.Equal(t, `"values" is not allowed on an integer schema at schemas Pet properties age`, headline)
+		assert.Equal(t, `use it with "type: map"`, explanation)
 	})
 
 	t.Run("schema.key_not_allowed beside ref", func(t *testing.T) {
