@@ -9,7 +9,7 @@ import (
 )
 
 func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
-	const allowedTypes = "object, array, string, integer, float, boolean"
+	const allowedTypes = "object, array, map, string, integer, float, number, boolean"
 
 	report := FormatValidationFailedReport(paint.For(&bytes.Buffer{}), "contract validation failed", []Violation{
 		{Code: "key.unknown", Path: "provides;rest;/pets;patch", Source: "api.yaml", Details: map[string]string{"key": "patch"}},
@@ -38,7 +38,7 @@ func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
   - api.yaml: invalid endpoint "/users/{userId}" at provides rest, dynamic path segments must use *
   - api.yaml: invalid service name "Payments-API" at consumes, must be snake_case
   - api.yaml: invalid status code "999" at provides rest /pets get responses, must be between 100 and 599
-  - api.yaml: invalid value "strng" for "type" at schemas Pet properties id, expected one of: object, array, string, integer, float, boolean
+  - api.yaml: invalid value "strng" for "type" at schemas Pet properties id, expected one of: object, array, map, string, integer, float, number, boolean
   - api.yaml: array schema without items at schemas Pets
   - api.yaml: map schema without values at schemas Inventory
   - api.yaml: object schema without properties at schemas Owner properties tags, declare the keys you read, or use "type: map" with "values" if the keys vary
@@ -78,7 +78,7 @@ func TestFormatValidationFailedReportPaintsTheHeadlineRed(t *testing.T) {
 }
 
 func TestFormatViolationLine(t *testing.T) {
-	const allowedTypes = "object, array, string, integer, float, boolean"
+	const allowedTypes = "object, array, map, string, integer, float, number, boolean"
 
 	t.Run("key.unknown", func(t *testing.T) {
 		headline, explanation := FormatViolationLine(Violation{
@@ -161,7 +161,7 @@ func TestFormatViolationLine(t *testing.T) {
 		})
 
 		assert.Equal(t, `invalid value "strng" for "type" at schemas Pet properties id`, headline)
-		assert.Equal(t, `expected one of: object, array, string, integer, float, boolean`, explanation)
+		assert.Equal(t, `expected one of: object, array, map, string, integer, float, number, boolean`, explanation)
 	})
 
 	t.Run("schema.invalid_type without a value reports the type as missing", func(t *testing.T) {
@@ -173,7 +173,7 @@ func TestFormatViolationLine(t *testing.T) {
 		})
 
 		assert.Equal(t, `missing "type" at schemas Pet properties tags items`, headline)
-		assert.Equal(t, `expected one of: object, array, string, integer, float, boolean`, explanation)
+		assert.Equal(t, `expected one of: object, array, map, string, integer, float, number, boolean`, explanation)
 	})
 
 	t.Run("schema.array_without_items", func(t *testing.T) {
