@@ -84,6 +84,14 @@ setup() {
   assert_output --partial "./app_single_file_typo.yaml: unresolved schema \"Todso\" referenced by consumes $API GET /todos 200"
 }
 
+@test "v6 rejected: unresolved ref at a schema root and in the items of a root array" {
+  run bidirekt publish ./api_root_refs.yaml --participant "$API" --version v6
+  assert_failure
+  assert_output --partial "contract validation failed
+  - ./api_root_refs.yaml: unresolved ref \"Missing\" in Order
+  - ./api_root_refs.yaml: unresolved ref \"Missing\" in Tags[]"
+}
+
 @test "publish todo_api v6 after all the rejections" {
   run bidirekt publish ./api_rest.yaml ./api_schemas.yaml --participant "$API" --version v6
   assert_success

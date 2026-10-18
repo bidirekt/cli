@@ -1,0 +1,17 @@
+consumes:
+  ${API}:
+    rest:
+      "/pets/*":
+        get:
+          responses:
+            "200": PetWithObjectLabels
+
+schemas:
+  PetWithObjectLabels:
+    type: object
+    properties:
+      labels:
+        type: object
+        properties:
+          en:
+            type: string
