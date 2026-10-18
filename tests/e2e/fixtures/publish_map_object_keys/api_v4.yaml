@@ -1,0 +1,17 @@
+provides:
+  rest:
+    "/pets/*":
+      get:
+        responses:
+          "200": Pet
+
+schemas:
+  Pet:
+    type: object
+    properties:
+      petId:
+        type: integer
+      labels:
+        type: object
+        values:
+          type: string

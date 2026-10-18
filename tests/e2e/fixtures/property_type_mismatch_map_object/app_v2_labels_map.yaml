@@ -1,0 +1,16 @@
+consumes:
+  ${API}:
+    rest:
+      "/pets/*":
+        get:
+          responses:
+            "200": PetWithMapLabels
+
+schemas:
+  PetWithMapLabels:
+    type: object
+    properties:
+      labels:
+        type: map
+        values:
+          type: string
