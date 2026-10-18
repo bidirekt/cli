@@ -228,6 +228,33 @@ payments (v2, deployed):
 		assert.Empty(t, out.String())
 	})
 
+	t.Run("property name that confuses the path prints where it is and why", func(t *testing.T) {
+		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpmock.ActivateNonDefault(httpClient.StdClient())
+		defer httpmock.DeactivateAndReset()
+
+		file := writeContract(t)
+
+		httpmock.RegisterResponder(http.MethodPost, endpoint,
+			httpmock.NewStringResponder(http.StatusBadRequest, `{"message":"contract validation failed","violations":[{"code":"property.name_syntax","path":"schemas;Pet;properties;user.name","source":"contract.yaml","details":{"key":"user.name","error":"must not contain \".\", \"[\", \"]\", \"{\", \"}\" or \";\""}}]}`))
+
+		command := validate_contract.NewValidateCommand(
+			validate_contract.NewValidateContractClient(httpClient),
+		)
+		var out, errOut bytes.Buffer
+		command.SetOut(&out)
+		command.SetErr(&errOut)
+		command.SetArgs([]string{file, "--participant", participant, "--environment", environment})
+
+		err := command.Execute()
+
+		require.ErrorIs(t, err, reports.ErrSilent)
+		assert.Equal(t, "contract validation failed\n"+
+			"  - contract.yaml: invalid property name \"user.name\" at schemas Pet properties, must not contain \".\", \"[\", \"]\", \"{\", \"}\" or \";\"\n",
+			errOut.String())
+		assert.Empty(t, out.String())
+	})
+
 	t.Run("unknown participant suggests creating it with create-participant", func(t *testing.T) {
 		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
 		httpmock.ActivateNonDefault(httpClient.StdClient())

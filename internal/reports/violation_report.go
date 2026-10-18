@@ -51,6 +51,10 @@ func FormatViolationLine(violation Violation) (headline, explanation string) {
 		return fmt.Sprintf("invalid endpoint %q%s", details["key"], keyAt), details["error"]
 	case "service.name_syntax":
 		return fmt.Sprintf("invalid service name %q%s", details["key"], keyAt), details["error"]
+	case "property.name_syntax":
+		return fmt.Sprintf("invalid property name %q%s", details["key"], keyAt), details["error"]
+	case "schema.name_syntax":
+		return fmt.Sprintf("invalid schema name %q%s", details["key"], keyAt), details["error"]
 	case "status.out_of_range":
 		return fmt.Sprintf("invalid status code %q%s", details["key"], keyAt), details["error"]
 	case "schema.invalid_type":
@@ -145,16 +149,11 @@ func fallbackViolationLine(violation Violation) string {
 }
 
 func location(path, quoted string) string {
-	if path == "" {
+	if path == quoted {
 		return ""
 	}
 
-	segments := strings.Split(path, ";")
-	if segments[len(segments)-1] == quoted {
-		segments = segments[:len(segments)-1]
-	}
-
-	return strings.Join(segments, " ")
+	return strings.ReplaceAll(strings.TrimSuffix(path, ";"+quoted), ";", " ")
 }
 
 func at(location string) string {
