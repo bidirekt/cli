@@ -265,8 +265,6 @@ func compareFieldBlockKeys(a, b fieldBlockKey) int {
 		strings.Compare(a.propertyType, b.propertyType),
 		strings.Compare(a.direction, b.direction),
 		strings.Compare(a.role, b.role),
-		strings.Compare(a.checkedFix, b.checkedFix),
-		strings.Compare(a.otherFix, b.otherFix),
 	)
 }
 
@@ -288,7 +286,7 @@ func writeFieldBlock(report *strings.Builder, counterpart string, block fieldBlo
 
 	otherFix := block.otherFix
 	somePlaceNamesTheOtherSidesField := slices.ContainsFunc(block.places, func(place breakPlace) bool { return place.counterpartField != "" })
-	if somePlaceNamesTheOtherSidesField && !block.otherFixNamesParent {
+	if somePlaceNamesTheOtherSidesField {
 		otherFix += " there"
 	}
 	fmt.Fprintf(report, "    → %s\n    → %s\n", block.checkedFix, otherFix)
@@ -375,7 +373,6 @@ func formatBreakLine(interaction checkedInteraction, contractBreak ContractBreak
 type propertyBreakLine struct {
 	text                 string
 	checkedFix, otherFix string
-	otherFixNamesParent  bool
 }
 
 func formatPropertyBreakLine(interaction checkedInteraction, contractBreak ContractBreak) (propertyBreak, propertyBreakLine, bool) {
@@ -393,7 +390,6 @@ func formatPropertyBreakLine(interaction checkedInteraction, contractBreak Contr
 		providerField:     details["providerField"],
 		path:              details["property"],
 		consumerIsChecked: asConsumer,
-		onRequest:         interaction.isRequest,
 	}
 	onRequest, onResponse := interaction.isRequest, !interaction.isRequest
 
@@ -402,19 +398,17 @@ func formatPropertyBreakLine(interaction checkedInteraction, contractBreak Contr
 		return propertyBreak{}, propertyBreakLine{}, false
 	case reason == "property_missing_in_provider" && onResponse:
 		return property, property.toPropertyBreakLine(propertyBreakPhrases{
-			consumerChecked:        fmt.Sprintf("%s reads it, but %s doesn't provide it", consumer, provider),
-			providerChecked:        fmt.Sprintf("%s doesn't provide it, but %s reads it", provider, consumer),
-			consumerFix:            "stop reading it, or handle its absence in the code and mark it optional",
-			providerFix:            "provide it",
-			readerFixMarksOptional: true,
+			consumerChecked: fmt.Sprintf("%s reads it, but %s doesn't provide it", consumer, provider),
+			providerChecked: fmt.Sprintf("%s doesn't provide it, but %s reads it", provider, consumer),
+			consumerFix:     "stop reading it, or handle its absence in the code and mark it optional",
+			providerFix:     "provide it",
 		}), true
 	case reason == "property_optional_in_provider_required_in_consumer" && onResponse:
 		return property, property.toPropertyBreakLine(propertyBreakPhrases{
-			consumerChecked:        fmt.Sprintf("%s requires it, but %s only sometimes provides it", consumer, provider),
-			providerChecked:        fmt.Sprintf("%s provides it only sometimes, but %s requires it", provider, consumer),
-			consumerFix:            "handle its absence in the code, then mark it optional",
-			providerFix:            "always provide it",
-			readerFixMarksOptional: true,
+			consumerChecked: fmt.Sprintf("%s requires it, but %s only sometimes provides it", consumer, provider),
+			providerChecked: fmt.Sprintf("%s provides it only sometimes, but %s requires it", provider, consumer),
+			consumerFix:     "handle its absence in the code, then mark it optional",
+			providerFix:     "always provide it",
 		}), true
 	case reason == "property_type_mismatch" && onResponse:
 		return property, property.toPropertyBreakLine(propertyBreakPhrases{
@@ -432,19 +426,17 @@ func formatPropertyBreakLine(interaction checkedInteraction, contractBreak Contr
 		}), true
 	case reason == "property_missing_in_consumer" && onRequest:
 		return property, property.toPropertyBreakLine(propertyBreakPhrases{
-			consumerChecked:        fmt.Sprintf("%s doesn't send it, but %s requires it", consumer, provider),
-			providerChecked:        fmt.Sprintf("%s requires it, but %s doesn't send it", provider, consumer),
-			consumerFix:            "send it",
-			providerFix:            "stop requiring it, then mark it optional",
-			readerFixMarksOptional: true,
+			consumerChecked: fmt.Sprintf("%s doesn't send it, but %s requires it", consumer, provider),
+			providerChecked: fmt.Sprintf("%s requires it, but %s doesn't send it", provider, consumer),
+			consumerFix:     "send it",
+			providerFix:     "stop requiring it, then mark it optional",
 		}), true
 	case reason == "property_optional_in_consumer_required_in_provider" && onRequest:
 		return property, property.toPropertyBreakLine(propertyBreakPhrases{
-			consumerChecked:        fmt.Sprintf("%s sends it only sometimes, but %s requires it", consumer, provider),
-			providerChecked:        fmt.Sprintf("%s requires it, but %s sends it only sometimes", provider, consumer),
-			consumerFix:            "always send it",
-			providerFix:            "handle its absence in the code, then mark it optional",
-			readerFixMarksOptional: true,
+			consumerChecked: fmt.Sprintf("%s sends it only sometimes, but %s requires it", consumer, provider),
+			providerChecked: fmt.Sprintf("%s requires it, but %s sends it only sometimes", provider, consumer),
+			consumerFix:     "always send it",
+			providerFix:     "handle its absence in the code, then mark it optional",
 		}), true
 	case reason == "property_type_mismatch" && onRequest:
 		return property, property.toPropertyBreakLine(propertyBreakPhrases{
@@ -470,13 +462,11 @@ type propertyBreak struct {
 	consumerField, providerField string
 	path                         string
 	consumerIsChecked            bool
-	onRequest                    bool
 }
 
 type propertyBreakPhrases struct {
 	consumerChecked, providerChecked string
 	consumerFix, providerFix         string
-	readerFixMarksOptional           bool
 }
 
 func (this propertyBreak) checkedAndOtherFields() (checkedField, otherField string) {
@@ -487,33 +477,11 @@ func (this propertyBreak) checkedAndOtherFields() (checkedField, otherField stri
 }
 
 func (this propertyBreak) toPropertyBreakLine(phrases propertyBreakPhrases) propertyBreakLine {
-	consumerFix, consumerFixNamesParent := phrases.consumerFix, false
-	providerFix, providerFixNamesParent := phrases.providerFix, false
-
-	// An array's items and a map's values aren't fields to mark optional: their reader reads the parent field the way
-	// the other side produces it.
-	isItemsOrValues := strings.HasSuffix(this.path, "[]") || strings.HasSuffix(this.path, "{}")
-	if isItemsOrValues && phrases.readerFixMarksOptional {
-		if this.onRequest {
-			providerFix, providerFixNamesParent = fmt.Sprintf("read %s the way %s sends it", this.parentPhrase(this.providerField), this.consumer), true
-		} else {
-			consumerFix, consumerFixNamesParent = fmt.Sprintf("read %s the way %s provides it", this.parentPhrase(this.consumerField), this.provider), true
-		}
-	}
-
-	consumerLine, providerLine := this.consumer+": "+consumerFix, this.provider+": "+providerFix
+	consumerLine, providerLine := this.consumer+": "+phrases.consumerFix, this.provider+": "+phrases.providerFix
 	if this.consumerIsChecked {
-		return propertyBreakLine{text: phrases.consumerChecked, checkedFix: consumerLine, otherFix: providerLine, otherFixNamesParent: providerFixNamesParent}
+		return propertyBreakLine{text: phrases.consumerChecked, checkedFix: consumerLine, otherFix: providerLine}
 	}
-	return propertyBreakLine{text: phrases.providerChecked, checkedFix: providerLine, otherFix: consumerLine, otherFixNamesParent: consumerFixNamesParent}
-}
-
-func (this propertyBreak) parentPhrase(readerField string) string {
-	itemsOrValues := this.path[len(this.path)-len("[]"):]
-	if readerField == "" {
-		return propertyPathPhrase(strings.TrimSuffix(this.path, itemsOrValues))
-	}
-	return strings.TrimSuffix(readerField, itemsOrValues)
+	return propertyBreakLine{text: phrases.providerChecked, checkedFix: providerLine, otherFix: consumerLine}
 }
 
 func orList(commaList string) string {

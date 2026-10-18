@@ -23,6 +23,7 @@ func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
 		{Code: "schema.object_without_properties", Path: "schemas;Owner;properties;tags", Source: "api.yaml"},
 		{Code: "schema.key_not_allowed", Path: "schemas;Owner;properties;pets", Source: "api.yaml", Details: map[string]string{"key": "values", "type": "object"}},
 		{Code: "schema.key_not_allowed", Path: "schemas;Owner;properties;pet", Source: "api.yaml", Details: map[string]string{"key": "type", "type": "ref"}},
+		{Code: "schema.optional_not_allowed", Path: "schemas;Pet;properties;tags;items", Source: "api.yaml", Details: map[string]string{"position": "items"}},
 		{Code: "resource.duplicate", Path: "provides;rest;/pets;get;responses;200", Source: "store.yaml", Details: map[string]string{"resource": "provides GET /pets 200", "declaredIn": "pets.yaml"}},
 		{Code: "resource.type_conflict", Path: "consumes;payments;rest;/invoices;get;responses;200", Source: "b.yaml", Details: map[string]string{"resource": "consumes payments GET /invoices 200", "property": "$.id", "type": "integer", "declaredIn": "a.yaml", "declaredType": "string"}},
 		{Code: "schema.duplicate", Path: "schemas;Pet", Source: "schemas.yaml", Details: map[string]string{"schema": "Pet", "declaredIn": "billing.yaml"}},
@@ -44,6 +45,7 @@ func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
   - api.yaml: object schema without properties at schemas Owner properties tags, declare the keys you read, or use "type: map" with "values" if the keys vary
   - api.yaml: "values" is not allowed on an object schema at schemas Owner properties pets, use it with "type: map"
   - api.yaml: "type" is not allowed beside "ref" at schemas Owner properties pet
+  - api.yaml: "optional" is not allowed on array items at schemas Pet properties tags items, mark the property that holds the array optional, or use "nullable: true" for an item that may be null
   - store.yaml: duplicate resource "provides GET /pets 200", also declared in pets.yaml
   - b.yaml: conflicting type for property "$.id" of consumes payments GET /invoices 200: integer here, string in a.yaml
   - schemas.yaml: duplicate schema "Pet", also declared in billing.yaml
@@ -278,6 +280,54 @@ func TestFormatViolationLine(t *testing.T) {
 		})
 
 		assert.Equal(t, `"values" is not allowed beside "ref" at schemas Owner properties pet`, headline)
+		assert.Empty(t, explanation)
+	})
+
+	t.Run("schema.optional_not_allowed on array items", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "schema.optional_not_allowed",
+			Path:    "schemas;Pet;properties;tags;items",
+			Source:  "api.yaml",
+			Details: map[string]string{"position": "items"},
+		})
+
+		assert.Equal(t, `"optional" is not allowed on array items at schemas Pet properties tags items`, headline)
+		assert.Equal(t, `mark the property that holds the array optional, or use "nullable: true" for an item that may be null`, explanation)
+	})
+
+	t.Run("schema.optional_not_allowed on map values", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "schema.optional_not_allowed",
+			Path:    "schemas;Pet;properties;scores;values",
+			Source:  "api.yaml",
+			Details: map[string]string{"position": "values"},
+		})
+
+		assert.Equal(t, `"optional" is not allowed on map values at schemas Pet properties scores values`, headline)
+		assert.Equal(t, `mark the property that holds the map optional, or use "nullable: true" for a value that may be null`, explanation)
+	})
+
+	t.Run("schema.optional_not_allowed on a named schema", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "schema.optional_not_allowed",
+			Path:    "schemas;Pet",
+			Source:  "api.yaml",
+			Details: map[string]string{"position": "schema"},
+		})
+
+		assert.Equal(t, `"optional" is not allowed on a schema at schemas Pet`, headline)
+		assert.Equal(t, `mark optional the property that uses it, beside its "ref"`, explanation)
+	})
+
+	t.Run("schema.optional_not_allowed at an unknown position falls back to the code with its details", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "schema.optional_not_allowed",
+			Path:    "schemas;Pet;properties;owner",
+			Source:  "api.yaml",
+			Details: map[string]string{"position": "property"},
+		})
+
+		assert.Equal(t, `schema.optional_not_allowed at schemas Pet properties owner (position: property)`, headline)
 		assert.Empty(t, explanation)
 	})
 
