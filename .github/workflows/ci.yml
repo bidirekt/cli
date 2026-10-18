@@ -66,7 +66,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - run: shellcheck install.sh
+      - run: shellcheck install.sh tests/e2e/setup_suite.bash
 
   e2e:
     runs-on: ubuntu-latest

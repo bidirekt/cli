@@ -35,6 +35,8 @@ docker compose -f tests/e2e/compose.yaml up -d --wait
 BIDIREKT_BROKER_URL=http://localhost:8080 bats tests/e2e
 ```
 
+Before the first test, the suite checks that the broker at `BIDIREKT_BROKER_URL` is the version pinned in `tests/e2e/compose.yaml`, and runs no test if it isn't.
+
 Each run uses its own participant and environment names, so running the suite again against the same broker passes. `docker compose -f tests/e2e/compose.yaml down` stops both containers and throws the data away (Postgres keeps it on tmpfs).
 
 ## License
