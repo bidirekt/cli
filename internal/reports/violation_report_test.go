@@ -16,6 +16,8 @@ func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
 		{Code: "value.invalid_kind", Path: "provides;rest;/pets;get", Source: "api.yaml", Details: map[string]string{"expected": "mapping", "got": "string"}},
 		{Code: "endpoint.syntax", Path: "provides;rest;/users/{userId}", Source: "api.yaml", Details: map[string]string{"key": "/users/{userId}", "error": "dynamic path segments must use *"}},
 		{Code: "service.name_syntax", Path: "consumes;Payments-API", Source: "api.yaml", Details: map[string]string{"key": "Payments-API", "error": "must be snake_case"}},
+		{Code: "property.name_syntax", Path: "schemas;Pet;properties;user.name", Source: "api.yaml", Details: map[string]string{"key": "user.name", "error": `must not contain ".", "[", "]", "{", "}" or ";"`}},
+		{Code: "schema.name_syntax", Path: "schemas;Pet.v2", Source: "api.yaml", Details: map[string]string{"key": "Pet.v2", "error": `must not contain ".", "[", "]", "{", "}" or ";"`}},
 		{Code: "status.out_of_range", Path: "provides;rest;/pets;get;responses;999", Source: "api.yaml", Details: map[string]string{"key": "999", "error": "must be between 100 and 599"}},
 		{Code: "schema.invalid_type", Path: "schemas;Pet;properties;id;type", Source: "api.yaml", Details: map[string]string{"value": "strng", "allowed": allowedTypes}},
 		{Code: "schema.array_without_items", Path: "schemas;Pets", Source: "api.yaml"},
@@ -38,6 +40,8 @@ func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
   - api.yaml: unexpected string at provides rest /pets get, expected mapping
   - api.yaml: invalid endpoint "/users/{userId}" at provides rest, dynamic path segments must use *
   - api.yaml: invalid service name "Payments-API" at consumes, must be snake_case
+  - api.yaml: invalid property name "user.name" at schemas Pet properties, must not contain ".", "[", "]", "{", "}" or ";"
+  - api.yaml: invalid schema name "Pet.v2" at schemas, must not contain ".", "[", "]", "{", "}" or ";"
   - api.yaml: invalid status code "999" at provides rest /pets get responses, must be between 100 and 599
   - api.yaml: invalid value "strng" for "type" at schemas Pet properties id, expected one of: object, array, map, string, integer, float, number, boolean
   - api.yaml: array schema without items at schemas Pets
@@ -81,6 +85,7 @@ func TestFormatValidationFailedReportPaintsTheHeadlineRed(t *testing.T) {
 
 func TestFormatViolationLine(t *testing.T) {
 	const allowedTypes = "object, array, map, string, integer, float, number, boolean"
+	const pathSafeNameError = `must not contain ".", "[", "]", "{", "}" or ";"`
 
 	t.Run("key.unknown", func(t *testing.T) {
 		headline, explanation := FormatViolationLine(Violation{
@@ -140,6 +145,102 @@ func TestFormatViolationLine(t *testing.T) {
 
 		assert.Equal(t, `invalid service name "Payments-API" at consumes`, headline)
 		assert.Equal(t, `must be snake_case`, explanation)
+	})
+
+	t.Run("service.name_syntax with a semicolon in the key leaves the whole key out of the location", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "service.name_syntax",
+			Path:    "consumes;Bad;Svc",
+			Source:  "api.yaml",
+			Details: map[string]string{"key": "Bad;Svc", "error": "must be snake_case"},
+		})
+
+		assert.Equal(t, `invalid service name "Bad;Svc" at consumes`, headline)
+		assert.Equal(t, `must be snake_case`, explanation)
+	})
+
+	t.Run("property.name_syntax", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "property.name_syntax",
+			Path:    "schemas;Pet;properties;user.name",
+			Source:  "api.yaml",
+			Details: map[string]string{"key": "user.name", "error": pathSafeNameError},
+		})
+
+		assert.Equal(t, `invalid property name "user.name" at schemas Pet properties`, headline)
+		assert.Equal(t, pathSafeNameError, explanation)
+	})
+
+	t.Run("property.name_syntax with an empty name", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "property.name_syntax",
+			Path:    "schemas;Pet;properties;",
+			Source:  "api.yaml",
+			Details: map[string]string{"key": "", "error": "must not be empty"},
+		})
+
+		assert.Equal(t, `invalid property name "" at schemas Pet properties`, headline)
+		assert.Equal(t, `must not be empty`, explanation)
+	})
+
+	t.Run("property.name_syntax with a semicolon in the name leaves the whole name out of the location", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "property.name_syntax",
+			Path:    "schemas;Pet;properties;x;y",
+			Source:  "api.yaml",
+			Details: map[string]string{"key": "x;y", "error": pathSafeNameError},
+		})
+
+		assert.Equal(t, `invalid property name "x;y" at schemas Pet properties`, headline)
+		assert.Equal(t, pathSafeNameError, explanation)
+	})
+
+	t.Run("property.name_syntax with a control character escapes it", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "property.name_syntax",
+			Path:    "schemas;Pet;properties;a\x00b",
+			Source:  "api.yaml",
+			Details: map[string]string{"key": "a\x00b", "error": "must not contain control characters"},
+		})
+
+		assert.Equal(t, `invalid property name "a\x00b" at schemas Pet properties`, headline)
+		assert.Equal(t, `must not contain control characters`, explanation)
+	})
+
+	t.Run("schema.name_syntax", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "schema.name_syntax",
+			Path:    "schemas;Pet.v2",
+			Source:  "api.yaml",
+			Details: map[string]string{"key": "Pet.v2", "error": pathSafeNameError},
+		})
+
+		assert.Equal(t, `invalid schema name "Pet.v2" at schemas`, headline)
+		assert.Equal(t, pathSafeNameError, explanation)
+	})
+
+	t.Run("schema.name_syntax with an empty name", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "schema.name_syntax",
+			Path:    "schemas;",
+			Source:  "api.yaml",
+			Details: map[string]string{"key": "", "error": "must not be empty"},
+		})
+
+		assert.Equal(t, `invalid schema name "" at schemas`, headline)
+		assert.Equal(t, `must not be empty`, explanation)
+	})
+
+	t.Run("schema.name_syntax with a control character escapes it", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "schema.name_syntax",
+			Path:    "schemas;Pet\x00",
+			Source:  "api.yaml",
+			Details: map[string]string{"key": "Pet\x00", "error": "must not contain control characters"},
+		})
+
+		assert.Equal(t, `invalid schema name "Pet\x00" at schemas`, headline)
+		assert.Equal(t, `must not contain control characters`, explanation)
 	})
 
 	t.Run("status.out_of_range", func(t *testing.T) {
