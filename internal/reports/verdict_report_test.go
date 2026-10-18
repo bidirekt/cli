@@ -600,78 +600,6 @@ petstore_api:
 `, report)
 }
 
-func TestFormatNotDeployableReportSplitsAFieldsBlocksByFix(t *testing.T) {
-	tests := []struct {
-		name                     string
-		participant, counterpart string
-		endpoints                map[string]map[string]map[string][]ContractBreak
-		blocks                   string
-	}{
-		{
-			name:        "an array's items the checked provider provides only sometimes to readers of two schemas",
-			participant: "api", counterpart: "spa",
-			endpoints: map[string]map[string]map[string][]ContractBreak{
-				"/a": {"get": {"200": {
-					{Reason: "property_optional_in_provider_required_in_consumer", Role: "provider", Details: map[string]string{
-						"consumerField": "A.tags[]", "providerField": "SessionRecord.tags[]", "property": "$.tags[]", "propertyType": "string", "consumerName": "spa", "providerName": "api",
-					}},
-				}}},
-				"/b": {"get": {"200": {
-					{Reason: "property_optional_in_provider_required_in_consumer", Role: "provider", Details: map[string]string{
-						"consumerField": "B.tags[]", "providerField": "SessionRecord.tags[]", "property": "$.tags[]", "propertyType": "string", "consumerName": "spa", "providerName": "api",
-					}},
-				}}},
-			},
-			blocks: `  SessionRecord.tags[] — api provides it only sometimes, but spa requires it
-    → api: always provide it
-    → spa: read A.tags the way api provides it
-      · GET /a response 200 at "$.tags[]" (spa: A.tags[])
-  SessionRecord.tags[] — api provides it only sometimes, but spa requires it
-    → api: always provide it
-    → spa: read B.tags the way api provides it
-      · GET /b response 200 at "$.tags[]" (spa: B.tags[])
-`,
-		},
-		{
-			name:        "a map's values the checked consumer sends only sometimes to readers of two schemas",
-			participant: "spa", counterpart: "api",
-			endpoints: map[string]map[string]map[string][]ContractBreak{
-				"/a": {"post": {"request": {
-					{Reason: "property_optional_in_consumer_required_in_provider", Role: "consumer", Details: map[string]string{
-						"consumerField": "NewSession.flags{}", "providerField": "ARecord.flags{}", "property": "$.flags{}", "propertyType": "boolean", "consumerName": "spa", "providerName": "api",
-					}},
-				}}},
-				"/b": {"post": {"request": {
-					{Reason: "property_optional_in_consumer_required_in_provider", Role: "consumer", Details: map[string]string{
-						"consumerField": "NewSession.flags{}", "providerField": "BRecord.flags{}", "property": "$.flags{}", "propertyType": "boolean", "consumerName": "spa", "providerName": "api",
-					}},
-				}}},
-			},
-			blocks: `  NewSession.flags{} — spa sends it only sometimes, but api requires it
-    → spa: always send it
-    → api: read ARecord.flags the way spa sends it
-      · POST /a request at "$.flags{}" (api: ARecord.flags{})
-  NewSession.flags{} — spa sends it only sometimes, but api requires it
-    → spa: always send it
-    → api: read BRecord.flags the way spa sends it
-      · POST /b request at "$.flags{}" (api: BRecord.flags{})
-`,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			results := map[string]CanIDeployResult{
-				test.counterpart: {Deployable: false, Endpoints: test.endpoints},
-			}
-
-			report := FormatNotDeployableReport(paint.For(&bytes.Buffer{}), test.participant+" 2.0.0", test.participant, "production", results)
-
-			assert.Equal(t, test.participant+" 2.0.0 cannot be deployed to production\n\n"+test.counterpart+":\n"+test.blocks, report)
-		})
-	}
-}
-
 func TestFormatNotDeployableReportPrintsARepeatedPlaceOnce(t *testing.T) {
 	results := map[string]CanIDeployResult{
 		"petstore_api": {
@@ -871,9 +799,6 @@ func TestFormatNotDeployableReportWritesAPropertyBreakAsAFieldBlock(t *testing.T
 	apiReceivesPet := checkedPlace{participant: "petstore_api", counterpart: "petstore_web", endpoint: "/pets", method: "post", interaction: "request"}
 	spaGetsFiles := checkedPlace{participant: "spa", counterpart: "api", endpoint: "/files", method: "get", interaction: "200"}
 	spaGetsSession := checkedPlace{participant: "spa", counterpart: "api", endpoint: "/session", method: "get", interaction: "200"}
-	apiServesSession := checkedPlace{participant: "api", counterpart: "spa", endpoint: "/session", method: "get", interaction: "200"}
-	spaPostsSession := checkedPlace{participant: "spa", counterpart: "api", endpoint: "/session", method: "post", interaction: "request"}
-	apiReceivesSession := checkedPlace{participant: "api", counterpart: "spa", endpoint: "/session", method: "post", interaction: "request"}
 
 	tests := []struct {
 		name          string
@@ -1153,78 +1078,6 @@ func TestFormatNotDeployableReportWritesAPropertyBreakAsAFieldBlock(t *testing.T
 `,
 		},
 		{
-			name:  "property_missing_in_provider at a map's values reads the parent field the way the provider provides it",
-			place: spaGetsSession,
-			contractBreak: ContractBreak{Reason: "property_missing_in_provider", Role: "consumer", Details: map[string]string{
-				"consumerField": "Session.onboarding{}", "property": "$.onboarding{}", "propertyType": "boolean", "consumerName": "spa", "providerName": "api",
-			}},
-			block: `  Session.onboarding{} — spa reads it, but api doesn't provide it
-    → spa: read Session.onboarding the way api provides it
-    → api: provide it
-      · GET /session response 200 at "$.onboarding{}"
-`,
-		},
-		{
-			name:  "property_missing_in_provider at a map's values as provider leaves there off the consumer's parent fix",
-			place: apiServesSession,
-			contractBreak: ContractBreak{Reason: "property_missing_in_provider", Role: "provider", Details: map[string]string{
-				"consumerField": "Session.onboarding{}", "property": "$.onboarding{}", "propertyType": "boolean", "consumerName": "spa", "providerName": "api",
-			}},
-			block: `  Session.onboarding{} — api doesn't provide it, but spa reads it
-    → api: provide it
-    → spa: read Session.onboarding the way api provides it
-      · GET /session response 200 at "$.onboarding{}" (spa: Session.onboarding{})
-`,
-		},
-		{
-			name:  "property_optional_in_provider_required_in_consumer at an array's items reads the parent field the way the provider provides it",
-			place: spaGetsSession,
-			contractBreak: ContractBreak{Reason: "property_optional_in_provider_required_in_consumer", Role: "consumer", Details: map[string]string{
-				"consumerField": "Session.tags[]", "providerField": "SessionRecord.tags[]", "property": "$.tags[]", "propertyType": "string", "consumerName": "spa", "providerName": "api",
-			}},
-			block: `  Session.tags[] — spa requires it, but api only sometimes provides it
-    → spa: read Session.tags the way api provides it
-    → api: always provide it there
-      · GET /session response 200 at "$.tags[]" (api: SessionRecord.tags[])
-`,
-		},
-		{
-			name:  "property_missing_in_provider at the root's items reads the body's field the way the provider provides it",
-			place: spaGetsFiles,
-			contractBreak: ContractBreak{Reason: "property_missing_in_provider", Role: "consumer", Details: map[string]string{
-				"consumerField": "Files[]", "property": "$[]", "propertyType": "string", "consumerName": "spa", "providerName": "api",
-			}},
-			block: `  Files[] — spa reads it, but api doesn't provide it
-    → spa: read Files the way api provides it
-    → api: provide it
-      · GET /files response 200 at "$[]"
-`,
-		},
-		{
-			name:  "property_missing_in_consumer at a map's values reads the parent field the way the consumer sends it",
-			place: apiReceivesSession,
-			contractBreak: ContractBreak{Reason: "property_missing_in_consumer", Role: "provider", Details: map[string]string{
-				"providerField": "NewSessionRecord.flags{}", "property": "$.flags{}", "propertyType": "boolean", "consumerName": "spa", "providerName": "api",
-			}},
-			block: `  NewSessionRecord.flags{} — api requires it, but spa doesn't send it
-    → api: read NewSessionRecord.flags the way spa sends it
-    → spa: send it
-      · POST /session request at "$.flags{}"
-`,
-		},
-		{
-			name:  "property_optional_in_consumer_required_in_provider at a map's values as consumer leaves there off the provider's parent fix",
-			place: spaPostsSession,
-			contractBreak: ContractBreak{Reason: "property_optional_in_consumer_required_in_provider", Role: "consumer", Details: map[string]string{
-				"consumerField": "NewSession.flags{}", "providerField": "NewSessionRecord.flags{}", "property": "$.flags{}", "propertyType": "boolean", "consumerName": "spa", "providerName": "api",
-			}},
-			block: `  NewSession.flags{} — spa sends it only sometimes, but api requires it
-    → spa: always send it
-    → api: read NewSessionRecord.flags the way spa sends it
-      · POST /session request at "$.flags{}" (api: NewSessionRecord.flags{})
-`,
-		},
-		{
 			name:  "a fix that doesn't mark it optional keeps its words and there at an array's items",
 			place: spaGetsSession,
 			contractBreak: ContractBreak{Reason: "property_nullable_in_provider_not_nullable_in_consumer", Role: "consumer", Details: map[string]string{
@@ -1234,30 +1087,6 @@ func TestFormatNotDeployableReportWritesAPropertyBreakAsAFieldBlock(t *testing.T
     → spa: handle null in the code, then mark it nullable
     → api: stop providing null there
       · GET /session response 200 at "$.tags[]" (api: SessionRecord.tags[])
-`,
-		},
-		{
-			name:  "break without fields at a map's values reads the parent property the way the provider provides it",
-			place: spaGetsSession,
-			contractBreak: ContractBreak{Reason: "property_missing_in_provider", Role: "consumer", Details: map[string]string{
-				"property": "$.onboarding{}", "propertyType": "boolean", "consumerName": "spa", "providerName": "api",
-			}},
-			block: `  "$.onboarding{}" — spa reads it, but api doesn't provide it
-    → spa: read "$.onboarding" the way api provides it
-    → api: provide it
-      · GET /session response 200 at "$.onboarding{}"
-`,
-		},
-		{
-			name:  "break without fields at the root's items reads the body the way the provider provides it",
-			place: spaGetsFiles,
-			contractBreak: ContractBreak{Reason: "property_missing_in_provider", Role: "consumer", Details: map[string]string{
-				"property": "$[]", "propertyType": "string", "consumerName": "spa", "providerName": "api",
-			}},
-			block: `  "$[]" — spa reads it, but api doesn't provide it
-    → spa: read the body the way api provides it
-    → api: provide it
-      · GET /files response 200 at "$[]"
 `,
 		},
 	}

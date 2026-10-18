@@ -73,6 +73,18 @@ func FormatViolationLine(violation Violation) (headline, explanation string) {
 				fmt.Sprintf(`use it with "type: %s"`, rightType)
 		}
 		return fallbackViolationLine(violation), ""
+	case "schema.optional_not_allowed":
+		switch details["position"] {
+		case "items":
+			return `"optional" is not allowed on array items` + pathAt,
+				`mark the property that holds the array optional, or use "nullable: true" for an item that may be null`
+		case "values":
+			return `"optional" is not allowed on map values` + pathAt,
+				`mark the property that holds the map optional, or use "nullable: true" for a value that may be null`
+		case "schema":
+			return `"optional" is not allowed on a schema` + pathAt, `mark optional the property that uses it, beside its "ref"`
+		}
+		return fallbackViolationLine(violation), ""
 	case "resource.duplicate":
 		if details["declaredIn"] == violation.Source {
 			return fmt.Sprintf("duplicate resource %q, declared twice", details["resource"]), ""

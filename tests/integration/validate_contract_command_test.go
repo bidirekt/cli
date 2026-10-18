@@ -201,6 +201,33 @@ payments (v2, deployed):
 		assert.Empty(t, out.String())
 	})
 
+	t.Run("optional on array items prints where it is and how to fix it", func(t *testing.T) {
+		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpmock.ActivateNonDefault(httpClient.StdClient())
+		defer httpmock.DeactivateAndReset()
+
+		file := writeContract(t)
+
+		httpmock.RegisterResponder(http.MethodPost, endpoint,
+			httpmock.NewStringResponder(http.StatusBadRequest, `{"message":"contract validation failed","violations":[{"code":"schema.optional_not_allowed","path":"schemas;Pet;properties;tags;items","source":"contract.yaml","details":{"position":"items"}}]}`))
+
+		command := validate_contract.NewValidateCommand(
+			validate_contract.NewValidateContractClient(httpClient),
+		)
+		var out, errOut bytes.Buffer
+		command.SetOut(&out)
+		command.SetErr(&errOut)
+		command.SetArgs([]string{file, "--participant", participant, "--environment", environment})
+
+		err := command.Execute()
+
+		require.ErrorIs(t, err, reports.ErrSilent)
+		assert.Equal(t, "contract validation failed\n"+
+			"  - contract.yaml: \"optional\" is not allowed on array items at schemas Pet properties tags items, mark the property that holds the array optional, or use \"nullable: true\" for an item that may be null\n",
+			errOut.String())
+		assert.Empty(t, out.String())
+	})
+
 	t.Run("unknown participant suggests creating it with create-participant", func(t *testing.T) {
 		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
 		httpmock.ActivateNonDefault(httpClient.StdClient())
