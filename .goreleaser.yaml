@@ -23,6 +23,21 @@ archives:
 checksum:
   name_template: checksums.txt
 
+dockers_v2:
+  - images:
+      - ghcr.io/bidirekt/cli
+    tags:
+      - "{{ .Version }}"
+    labels:
+      org.opencontainers.image.created: "{{ .Date }}"
+      org.opencontainers.image.description: CLI for the Bidirekt broker
+      org.opencontainers.image.licenses: Apache-2.0
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.source: https://github.com/bidirekt/cli
+      org.opencontainers.image.title: cli
+      org.opencontainers.image.url: https://github.com/bidirekt/cli
+      org.opencontainers.image.version: "{{ .Version }}"
+
 # A tag with a suffix such as -rc.1 is a pre-release, which releases/latest (and install.sh without a version) never picks.
 release:
   prerelease: auto
