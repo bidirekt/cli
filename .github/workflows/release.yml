@@ -31,6 +31,8 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # With two tags on one commit (v0.1.0 and v0.1.0-rc.2), goreleaser released the wrong one.
+          GORELEASER_CURRENT_TAG: ${{ github.ref_name }}
 
   install:
     needs: goreleaser
