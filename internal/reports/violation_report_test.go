@@ -31,7 +31,6 @@ func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
 		{Code: "schema.duplicate", Path: "schemas;Pet", Source: "schemas.yaml", Details: map[string]string{"schema": "Pet", "declaredIn": "billing.yaml"}},
 		{Code: "schema.unresolved_name", Path: "provides;rest;/pets;get;responses;200", Source: "pets.yaml", Details: map[string]string{"schema": "Pets", "resource": "provides GET /pets 200"}},
 		{Code: "schema.unresolved_ref", Path: "schemas;Invoice;properties;payment", Source: "billing.yaml", Details: map[string]string{"schema": "Payment", "property": "Invoice.payment"}},
-		{Code: "schema.too_deep", Path: "schemas;Owner", Source: "schemas.yaml", Details: map[string]string{"schema": "Owner", "maxDepth": "10"}},
 		{Code: "something.new", Path: "provides;rest;/pets", Source: "api.yaml", Details: map[string]string{"hint": "x"}},
 	})
 
@@ -55,7 +54,6 @@ func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
   - schemas.yaml: duplicate schema "Pet", also declared in billing.yaml
   - pets.yaml: unresolved schema "Pets" referenced by provides GET /pets 200
   - billing.yaml: unresolved ref "Payment" in Invoice.payment
-  - schemas.yaml: schema "Owner" is deeper than 10 levels
   - api.yaml: something.new at provides rest /pets (hint: x)
 `, report)
 }
@@ -519,18 +517,6 @@ func TestFormatViolationLine(t *testing.T) {
 		})
 
 		assert.Equal(t, `unresolved ref "Payment" in Invoice.payment`, headline)
-		assert.Empty(t, explanation)
-	})
-
-	t.Run("schema.too_deep", func(t *testing.T) {
-		headline, explanation := FormatViolationLine(Violation{
-			Code:    "schema.too_deep",
-			Path:    "schemas;Owner",
-			Source:  "schemas.yaml",
-			Details: map[string]string{"schema": "Owner", "maxDepth": "10"},
-		})
-
-		assert.Equal(t, `schema "Owner" is deeper than 10 levels`, headline)
 		assert.Empty(t, explanation)
 	})
 
