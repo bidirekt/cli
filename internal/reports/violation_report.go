@@ -106,8 +106,6 @@ func FormatViolationLine(violation Violation) (headline, explanation string) {
 		return fmt.Sprintf("unresolved schema %q referenced by %s", details["schema"], details["resource"]), ""
 	case "schema.unresolved_ref":
 		return fmt.Sprintf("unresolved ref %q in %s", details["schema"], details["property"]), ""
-	case "schema.too_deep":
-		return fmt.Sprintf("schema %q is deeper than %s levels", details["schema"], details["maxDepth"]), ""
 	default:
 		return fallbackViolationLine(violation), ""
 	}
