@@ -53,13 +53,36 @@ func TestCreateEnvironmentCommand(t *testing.T) {
 		assert.Empty(t, errOut.String())
 	})
 
+	t.Run("existing environment prints already exists, exits 0", func(t *testing.T) {
+		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpmock.ActivateNonDefault(httpClient.StdClient())
+		defer httpmock.DeactivateAndReset()
+
+		httpmock.RegisterResponder(http.MethodPost, endpoint,
+			httpmock.NewStringResponder(http.StatusOK, `{"message":"environment already exists"}`))
+
+		command := create_environment.NewCreateEnvironmentCommand(
+			create_environment.NewCreateEnvironmentClient(httpClient),
+		)
+		var out, errOut bytes.Buffer
+		command.SetOut(&out)
+		command.SetErr(&errOut)
+		command.SetArgs([]string{name})
+
+		err := command.Execute()
+
+		require.NoError(t, err)
+		assert.Equal(t, name+" environment already exists\n", out.String())
+		assert.Empty(t, errOut.String())
+	})
+
 	t.Run("non-200 response surfaces the broker body and exits non-zero", func(t *testing.T) {
 		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
 		httpmock.RegisterResponder(http.MethodPost, endpoint,
-			httpmock.NewStringResponder(http.StatusBadRequest, `{"success":false,"message":"environment already exists"}`))
+			httpmock.NewStringResponder(http.StatusBadRequest, `{"message":"environment invalid input"}`))
 
 		command := create_environment.NewCreateEnvironmentCommand(
 			create_environment.NewCreateEnvironmentClient(httpClient),
@@ -72,6 +95,6 @@ func TestCreateEnvironmentCommand(t *testing.T) {
 		err := command.Execute()
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "environment already exists")
+		assert.Equal(t, "cannot post environment to broker: environment invalid input", err.Error())
 	})
 }
