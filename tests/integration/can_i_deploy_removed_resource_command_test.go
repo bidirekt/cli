@@ -16,7 +16,7 @@ import (
 func TestCanIDeployCommandRemovedResourceStillConsumed(t *testing.T) {
 	const (
 		brokerURL   = "http://localhost:8080"
-		participant = "orders-api"
+		participant = "orders_api"
 		version     = "v2"
 		environment = "production"
 		endpoint    = brokerURL + "/api/can-i-deploy"
@@ -28,12 +28,12 @@ func TestCanIDeployCommandRemovedResourceStillConsumed(t *testing.T) {
 
 	responseBody := `{
 	  "message": "contract checked successfully",
-	  "participant": "orders-api",
+	  "participant": "orders_api",
 	  "version": "v2",
 	  "environment": "production",
 	  "deployable": false,
 	  "results": {
-	    "orders-web": {
+	    "orders_web": {
 	      "deployable": false,
 	      "participantVersion": "v7",
 	      "endpoints": {
@@ -62,13 +62,13 @@ func TestCanIDeployCommandRemovedResourceStillConsumed(t *testing.T) {
 	err := command.Execute()
 
 	require.ErrorIs(t, err, reports.ErrSilent)
-	assert.Equal(t, `orders-api v2 cannot be deployed to production
+	assert.Equal(t, `orders_api v2 cannot be deployed to production
 
-orders-web (v7, deployed):
+orders_web (v7, deployed):
   GET /users
-    - orders-api removed GET /users, but orders-web still calls it
-      → orders-api: keep it until orders-web stops calling it
-      → orders-web: stop calling it
+    - orders_api removed GET /users, but orders_web still calls it
+      → orders_api: keep it until orders_web stops calling it
+      → orders_web: stop calling it
 `, out.String())
 	assert.NotContains(t, errOut.String(), "Error:")
 }

@@ -17,8 +17,8 @@ import (
 func TestRenameParticipantCommand(t *testing.T) {
 	const (
 		brokerURL = "http://localhost:8080"
-		oldName   = "pets-service"
-		newName   = "orders-service"
+		oldName   = "pets_service"
+		newName   = "orders_service"
 		endpoint  = brokerURL + "/api/participants/rename"
 	)
 
@@ -35,7 +35,7 @@ func TestRenameParticipantCommand(t *testing.T) {
 					return nil, err
 				}
 				capturedBody = body
-				return httpmock.NewStringResponse(http.StatusOK, `{"success":true,"message":"participant renamed"}`), nil
+				return httpmock.NewStringResponse(http.StatusOK, `{"message":"participant renamed"}`), nil
 			})
 
 		command := rename_participant.NewRenameParticipantCommand(
@@ -50,7 +50,7 @@ func TestRenameParticipantCommand(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, 1, httpmock.GetCallCountInfo()["POST "+endpoint])
-		assert.JSONEq(t, `{"oldName":"pets-service","newName":"orders-service"}`, string(capturedBody))
+		assert.JSONEq(t, `{"oldName":"pets_service","newName":"orders_service"}`, string(capturedBody))
 		assert.Equal(t, oldName+" participant renamed to "+newName+"\n", out.String())
 		assert.Empty(t, errOut.String())
 	})
@@ -81,7 +81,7 @@ func TestRenameParticipantCommand(t *testing.T) {
 		defer httpmock.DeactivateAndReset()
 
 		httpmock.RegisterResponder(http.MethodPost, endpoint,
-			httpmock.NewStringResponder(http.StatusBadRequest, `{"success":false,"message":"participant already exists"}`))
+			httpmock.NewStringResponder(http.StatusConflict, `{"message":"participant already exists"}`))
 
 		command := rename_participant.NewRenameParticipantCommand(
 			rename_participant.NewRenameParticipantClient(httpClient),

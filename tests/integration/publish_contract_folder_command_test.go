@@ -20,7 +20,7 @@ import (
 func TestPublishContractFolderCommand(t *testing.T) {
 	const (
 		brokerURL   = "http://localhost:8080"
-		participant = "pets-service"
+		participant = "pets_service"
 		version     = "v1"
 		endpoint    = brokerURL + "/api/contracts"
 	)
@@ -43,7 +43,7 @@ func TestPublishContractFolderCommand(t *testing.T) {
 		require.NoError(t, os.MkdirAll(filepath.Dir(pets), 0o700))
 		require.NoError(t, os.WriteFile(pets, []byte(petsContent), 0o600))
 		require.NoError(t, os.WriteFile(schemas, []byte(schemasContent), 0o600))
-		require.NoError(t, os.WriteFile(readme, []byte("# pets-service contracts\n"), 0o600))
+		require.NoError(t, os.WriteFile(readme, []byte("# pets_service contracts\n"), 0o600))
 		require.NoError(t, os.WriteFile(store, []byte(storeContent), 0o600))
 
 		var capturedBody []byte

@@ -22,7 +22,7 @@ import (
 func TestPublishContractCommand(t *testing.T) {
 	const (
 		brokerURL   = "http://localhost:8080"
-		participant = "pets-service"
+		participant = "pets_service"
 		version     = "v1"
 		endpoint    = brokerURL + "/api/contracts"
 	)
@@ -316,7 +316,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		require.Error(t, err)
 		assert.NotErrorIs(t, err, reports.ErrSilent)
-		assert.Equal(t, `participant "pets-service" not found → create it with: bidirekt create-participant pets-service`, err.Error())
+		assert.Equal(t, `participant "pets_service" not found → create it with: bidirekt create-participant pets_service`, err.Error())
 		assert.Empty(t, out.String())
 		assert.Empty(t, errOut.String())
 	})

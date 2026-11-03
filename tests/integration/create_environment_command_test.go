@@ -33,7 +33,7 @@ func TestCreateEnvironmentCommand(t *testing.T) {
 					return nil, err
 				}
 				capturedBody = body
-				return httpmock.NewStringResponse(http.StatusOK, `{"success":true,"message":"environment created"}`), nil
+				return httpmock.NewStringResponse(http.StatusOK, `{"message":"environment created"}`), nil
 			})
 
 		command := create_environment.NewCreateEnvironmentCommand(
