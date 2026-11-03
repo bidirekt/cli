@@ -79,6 +79,29 @@ func TestCreateParticipantCommand(t *testing.T) {
 		assert.Empty(t, errOut.String())
 	})
 
+	t.Run("existing participant prints already exists, exits 0", func(t *testing.T) {
+		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpmock.ActivateNonDefault(httpClient.StdClient())
+		defer httpmock.DeactivateAndReset()
+
+		httpmock.RegisterResponder(http.MethodPost, endpoint,
+			httpmock.NewStringResponder(http.StatusOK, `{"message":"participant already exists"}`))
+
+		command := create_participant.NewCreateParticipantCommand(
+			create_participant.NewCreateParticipantClient(httpClient),
+		)
+		var out, errOut bytes.Buffer
+		command.SetOut(&out)
+		command.SetErr(&errOut)
+		command.SetArgs([]string{name})
+
+		err := command.Execute()
+
+		require.NoError(t, err)
+		assert.Equal(t, name+" participant already exists\n", out.String())
+		assert.Empty(t, errOut.String())
+	})
+
 	t.Run("non-200 response surfaces the broker body and exits non-zero", func(t *testing.T) {
 		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
 		httpmock.ActivateNonDefault(httpClient.StdClient())
