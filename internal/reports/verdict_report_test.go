@@ -265,6 +265,48 @@ petstore_web:
 `, report)
 }
 
+func TestFormatNotDeployableReportPrintsARemovedInteractionPerInteraction(t *testing.T) {
+	results := map[string]CanIDeployResult{
+		"petstore_web": {
+			Deployable: false,
+			Endpoints: map[string]map[string]map[string][]ContractBreak{
+				"/pets/*": {
+					"delete": {
+						"200": {{Reason: "provider_resource_interaction_removed_but_still_consumed", Role: "provider", Details: map[string]string{"providerStatuses": "204"}}},
+						"202": {{Reason: "provider_resource_interaction_removed_but_still_consumed", Role: "provider", Details: map[string]string{"providerStatuses": "204"}}},
+					},
+				},
+				"/pets": {
+					"post": {
+						"request": {{Reason: "provider_resource_removed_but_still_consumed", Role: "provider"}},
+						"201":     {{Reason: "provider_resource_removed_but_still_consumed", Role: "provider"}},
+					},
+				},
+			},
+		},
+	}
+
+	report := FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_api 3.0.0", "petstore_api", "production", results)
+
+	assert.Equal(t, `petstore_api 3.0.0 cannot be deployed to production
+
+petstore_web:
+  POST /pets
+    - petstore_api removed POST /pets, but petstore_web still calls it
+      → petstore_api: keep it until petstore_web stops calling it
+      → petstore_web: stop calling it
+  DELETE /pets/*
+    response 200:
+      - petstore_api now answers DELETE /pets/* only with 204, but petstore_web still reads response 200
+        → petstore_api: keep answering 200 until petstore_web stops reading it
+        → petstore_web: read response 204
+    response 202:
+      - petstore_api now answers DELETE /pets/* only with 204, but petstore_web still reads response 202
+        → petstore_api: keep answering 202 until petstore_web stops reading it
+        → petstore_web: read response 204
+`, report)
+}
+
 func TestFormatNotDeployableReportOmitsVersionWhenNull(t *testing.T) {
 	results := map[string]CanIDeployResult{
 		"petstore_reviews": {
@@ -1220,6 +1262,8 @@ func TestFormatBreakLine(t *testing.T) {
 	siteReadsUnsubscribe200 := checkedInteraction{participant: "site", counterpart: "api", environment: "production", method: "POST", endpoint: "/api/newsletter/unsubscribe", status: "200"}
 	siteReadsUpload201 := checkedInteraction{participant: "site", counterpart: "api", environment: "production", method: "POST", endpoint: "/api/files", status: "201"}
 	appSendsRestore := checkedInteraction{participant: "app", counterpart: "api", environment: "production", method: "POST", endpoint: "/api/users/*/restore", isRequest: true}
+	apiAnswersDelete200 := checkedInteraction{participant: "petstore_api", counterpart: "petstore_web", environment: "production", method: "DELETE", endpoint: "/pets/*", status: "200"}
+	apiAcceptsCreate := checkedInteraction{participant: "petstore_api", counterpart: "petstore_web", environment: "production", method: "POST", endpoint: "/pets", isRequest: true}
 
 	tests := []struct {
 		name          string
@@ -1336,6 +1380,58 @@ func TestFormatBreakLine(t *testing.T) {
 				fixes: []string{
 					"petstore_api: keep it until petstore_web stops calling it",
 					"petstore_web: stop calling it",
+				},
+			},
+		},
+		{
+			name:        "provider_resource_interaction_removed_but_still_consumed as provider on a response names the statuses it now answers",
+			interaction: apiAnswersDelete200,
+			contractBreak: ContractBreak{Reason: "provider_resource_interaction_removed_but_still_consumed", Role: "provider", Details: map[string]string{
+				"providerStatuses": "204",
+			}},
+			line: breakLine{
+				text: "petstore_api now answers DELETE /pets/* only with 204, but petstore_web still reads response 200",
+				fixes: []string{
+					"petstore_api: keep answering 200 until petstore_web stops reading it",
+					"petstore_web: read response 204",
+				},
+			},
+		},
+		{
+			name:        "provider_resource_interaction_removed_but_still_consumed as provider on a response puts or before the last of several statuses",
+			interaction: apiAnswersDelete200,
+			contractBreak: ContractBreak{Reason: "provider_resource_interaction_removed_but_still_consumed", Role: "provider", Details: map[string]string{
+				"providerStatuses": "202, 204, 404",
+			}},
+			line: breakLine{
+				text: "petstore_api now answers DELETE /pets/* only with 202, 204 or 404, but petstore_web still reads response 200",
+				fixes: []string{
+					"petstore_api: keep answering 200 until petstore_web stops reading it",
+					"petstore_web: read response 202, 204 or 404",
+				},
+			},
+		},
+		{
+			name:          "provider_resource_interaction_removed_but_still_consumed as provider on a response when no response is left",
+			interaction:   apiAnswersDelete200,
+			contractBreak: ContractBreak{Reason: "provider_resource_interaction_removed_but_still_consumed", Role: "provider"},
+			line: breakLine{
+				text: "petstore_api no longer answers DELETE /pets/*, but petstore_web still reads response 200",
+				fixes: []string{
+					"petstore_api: keep answering 200 until petstore_web stops reading it",
+					"petstore_web: stop reading it",
+				},
+			},
+		},
+		{
+			name:          "provider_resource_interaction_removed_but_still_consumed as provider on a request",
+			interaction:   apiAcceptsCreate,
+			contractBreak: ContractBreak{Reason: "provider_resource_interaction_removed_but_still_consumed", Role: "provider"},
+			line: breakLine{
+				text: "petstore_api dropped the request body of POST /pets, but petstore_web still sends it",
+				fixes: []string{
+					"petstore_api: keep accepting it until petstore_web stops sending it",
+					"petstore_web: stop sending it",
 				},
 			},
 		},

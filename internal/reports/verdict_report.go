@@ -365,6 +365,22 @@ func formatBreakLine(interaction checkedInteraction, contractBreak ContractBreak
 			text:  fmt.Sprintf("%s removed %s, but %s still calls it", me, resource, other),
 			fixes: []string{fmt.Sprintf("%s: keep it until %s stops calling it", me, other), other + ": stop calling it"},
 		}
+	case reason == "provider_resource_interaction_removed_but_still_consumed" && asProvider && onRequest:
+		return breakLine{
+			text:  fmt.Sprintf("%s dropped the request body of %s, but %s still sends it", me, resource, other),
+			fixes: []string{fmt.Sprintf("%s: keep accepting it until %s stops sending it", me, other), other + ": stop sending it"},
+		}
+	case reason == "provider_resource_interaction_removed_but_still_consumed" && asProvider && onResponse && details["providerStatuses"] == "":
+		return breakLine{
+			text:  fmt.Sprintf("%s no longer answers %s, but %s still reads response %s", me, resource, other, interaction.status),
+			fixes: []string{fmt.Sprintf("%s: keep answering %s until %s stops reading it", me, interaction.status, other), other + ": stop reading it"},
+		}
+	case reason == "provider_resource_interaction_removed_but_still_consumed" && asProvider && onResponse:
+		providerStatuses := orList(details["providerStatuses"])
+		return breakLine{
+			text:  fmt.Sprintf("%s now answers %s only with %s, but %s still reads response %s", me, resource, providerStatuses, other, interaction.status),
+			fixes: []string{fmt.Sprintf("%s: keep answering %s until %s stops reading it", me, interaction.status, other), other + ": read response " + providerStatuses},
+		}
 	default:
 		return breakLine{text: fallbackBreakLine(reason, details)}
 	}
