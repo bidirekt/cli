@@ -36,7 +36,7 @@ func TestRecordDeploymentCommand(t *testing.T) {
 					return nil, err
 				}
 				capturedBody = body
-				return httpmock.NewStringResponse(http.StatusOK, `{"success":true,"message":"deployment recorded"}`), nil
+				return httpmock.NewStringResponse(http.StatusOK, `{"message":"deployment recorded"}`), nil
 			})
 
 		command := record_deployment.NewRecordDeploymentCommand(
@@ -126,7 +126,7 @@ func TestRecordDeploymentCommand(t *testing.T) {
 		defer httpmock.DeactivateAndReset()
 
 		httpmock.RegisterResponder(http.MethodPost, endpoint,
-			httpmock.NewStringResponder(http.StatusBadRequest, `{"success":false,"message":"version not found"}`))
+			httpmock.NewStringResponder(http.StatusNotFound, `{"message":"version not found"}`))
 
 		command := record_deployment.NewRecordDeploymentCommand(
 			record_deployment.NewRecordDeploymentClient(httpClient),

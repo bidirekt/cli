@@ -16,7 +16,7 @@ import (
 func TestCreateParticipantCommand(t *testing.T) {
 	const (
 		brokerURL = "http://localhost:8080"
-		name      = "pets-service"
+		name      = "pets_service"
 		endpoint  = brokerURL + "/api/participants"
 	)
 
@@ -33,7 +33,7 @@ func TestCreateParticipantCommand(t *testing.T) {
 					return nil, err
 				}
 				capturedBody = body
-				return httpmock.NewStringResponse(http.StatusOK, `{"success":true,"message":"participant created"}`), nil
+				return httpmock.NewStringResponse(http.StatusOK, `{"message":"participant created"}`), nil
 			})
 
 		command := create_participant.NewCreateParticipantCommand(
@@ -48,7 +48,7 @@ func TestCreateParticipantCommand(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, 1, httpmock.GetCallCountInfo()["POST "+endpoint])
-		assert.JSONEq(t, `{"participant":"pets-service"}`, string(capturedBody))
+		assert.JSONEq(t, `{"participant":"pets_service"}`, string(capturedBody))
 		assert.Equal(t, name+" participant created\n", out.String())
 		assert.Empty(t, errOut.String())
 	})
@@ -62,7 +62,7 @@ func TestCreateParticipantCommand(t *testing.T) {
 		defer httpmock.DeactivateAndReset()
 
 		httpmock.RegisterResponder(http.MethodPost, endpoint,
-			httpmock.NewStringResponder(http.StatusOK, `{"success":true,"message":"participant created"}`))
+			httpmock.NewStringResponder(http.StatusOK, `{"message":"participant created"}`))
 
 		command := create_participant.NewCreateParticipantCommand(
 			create_participant.NewCreateParticipantClient(httpClient),
@@ -108,7 +108,7 @@ func TestCreateParticipantCommand(t *testing.T) {
 		defer httpmock.DeactivateAndReset()
 
 		httpmock.RegisterResponder(http.MethodPost, endpoint,
-			httpmock.NewStringResponder(http.StatusBadRequest, `{"success":false,"message":"participant invalid input"}`))
+			httpmock.NewStringResponder(http.StatusBadRequest, `{"message":"participant invalid input"}`))
 
 		command := create_participant.NewCreateParticipantCommand(
 			create_participant.NewCreateParticipantClient(httpClient),
