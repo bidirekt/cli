@@ -352,12 +352,8 @@ func formatBreakLine(interaction checkedInteraction, contractBreak ContractBreak
 			fixes: []string{me + ": read response " + providerStatuses, other + ": answer " + interaction.status},
 		}
 	case reason == "provider_resource_not_deployed_in_environment" && asConsumer:
-		deployedIn := ""
-		if environments, ok := details["deployedEnvironments"]; ok {
-			deployedIn = fmt.Sprintf(" (deployed in: %s)", environments)
-		}
 		return breakLine{
-			text:  fmt.Sprintf("%s calls %s, but %s is not deployed in %s%s", me, resource, other, interaction.environment, deployedIn),
+			text:  fmt.Sprintf("%s calls %s, but %s is not deployed in %s", me, resource, other, interaction.environment),
 			fixes: []string{fmt.Sprintf("%s: deploy it to %s first", other, interaction.environment)},
 		}
 	case reason == "provider_resource_removed_but_still_consumed" && asProvider:
