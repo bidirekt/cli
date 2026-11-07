@@ -1352,18 +1352,7 @@ func TestFormatBreakLine(t *testing.T) {
 			},
 		},
 		{
-			name:        "provider_resource_not_deployed_in_environment as consumer lists where the provider is deployed",
-			interaction: webGetsReview,
-			contractBreak: ContractBreak{Reason: "provider_resource_not_deployed_in_environment", Role: "consumer", Details: map[string]string{
-				"deployedEnvironments": "staging, qa",
-			}},
-			line: breakLine{
-				text:  "petstore_web calls GET /reviews/*, but petstore_reviews is not deployed in production (deployed in: staging, qa)",
-				fixes: []string{"petstore_reviews: deploy it to production first"},
-			},
-		},
-		{
-			name:          "provider_resource_not_deployed_in_environment as consumer without deployedEnvironments",
+			name:          "provider_resource_not_deployed_in_environment as consumer",
 			interaction:   webGetsReview,
 			contractBreak: ContractBreak{Reason: "provider_resource_not_deployed_in_environment", Role: "consumer"},
 			line: breakLine{
