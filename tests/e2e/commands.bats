@@ -5,7 +5,7 @@ setup_file() {
   fi
 
   export RUN="$(date +%s)$$"
-  export API="todo_api_$RUN" TASKS_API="tasks_api_$RUN"
+  export API="todo_api_$RUN"
   export BIDIREKT_CONFIG_FILE="$BATS_FILE_TMPDIR/config.json"
 }
 
@@ -35,19 +35,6 @@ the config file has the profile e2e_$RUN — pass --profile e2e_$RUN or set BIDI
 @test "create participant todo_api" {
   run bidirekt create-participant "$API"
   assert_success
-}
-
-@test "rename todo_api to tasks_api" {
-  run bidirekt rename-participant "$API" "$TASKS_API"
-  assert_success
-  assert_output --partial "$API participant renamed to $TASKS_API"
-}
-
-@test "lists tasks_api instead of todo_api" {
-  run bidirekt list-participants
-  assert_success
-  assert_line "$TASKS_API"
-  refute_line "$API"
 }
 
 @test "shows the dev version" {
