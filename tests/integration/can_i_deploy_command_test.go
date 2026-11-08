@@ -9,6 +9,7 @@ import (
 
 	"github.com/bidirekt/cli/internal/components"
 	"github.com/bidirekt/cli/internal/features/can_i_deploy"
+	"github.com/bidirekt/cli/internal/reports"
 	"github.com/jarcoal/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -274,7 +275,7 @@ api:
 		assert.Empty(t, errOut.String())
 	})
 
-	t.Run("non-2xx response renders the broker message to stderr and exits non-zero", func(t *testing.T) {
+	t.Run("non-2xx response returns the broker message as the error", func(t *testing.T) {
 		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
@@ -293,9 +294,10 @@ api:
 		err := command.Execute()
 
 		require.Error(t, err)
-		assert.Contains(t, errOut.String(), "participant not found")
-		assert.NotContains(t, errOut.String(), "{")
-		assert.NotContains(t, errOut.String(), "\"success\"")
+		assert.NotErrorIs(t, err, reports.ErrSilent)
+		assert.Equal(t, "cannot query can-i-deploy from broker: participant not found", err.Error())
+		assert.Empty(t, out.String())
+		assert.Empty(t, errOut.String())
 	})
 
 	t.Run("missing --version fails before any request", func(t *testing.T) {
