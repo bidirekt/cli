@@ -95,23 +95,23 @@ func newRootCommand(dependencies *components.Components) *cobra.Command {
 	return rootCommand
 }
 
-func resolveBroker(command *cobra.Command, config *components.Config) (components.ResolvedBrokerURL, error) {
+func resolveBroker(command *cobra.Command, config *components.Config) (components.ResolvedProfile, error) {
 	flagBrokerURL, err := command.Flags().GetString("broker-url")
 	if err != nil {
-		return components.ResolvedBrokerURL{}, err
+		return components.ResolvedProfile{}, err
 	}
 
 	flagProfile, err := command.Flags().GetString("profile")
 	if err != nil {
-		return components.ResolvedBrokerURL{}, err
+		return components.ResolvedProfile{}, err
 	}
 
 	configFile, err := components.ConfigFileFromEnvironment()
 	if err != nil {
-		return components.ResolvedBrokerURL{}, err
+		return components.ResolvedProfile{}, err
 	}
 
-	resolved, err := components.ResolveBrokerURL(components.BrokerURLSources{
+	resolved, err := components.ResolveProfile(components.ProfileSources{
 		FlagBrokerURL: flagBrokerURL,
 		EnvBrokerURL:  config.BrokerURL,
 		FlagProfile:   flagProfile,
@@ -123,15 +123,15 @@ func resolveBroker(command *cobra.Command, config *components.Config) (component
 	}
 
 	if resolved.ProfileNotFound {
-		return components.ResolvedBrokerURL{}, fmt.Errorf("profile %q not found in %s", resolved.Profile, configFile.Path)
+		return components.ResolvedProfile{}, fmt.Errorf("profile %q not found in %s", resolved.Profile, configFile.Path)
 	}
 
 	switch len(resolved.OtherProfiles) {
 	case 0:
-		return components.ResolvedBrokerURL{}, errNoBrokerConfigured
+		return components.ResolvedProfile{}, errNoBrokerConfigured
 	case 1:
-		return components.ResolvedBrokerURL{}, fmt.Errorf("%w\nthe config file has the profile %[2]s — pass --profile %[2]s or set BIDIREKT_PROFILE=%[2]s", errNoBrokerConfigured, resolved.OtherProfiles[0])
+		return components.ResolvedProfile{}, fmt.Errorf("%w\nthe config file has the profile %[2]s — pass --profile %[2]s or set BIDIREKT_PROFILE=%[2]s", errNoBrokerConfigured, resolved.OtherProfiles[0])
 	default:
-		return components.ResolvedBrokerURL{}, fmt.Errorf("%w\nthe config file has the profiles %s — pass --profile <name> or set BIDIREKT_PROFILE=<name>", errNoBrokerConfigured, strings.Join(resolved.OtherProfiles, ", "))
+		return components.ResolvedProfile{}, fmt.Errorf("%w\nthe config file has the profiles %s — pass --profile <name> or set BIDIREKT_PROFILE=<name>", errNoBrokerConfigured, strings.Join(resolved.OtherProfiles, ", "))
 	}
 }

@@ -7,7 +7,7 @@ const (
 	brokerURLEnvOrigin  = "from BIDIREKT_BROKER_URL"
 )
 
-type BrokerURLSources struct {
+type ProfileSources struct {
 	FlagBrokerURL string
 	EnvBrokerURL  string
 	FlagProfile   string
@@ -15,7 +15,7 @@ type BrokerURLSources struct {
 	ReadProfiles  func() (map[string]Profile, error)
 }
 
-type ResolvedBrokerURL struct {
+type ResolvedProfile struct {
 	BrokerURL string
 	Origin    string
 	Profile   string
@@ -34,22 +34,22 @@ func ActiveProfileName(flagProfile, envProfile string) string {
 	return "default"
 }
 
-func ResolveBrokerURL(sources BrokerURLSources) (ResolvedBrokerURL, error) {
+func ResolveProfile(sources ProfileSources) (ResolvedProfile, error) {
 	profileName := ActiveProfileName(sources.FlagProfile, sources.EnvProfile)
 
-	var resolved ResolvedBrokerURL
+	var resolved ResolvedProfile
 	switch {
 	case sources.FlagBrokerURL != "":
-		resolved = ResolvedBrokerURL{BrokerURL: sources.FlagBrokerURL, Origin: BrokerURLFlagOrigin, Profile: profileName}
+		resolved = ResolvedProfile{BrokerURL: sources.FlagBrokerURL, Origin: BrokerURLFlagOrigin, Profile: profileName}
 	case sources.EnvBrokerURL != "":
-		resolved = ResolvedBrokerURL{BrokerURL: sources.EnvBrokerURL, Origin: brokerURLEnvOrigin, Profile: profileName}
+		resolved = ResolvedProfile{BrokerURL: sources.EnvBrokerURL, Origin: brokerURLEnvOrigin, Profile: profileName}
 	default:
 		profiles, err := sources.ReadProfiles()
 		if err != nil {
-			return ResolvedBrokerURL{}, err
+			return ResolvedProfile{}, err
 		}
 		profile, found := profiles[profileName]
-		resolved = ResolvedBrokerURL{
+		resolved = ResolvedProfile{
 			BrokerURL:       profile.BrokerURL,
 			Origin:          "profile: " + profileName,
 			Profile:         profileName,
@@ -62,7 +62,7 @@ func ResolveBrokerURL(sources BrokerURLSources) (ResolvedBrokerURL, error) {
 		return resolved, nil
 	}
 	if err := ValidateBrokerURL(resolved.BrokerURL, resolved.Origin); err != nil {
-		return ResolvedBrokerURL{}, err
+		return ResolvedProfile{}, err
 	}
 
 	return resolved, nil
