@@ -25,7 +25,8 @@ func TestCanIDeployCommandRemovedInteractionStillConsumed(t *testing.T) {
 	runCanIDeploy := func(t *testing.T, endpoints string) (string, string, error) {
 		t.Helper()
 
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		t.Cleanup(httpmock.DeactivateAndReset)
 

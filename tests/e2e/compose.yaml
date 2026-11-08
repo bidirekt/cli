@@ -14,9 +14,11 @@ services:
       retries: 15
 
   broker:
-    image: ghcr.io/bidirekt/broker:0.1.0
+    image: ghcr.io/bidirekt/broker:0.2.0-rc.1
     environment:
       BIDIREKT_DATABASE_URL: postgres://broker:broker@postgres:5432/broker?sslmode=disable
+      BIDIREKT_PUBLIC_URL: http://localhost:8080
+      BIDIREKT_TOKEN_SIGNING_KEY: ZTJlLW9ubHktdG9rZW4tc2lnbmluZy1rZXktMzJieXQ=
     ports:
       - "8080:8080"
     depends_on:

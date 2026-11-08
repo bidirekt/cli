@@ -107,12 +107,11 @@ setup() {
   assert_success
 }
 
-@test "todo_app v3 blocked: participant billing doesn't exist" {
+@test "todo_app v3 blocked: participant billing doesn't exist, so it is not deployed in production" {
   run bidirekt can-i-deploy "$APP" --version v3 --environment "$PRODUCTION"
   assert_failure
-  assert_output --partial "$APP calls GET /invoices, but billing doesn't provide it
-        → $APP: stop calling it
-        → billing: publish it"
+  assert_output --partial "$APP calls GET /invoices, but billing is not deployed in $PRODUCTION
+        → billing: deploy it to $PRODUCTION first"
 }
 
 @test "publish todo_app v4 (without billing)" {

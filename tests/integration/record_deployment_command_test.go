@@ -24,7 +24,8 @@ func TestRecordDeploymentCommand(t *testing.T) {
 	)
 
 	t.Run("records a deployment, posts participant+version+environment, prints the message, exits 0", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
@@ -57,7 +58,8 @@ func TestRecordDeploymentCommand(t *testing.T) {
 	})
 
 	t.Run("records a rollback, prints participant rolled back to version in environment, exits 0", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
@@ -81,7 +83,8 @@ func TestRecordDeploymentCommand(t *testing.T) {
 	})
 
 	t.Run("missing --version fails before any request", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 		httpmock.RegisterNoResponder(httpmock.NewErrorResponder(errors.New("unexpected request to the broker")))
@@ -101,7 +104,8 @@ func TestRecordDeploymentCommand(t *testing.T) {
 	})
 
 	t.Run("missing --environment fails before any request", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 		httpmock.RegisterNoResponder(httpmock.NewErrorResponder(errors.New("unexpected request to the broker")))
@@ -121,7 +125,8 @@ func TestRecordDeploymentCommand(t *testing.T) {
 	})
 
 	t.Run("non-2xx response surfaces the broker body and exits non-zero", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 

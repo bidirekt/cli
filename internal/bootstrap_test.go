@@ -2,11 +2,14 @@ package internal
 
 import (
 	"bytes"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -15,24 +18,38 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const noBrokerConfigured = `no broker configured — pass --broker-url, set BIDIREKT_BROKER_URL, or run "bidirekt configure"`
+const noBrokerConfigured = `no broker configured — run "bidirekt login" or set BIDIREKT_BROKER_URL and BIDIREKT_API_KEY`
 
 type brokerStub struct {
-	url      string
-	requests *atomic.Int32
+	url            string
+	requests       *atomic.Int32
+	authorizations func() []string
 }
 
 func startBrokerStub(t *testing.T) brokerStub {
 	t.Helper()
 
 	requests := &atomic.Int32{}
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+	var lock sync.Mutex
+	var authorizations []string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		requests.Add(1)
+		lock.Lock()
+		authorizations = append(authorizations, request.Header.Get("Authorization"))
+		lock.Unlock()
 		_, _ = writer.Write([]byte(`{"message":"participant created"}`))
 	}))
 	t.Cleanup(server.Close)
 
-	return brokerStub{url: server.URL, requests: requests}
+	return brokerStub{
+		url:      server.URL,
+		requests: requests,
+		authorizations: func() []string {
+			lock.Lock()
+			defer lock.Unlock()
+			return slices.Clone(authorizations)
+		},
+	}
 }
 
 func isolateEnvironment(t *testing.T) string {
@@ -41,6 +58,7 @@ func isolateEnvironment(t *testing.T) string {
 	configFilePath := filepath.Join(t.TempDir(), "bidirekt", "config.json")
 	t.Setenv("BIDIREKT_CONFIG_FILE", configFilePath)
 	t.Setenv("BIDIREKT_BROKER_URL", "")
+	t.Setenv("BIDIREKT_API_KEY", "")
 	t.Setenv("BIDIREKT_PROFILE", "")
 
 	return configFilePath
@@ -113,7 +131,7 @@ func TestBrokerCommandWithoutABrokerFailsWithoutCallingIt(t *testing.T) {
 	configFilePath := isolateEnvironment(t)
 	broker := startBrokerStub(t)
 	dependencies := components.New()
-	dependencies.HTTPClient.SetBaseURL(broker.url)
+	dependencies.HTTPClient.UseBroker(broker.url, "")
 
 	execution := executeRoot(t, dependencies, "create-participant", "pets")
 
@@ -133,6 +151,7 @@ func TestUsageErrorsComeBeforeAnyBrokerResolution(t *testing.T) {
 		{args: []string{"create-participant"}, err: "accepts 1 arg(s), received 0"},
 		{args: []string{"publish", "--participant", "pets", "--version", "v1"}, err: "requires at least 1 arg(s), only received 0"},
 		{args: []string{"can-i-deploy", "pets", "--unknown"}, err: "unknown flag: --unknown"},
+		{args: []string{"list-participants", "--broker-url", "x"}, err: "unknown flag: --broker-url"},
 	}
 
 	for _, test := range tests {
@@ -150,57 +169,58 @@ func TestUsageErrorsComeBeforeAnyBrokerResolution(t *testing.T) {
 	}
 }
 
-func TestBrokerURLComesFromTheFirstSourceThatHasOneAndIsAnnouncedOnStderr(t *testing.T) {
-	flagBroker := startBrokerStub(t)
+func TestBrokerComesFromTheEnvironmentPairOrTheActiveProfileAndIsAnnouncedOnStderr(t *testing.T) {
 	envBroker := startBrokerStub(t)
 	defaultBroker := startBrokerStub(t)
-	stagingBroker := startBrokerStub(t)
-	configFileContent := `{"profiles":{"default":{"brokerUrl":"` + defaultBroker.url + `"},"staging":{"brokerUrl":"` + stagingBroker.url + `"}}}`
+	globexBroker := startBrokerStub(t)
+	configFileContent := `{"profiles":{"default":{"brokerUrl":"` + defaultBroker.url + `","apiKey":"bdk_default"},"globex":{"brokerUrl":"` + globexBroker.url + `","apiKey":"bdk_globex"}}}`
 
 	tests := []struct {
-		name       string
-		envURL     string
-		envProfile string
-		args       []string
-		broker     brokerStub
-		brokerLine string
+		name          string
+		envURL        string
+		envKey        string
+		envProfile    string
+		args          []string
+		broker        brokerStub
+		brokerLine    string
+		authorization string
 	}{
 		{
-			name:       "--broker-url wins over BIDIREKT_BROKER_URL and the profile",
-			envURL:     envBroker.url,
-			args:       []string{"--broker-url", flagBroker.url},
-			broker:     flagBroker,
-			brokerLine: "Broker: " + flagBroker.url + " (from --broker-url)\n",
+			name:          "BIDIREKT_BROKER_URL and BIDIREKT_API_KEY win over the profile",
+			envURL:        envBroker.url,
+			envKey:        "bdk_env",
+			args:          []string{"--profile", "globex"},
+			broker:        envBroker,
+			brokerLine:    "Broker: " + envBroker.url + " (from BIDIREKT_BROKER_URL)\n",
+			authorization: "Bearer bdk_env",
 		},
 		{
-			name:       "BIDIREKT_BROKER_URL wins over the profile",
-			envURL:     envBroker.url,
-			broker:     envBroker,
-			brokerLine: "Broker: " + envBroker.url + " (from BIDIREKT_BROKER_URL)\n",
+			name:          "the default profile is used without --profile and BIDIREKT_PROFILE",
+			broker:        defaultBroker,
+			brokerLine:    "Broker: " + defaultBroker.url + " (profile: default)\n",
+			authorization: "Bearer bdk_default",
 		},
 		{
-			name:       "the default profile is used without --profile and BIDIREKT_PROFILE",
-			broker:     defaultBroker,
-			brokerLine: "Broker: " + defaultBroker.url + " (profile: default)\n",
+			name:          "--profile selects the profile",
+			args:          []string{"--profile", "globex"},
+			broker:        globexBroker,
+			brokerLine:    "Broker: " + globexBroker.url + " (profile: globex)\n",
+			authorization: "Bearer bdk_globex",
 		},
 		{
-			name:       "--profile selects the profile",
-			args:       []string{"--profile", "staging"},
-			broker:     stagingBroker,
-			brokerLine: "Broker: " + stagingBroker.url + " (profile: staging)\n",
+			name:          "BIDIREKT_PROFILE selects the profile",
+			envProfile:    "globex",
+			broker:        globexBroker,
+			brokerLine:    "Broker: " + globexBroker.url + " (profile: globex)\n",
+			authorization: "Bearer bdk_globex",
 		},
 		{
-			name:       "BIDIREKT_PROFILE selects the profile",
-			envProfile: "staging",
-			broker:     stagingBroker,
-			brokerLine: "Broker: " + stagingBroker.url + " (profile: staging)\n",
-		},
-		{
-			name:       "--profile wins over BIDIREKT_PROFILE",
-			envProfile: "default",
-			args:       []string{"--profile", "staging"},
-			broker:     stagingBroker,
-			brokerLine: "Broker: " + stagingBroker.url + " (profile: staging)\n",
+			name:          "--profile wins over BIDIREKT_PROFILE",
+			envProfile:    "default",
+			args:          []string{"--profile", "globex"},
+			broker:        globexBroker,
+			brokerLine:    "Broker: " + globexBroker.url + " (profile: globex)\n",
+			authorization: "Bearer bdk_globex",
 		},
 	}
 
@@ -209,6 +229,7 @@ func TestBrokerURLComesFromTheFirstSourceThatHasOneAndIsAnnouncedOnStderr(t *tes
 			configFilePath := isolateEnvironment(t)
 			writeConfigFile(t, configFilePath, configFileContent)
 			t.Setenv("BIDIREKT_BROKER_URL", test.envURL)
+			t.Setenv("BIDIREKT_API_KEY", test.envKey)
 			t.Setenv("BIDIREKT_PROFILE", test.envProfile)
 			requestsBefore := test.broker.requests.Load()
 
@@ -218,38 +239,135 @@ func TestBrokerURLComesFromTheFirstSourceThatHasOneAndIsAnnouncedOnStderr(t *tes
 			assert.Equal(t, "pets participant created\n", execution.stdout)
 			assert.Equal(t, test.brokerLine, execution.stderr)
 			assert.Equal(t, requestsBefore+1, test.broker.requests.Load())
+			authorizations := test.broker.authorizations()
+			assert.Equal(t, test.authorization, authorizations[len(authorizations)-1])
 		})
 	}
 }
 
-func TestConfigFileIsReadOnlyWhenNoFlagOrEnvironmentHasAURL(t *testing.T) {
+func TestProfileWithoutAKeySendsNoAuthorization(t *testing.T) {
+	configFilePath := isolateEnvironment(t)
+	broker := startBrokerStub(t)
+	writeConfigFile(t, configFilePath, `{"profiles":{"default":{"brokerUrl":"`+broker.url+`"}}}`)
+
+	execution := executeRoot(t, components.New(), "create-participant", "pets")
+
+	require.NoError(t, execution.err)
+	assert.Equal(t, []string{""}, broker.authorizations())
+}
+
+func TestEnvironmentPairIgnoresTheConfigFile(t *testing.T) {
+	tests := []struct {
+		name              string
+		configFileContent string
+		args              []string
+	}{
+		{name: "a corrupt config file", configFileContent: `{"profiles":`},
+		{name: "a config file without the named profile", configFileContent: `{"profiles":{}}`, args: []string{"--profile", "acme"}},
+		{name: "no config file"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			configFilePath := isolateEnvironment(t)
+			if test.configFileContent != "" {
+				writeConfigFile(t, configFilePath, test.configFileContent)
+			}
+			broker := startBrokerStub(t)
+			t.Setenv("BIDIREKT_BROKER_URL", broker.url)
+			t.Setenv("BIDIREKT_API_KEY", "bdk_env")
+
+			execution := executeRoot(t, components.New(), append([]string{"create-participant", "pets"}, test.args...)...)
+
+			require.NoError(t, execution.err)
+			assert.Equal(t, []string{"Bearer bdk_env"}, broker.authorizations())
+		})
+	}
+}
+
+func TestConfigFileIsReadWithoutTheEnvironmentPair(t *testing.T) {
 	configFilePath := isolateEnvironment(t)
 	writeConfigFile(t, configFilePath, `{"profiles":`)
 	broker := startBrokerStub(t)
 
-	fromFlag := executeRoot(t, components.New(), "create-participant", "pets", "--broker-url", broker.url)
-	require.NoError(t, fromFlag.err)
+	execution := executeRoot(t, components.New(), "create-participant", "pets")
 
-	t.Setenv("BIDIREKT_BROKER_URL", broker.url)
-	fromEnv := executeRoot(t, components.New(), "create-participant", "pets")
-	require.NoError(t, fromEnv.err)
-
-	t.Setenv("BIDIREKT_BROKER_URL", "")
-	fromProfile := executeRoot(t, components.New(), "create-participant", "pets")
-	assert.ErrorContains(t, fromProfile.err, "invalid config file "+configFilePath+":")
-	assert.Equal(t, int32(2), broker.requests.Load())
+	assert.ErrorContains(t, execution.err, "invalid config file "+configFilePath+":")
+	assert.Zero(t, broker.requests.Load())
 }
 
-func TestBrokerLineHidesThePassword(t *testing.T) {
+func TestOnlyOneOfTheEnvironmentPairFailsWithoutCallingTheBroker(t *testing.T) {
+	tests := []struct {
+		name   string
+		envURL bool
+		envKey bool
+	}{
+		{name: "only BIDIREKT_BROKER_URL", envURL: true},
+		{name: "only BIDIREKT_API_KEY", envKey: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			configFilePath := isolateEnvironment(t)
+			broker := startBrokerStub(t)
+			writeConfigFile(t, configFilePath, `{"profiles":{"default":{"brokerUrl":"`+broker.url+`","apiKey":"bdk_default"}}}`)
+			if test.envURL {
+				t.Setenv("BIDIREKT_BROKER_URL", broker.url)
+			}
+			if test.envKey {
+				t.Setenv("BIDIREKT_API_KEY", "bdk_env")
+			}
+
+			execution := executeRoot(t, components.New(), "create-participant", "pets")
+
+			require.EqualError(t, execution.err, "set both BIDIREKT_BROKER_URL and BIDIREKT_API_KEY, or neither")
+			assert.Empty(t, execution.stderr)
+			assert.Zero(t, broker.requests.Load())
+		})
+	}
+}
+
+func TestKeyWithoutThePrefixNeverLeavesTheMachine(t *testing.T) {
+	tests := []struct {
+		name    string
+		profile string
+		envKey  string
+		err     string
+	}{
+		{name: "from BIDIREKT_API_KEY", envKey: "acme_key", err: "the API key from BIDIREKT_API_KEY doesn't start with bdk_"},
+		{name: "in the profile", profile: "acme_key", err: "the API key in profile default doesn't start with bdk_"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			configFilePath := isolateEnvironment(t)
+			broker := startBrokerStub(t)
+			writeConfigFile(t, configFilePath, `{"profiles":{"default":{"brokerUrl":"`+broker.url+`","apiKey":"`+test.profile+`"}}}`)
+			if test.envKey != "" {
+				t.Setenv("BIDIREKT_BROKER_URL", broker.url)
+				t.Setenv("BIDIREKT_API_KEY", test.envKey)
+			}
+
+			execution := executeRoot(t, components.New(), "create-participant", "pets")
+
+			require.EqualError(t, execution.err, test.err)
+			assert.Empty(t, execution.stderr)
+			assert.Zero(t, broker.requests.Load())
+		})
+	}
+}
+
+func TestBrokerLineHidesThePasswordAndTheKey(t *testing.T) {
 	isolateEnvironment(t)
 	broker := startBrokerStub(t)
-	brokerURL := strings.Replace(broker.url, "http://", "http://ci:segredo@", 1)
+	t.Setenv("BIDIREKT_BROKER_URL", strings.Replace(broker.url, "http://", "http://ci:segredo@", 1))
+	t.Setenv("BIDIREKT_API_KEY", "bdk_segredo")
 
-	execution := executeRoot(t, components.New(), "create-participant", "pets", "--broker-url", brokerURL)
+	execution := executeRoot(t, components.New(), "create-participant", "pets")
 
 	require.NoError(t, execution.err)
-	assert.Equal(t, "Broker: "+strings.Replace(broker.url, "http://", "http://ci:xxxxx@", 1)+" (from --broker-url)\n", execution.stderr)
-	assert.NotContains(t, execution.stderr, "segredo")
+	assert.Equal(t, "Broker: "+strings.Replace(broker.url, "http://", "http://ci:xxxxx@", 1)+" (from BIDIREKT_BROKER_URL)\n", execution.stderr)
+	assert.NotContains(t, execution.stderr+execution.stdout, "segredo")
 	assert.Equal(t, int32(1), broker.requests.Load())
 }
 
@@ -262,20 +380,15 @@ func TestInvalidBrokerURLFailsNamingItsOrigin(t *testing.T) {
 		err               string
 	}{
 		{
-			name: "from --broker-url",
-			args: []string{"--broker-url", "broker.acme.com"},
-			err:  `invalid broker URL "broker.acme.com" (from --broker-url) — use http:// or https:// followed by a host`,
-		},
-		{
 			name:   "from BIDIREKT_BROKER_URL",
 			envURL: "ftp://x",
 			err:    `invalid broker URL "ftp://x" (from BIDIREKT_BROKER_URL) — use http:// or https:// followed by a host`,
 		},
 		{
 			name:              "from the profile",
-			configFileContent: `{"profiles":{"staging":{"brokerUrl":"http://"}}}`,
-			args:              []string{"--profile", "staging"},
-			err:               `invalid broker URL "http://" (profile: staging) — use http:// or https:// followed by a host`,
+			configFileContent: `{"profiles":{"globex":{"brokerUrl":"http://"}}}`,
+			args:              []string{"--profile", "globex"},
+			err:               `invalid broker URL "http://" (profile: globex) — use http:// or https:// followed by a host`,
 		},
 		{
 			name:   "with the password hidden",
@@ -290,10 +403,13 @@ func TestInvalidBrokerURLFailsNamingItsOrigin(t *testing.T) {
 			if test.configFileContent != "" {
 				writeConfigFile(t, configFilePath, test.configFileContent)
 			}
-			t.Setenv("BIDIREKT_BROKER_URL", test.envURL)
+			if test.envURL != "" {
+				t.Setenv("BIDIREKT_BROKER_URL", test.envURL)
+				t.Setenv("BIDIREKT_API_KEY", "bdk_env")
+			}
 			broker := startBrokerStub(t)
 			dependencies := components.New()
-			dependencies.HTTPClient.SetBaseURL(broker.url)
+			dependencies.HTTPClient.UseBroker(broker.url, "")
 
 			execution := executeRoot(t, dependencies, append([]string{"create-participant", "pets"}, test.args...)...)
 
@@ -321,7 +437,7 @@ func TestProfileNamedByFlagOrEnvironmentMustExist(t *testing.T) {
 			t.Setenv("BIDIREKT_PROFILE", test.envProfile)
 			broker := startBrokerStub(t)
 			dependencies := components.New()
-			dependencies.HTTPClient.SetBaseURL(broker.url)
+			dependencies.HTTPClient.UseBroker(broker.url, "")
 
 			execution := executeRoot(t, dependencies, append([]string{"create-participant", "pets"}, test.args...)...)
 
@@ -338,7 +454,7 @@ func TestMissingBrokerURLFailsWithoutWritingTheConfigFile(t *testing.T) {
 	writeConfigFile(t, configFilePath, configFileContent)
 	broker := startBrokerStub(t)
 	dependencies := components.New()
-	dependencies.HTTPClient.SetBaseURL(broker.url)
+	dependencies.HTTPClient.UseBroker(broker.url, "")
 
 	execution := executeRoot(t, dependencies, "create-participant", "pets")
 
@@ -385,7 +501,7 @@ func TestMissingBrokerURLNamesTheProfilesOfTheConfigFile(t *testing.T) {
 			}
 			broker := startBrokerStub(t)
 			dependencies := components.New()
-			dependencies.HTTPClient.SetBaseURL(broker.url)
+			dependencies.HTTPClient.UseBroker(broker.url, "")
 
 			execution := executeRoot(t, dependencies, "list-participants")
 
@@ -408,4 +524,79 @@ func TestDotEnvInTheWorkingDirectoryIsIgnored(t *testing.T) {
 
 	require.EqualError(t, execution.err, noBrokerConfigured)
 	assert.Zero(t, broker.requests.Load())
+}
+
+func TestAuthFailuresPrintOnlyTheirHint(t *testing.T) {
+	statuses := []struct {
+		status int
+		hint   func(brokerURL string) string
+	}{
+		{status: http.StatusUnauthorized, hint: func(brokerURL string) string {
+			return "not signed in to " + brokerURL + ` — run "bidirekt login" or set BIDIREKT_BROKER_URL and BIDIREKT_API_KEY`
+		}},
+		{status: http.StatusForbidden, hint: func(brokerURL string) string {
+			return "the API key can't do this — check its permission at " + brokerURL + "/profile"
+		}},
+	}
+	commands := [][]string{
+		{"create-participant", "pets"},
+		{"list-participants"},
+		{"can-i-deploy", "pets", "--version", "v1", "--environment", "production"},
+		{"record-deployment", "pets", "--version", "v1", "--environment", "production"},
+	}
+
+	for _, status := range statuses {
+		for _, args := range commands {
+			t.Run(http.StatusText(status.status)+" "+strings.Join(args, " "), func(t *testing.T) {
+				isolateEnvironment(t)
+				server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+					writer.WriteHeader(status.status)
+					_, _ = writer.Write([]byte(`{"message":"refused"}`))
+				}))
+				t.Cleanup(server.Close)
+				t.Setenv("BIDIREKT_BROKER_URL", server.URL)
+				t.Setenv("BIDIREKT_API_KEY", "bdk_acme")
+
+				execution := executeRoot(t, components.New(), args...)
+				var printed bytes.Buffer
+				printError(&printed, execution.err)
+
+				require.Error(t, execution.err)
+				assert.Equal(t, status.hint(server.URL)+"\n", printed.String())
+				assert.Empty(t, execution.stdout)
+				assert.Equal(t, "Broker: "+server.URL+" (from BIDIREKT_BROKER_URL)\n", execution.stderr)
+			})
+		}
+	}
+}
+
+type roundTripFunc func(request *http.Request) (*http.Response, error)
+
+func (this roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return this(request)
+}
+
+func TestKeyOverPlainHTTPToARemoteHostWarnsAndTheRequestProceeds(t *testing.T) {
+	isolateEnvironment(t)
+	const brokerURL = "http://broker.acme.internal:8080"
+	t.Setenv("BIDIREKT_BROKER_URL", brokerURL)
+	t.Setenv("BIDIREKT_API_KEY", "bdk_acme")
+	dependencies := components.New()
+	var requested []string
+	dependencies.HTTPClient.StdClient().Transport = roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		requested = append(requested, request.URL.String())
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"message":"participant created"}`)),
+			Request:    request,
+		}, nil
+	})
+
+	execution := executeRoot(t, dependencies, "create-participant", "pets")
+
+	require.NoError(t, execution.err)
+	assert.Equal(t, "Broker: "+brokerURL+" (from BIDIREKT_BROKER_URL)\nwarning: the API key travels unencrypted to "+brokerURL+"\n", execution.stderr)
+	assert.Equal(t, []string{brokerURL + "/api/participants"}, requested)
+	assert.NotContains(t, execution.stderr, "bdk_acme")
 }

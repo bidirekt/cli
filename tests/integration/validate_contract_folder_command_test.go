@@ -26,7 +26,8 @@ func TestValidateContractFolderCommand(t *testing.T) {
 	)
 
 	t.Run("validates a folder with its subfolders and the files passed beside it as one request, each YAML file once, in path order", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
@@ -85,7 +86,8 @@ func TestValidateContractFolderCommand(t *testing.T) {
 	})
 
 	t.Run("a folder without YAML files fails naming the folder before any request", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 		httpmock.RegisterNoResponder(httpmock.NewErrorResponder(errors.New("unexpected request to the broker")))

@@ -3,6 +3,7 @@ package internal
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -24,19 +25,34 @@ import (
 // Overridden at link time by the release pipeline (-ldflags "-X github.com/bidirekt/cli/internal.version=<tag>").
 var version = "dev"
 
-var errNoBrokerConfigured = errors.New(`no broker configured — pass --broker-url, set BIDIREKT_BROKER_URL, or run "bidirekt configure"`)
+var errNoBrokerConfigured = errors.New(`no broker configured — run "bidirekt login" or set BIDIREKT_BROKER_URL and BIDIREKT_API_KEY`)
 
 func Run() {
 	rootCommand := newRootCommand(components.New())
 
 	if err := rootCommand.Execute(); err != nil {
-		if !errors.Is(err, reports.ErrSilent) {
-			errWriter := rootCommand.ErrOrStderr()
-			_, _ = fmt.Fprintln(errWriter, paint.For(errWriter).Red(err.Error()))
-		}
-
+		printError(rootCommand.ErrOrStderr(), err)
 		os.Exit(1)
 	}
+}
+
+func printError(errWriter io.Writer, err error) {
+	if errors.Is(err, reports.ErrSilent) {
+		return
+	}
+	_, _ = fmt.Fprintln(errWriter, paint.For(errWriter).Red(userText(err)))
+}
+
+func userText(err error) string {
+	var notSignedIn components.NotSignedInError
+	if errors.As(err, &notSignedIn) {
+		return notSignedIn.Error()
+	}
+	var forbidden components.ForbiddenError
+	if errors.As(err, &forbidden) {
+		return forbidden.Error()
+	}
+	return err.Error()
 }
 
 func newRootCommand(dependencies *components.Components) *cobra.Command {
@@ -66,13 +82,16 @@ func newRootCommand(dependencies *components.Components) *cobra.Command {
 			if _, err := fmt.Fprintf(command.ErrOrStderr(), "Broker: %s (%s)\n", components.RedactedURL(broker.BrokerURL), broker.Origin); err != nil {
 				return err
 			}
-			dependencies.HTTPClient.SetBaseURL(broker.BrokerURL)
+			if err := components.WarnIfKeyTravelsUnencrypted(command.ErrOrStderr(), broker.BrokerURL, broker.APIKey); err != nil {
+				return err
+			}
+			dependencies.HTTPClient.UseBroker(broker.BrokerURL, broker.APIKey)
+			dependencies.HTTPClient.ExplainAuthFailures(broker.BrokerURL)
 
 			return nil
 		},
 	}
 
-	rootCommand.PersistentFlags().String("broker-url", "", "Broker base URL")
 	rootCommand.PersistentFlags().String("profile", "", `Profile in the config file (falls back to BIDIREKT_PROFILE, then "default")`)
 
 	create_participant.Register(rootCommand, dependencies)
@@ -95,43 +114,38 @@ func newRootCommand(dependencies *components.Components) *cobra.Command {
 	return rootCommand
 }
 
-func resolveBroker(command *cobra.Command, config *components.Config) (components.ResolvedBrokerURL, error) {
-	flagBrokerURL, err := command.Flags().GetString("broker-url")
-	if err != nil {
-		return components.ResolvedBrokerURL{}, err
-	}
-
+func resolveBroker(command *cobra.Command, config *components.Config) (components.ResolvedProfile, error) {
 	flagProfile, err := command.Flags().GetString("profile")
 	if err != nil {
-		return components.ResolvedBrokerURL{}, err
+		return components.ResolvedProfile{}, err
 	}
 
 	configFile, err := components.ConfigFileFromEnvironment()
 	if err != nil {
-		return components.ResolvedBrokerURL{}, err
+		return components.ResolvedProfile{}, err
 	}
 
-	resolved, err := components.ResolveBrokerURL(components.BrokerURLSources{
-		FlagBrokerURL: flagBrokerURL,
-		EnvBrokerURL:  config.BrokerURL,
-		FlagProfile:   flagProfile,
-		EnvProfile:    config.Profile,
-		ReadProfiles:  configFile.ReadProfiles,
+	resolved, err := components.ResolveProfile(components.ProfileSources{
+		EnvBrokerURL: config.BrokerURL,
+		EnvAPIKey:    config.APIKey,
+		FlagProfile:  flagProfile,
+		EnvProfile:   config.Profile,
+		ReadProfiles: configFile.ReadProfiles,
 	})
 	if err != nil || resolved.BrokerURL != "" {
 		return resolved, err
 	}
 
 	if resolved.ProfileNotFound {
-		return components.ResolvedBrokerURL{}, fmt.Errorf("profile %q not found in %s", resolved.Profile, configFile.Path)
+		return components.ResolvedProfile{}, fmt.Errorf("profile %q not found in %s", resolved.Profile, configFile.Path)
 	}
 
 	switch len(resolved.OtherProfiles) {
 	case 0:
-		return components.ResolvedBrokerURL{}, errNoBrokerConfigured
+		return components.ResolvedProfile{}, errNoBrokerConfigured
 	case 1:
-		return components.ResolvedBrokerURL{}, fmt.Errorf("%w\nthe config file has the profile %[2]s — pass --profile %[2]s or set BIDIREKT_PROFILE=%[2]s", errNoBrokerConfigured, resolved.OtherProfiles[0])
+		return components.ResolvedProfile{}, fmt.Errorf("%w\nthe config file has the profile %[2]s — pass --profile %[2]s or set BIDIREKT_PROFILE=%[2]s", errNoBrokerConfigured, resolved.OtherProfiles[0])
 	default:
-		return components.ResolvedBrokerURL{}, fmt.Errorf("%w\nthe config file has the profiles %s — pass --profile <name> or set BIDIREKT_PROFILE=<name>", errNoBrokerConfigured, strings.Join(resolved.OtherProfiles, ", "))
+		return components.ResolvedProfile{}, fmt.Errorf("%w\nthe config file has the profiles %s — pass --profile <name> or set BIDIREKT_PROFILE=<name>", errNoBrokerConfigured, strings.Join(resolved.OtherProfiles, ", "))
 	}
 }

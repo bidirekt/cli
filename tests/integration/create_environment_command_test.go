@@ -21,7 +21,8 @@ func TestCreateEnvironmentCommand(t *testing.T) {
 	)
 
 	t.Run("creates an environment, posts name, prints the message, exits 0", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
@@ -54,7 +55,8 @@ func TestCreateEnvironmentCommand(t *testing.T) {
 	})
 
 	t.Run("existing environment prints already exists, exits 0", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
@@ -77,7 +79,8 @@ func TestCreateEnvironmentCommand(t *testing.T) {
 	})
 
 	t.Run("non-200 response surfaces the broker body and exits non-zero", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
