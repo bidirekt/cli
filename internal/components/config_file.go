@@ -66,11 +66,13 @@ func (this ConfigFile) ReadProfiles() (map[string]Profile, error) {
 	return content.Profiles, nil
 }
 
-func (this ConfigFile) WriteProfile(name string, profile Profile) error {
+func (this ConfigFile) WriteProfile(name string, change func(profile *Profile)) error {
 	profiles, err := this.ReadProfiles()
 	if err != nil {
 		return err
 	}
+	profile := profiles[name]
+	change(&profile)
 	profiles[name] = profile
 
 	data, err := json.MarshalIndent(configFileContent{Profiles: profiles}, "", "  ")
@@ -78,12 +80,35 @@ func (this ConfigFile) WriteProfile(name string, profile Profile) error {
 		return fmt.Errorf("serialize config file: %w", err)
 	}
 
-	if err := os.MkdirAll(filepath.Dir(this.Path), 0o700); err != nil {
+	folder := filepath.Dir(this.Path)
+	if err := os.MkdirAll(folder, 0o700); err != nil {
 		return fmt.Errorf("create config folder: %w", err)
 	}
-	if err := os.WriteFile(this.Path, append(data, '\n'), 0o600); err != nil {
+	if err := replaceFile(folder, this.Path, append(data, '\n')); err != nil {
 		return fmt.Errorf("write config file: %w", err)
 	}
 
 	return nil
+}
+
+func replaceFile(folder, path string, data []byte) error {
+	temp, err := os.CreateTemp(folder, filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = os.Remove(temp.Name()) }()
+
+	if _, err := temp.Write(data); err != nil {
+		_ = temp.Close()
+		return err
+	}
+	if err := temp.Sync(); err != nil {
+		_ = temp.Close()
+		return err
+	}
+	if err := temp.Close(); err != nil {
+		return err
+	}
+
+	return os.Rename(temp.Name(), path)
 }

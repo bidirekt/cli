@@ -125,7 +125,7 @@ func TestConfigFileWriteProfile(t *testing.T) {
 		folder := filepath.Join(t.TempDir(), "config", "bidirekt")
 		path := filepath.Join(folder, "config.json")
 
-		err := components.ConfigFile{Path: path}.WriteProfile("default", components.Profile{BrokerURL: "https://broker.acme.internal"})
+		err := components.ConfigFile{Path: path}.WriteProfile("default", setBrokerURL("https://broker.acme.internal"))
 
 		require.NoError(t, err)
 		folderInfo, err := os.Stat(folder)
@@ -139,7 +139,7 @@ func TestConfigFileWriteProfile(t *testing.T) {
 	t.Run("writes the profiles format", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "config.json")
 
-		err := components.ConfigFile{Path: path}.WriteProfile("default", components.Profile{BrokerURL: "https://broker.acme.internal"})
+		err := components.ConfigFile{Path: path}.WriteProfile("default", setBrokerURL("https://broker.acme.internal"))
 
 		require.NoError(t, err)
 		written, err := os.ReadFile(path)
@@ -152,7 +152,7 @@ func TestConfigFileWriteProfile(t *testing.T) {
 		content := `{"profiles":{"default":{"brokerUrl":"https://broker.acme.internal"},"globex":{"brokerUrl":"http://old.internal"}}}`
 		require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
 
-		err := components.ConfigFile{Path: path}.WriteProfile("globex", components.Profile{BrokerURL: "http://localhost:8080"})
+		err := components.ConfigFile{Path: path}.WriteProfile("globex", setBrokerURL("http://localhost:8080"))
 
 		require.NoError(t, err)
 		written, err := os.ReadFile(path)
@@ -160,15 +160,67 @@ func TestConfigFileWriteProfile(t *testing.T) {
 		assert.JSONEq(t, `{"profiles":{"default":{"brokerUrl":"https://broker.acme.internal"},"globex":{"brokerUrl":"http://localhost:8080"}}}`, string(written))
 	})
 
+	t.Run("hands the change the stored profile, so what it leaves alone survives", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "config.json")
+		content := `{"profiles":{"default":{"brokerUrl":"https://broker.acme.internal"},"globex":{"brokerUrl":"https://broker.globex.internal"}}}`
+		require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+
+		var seen components.Profile
+		err := components.ConfigFile{Path: path}.WriteProfile("globex", func(profile *components.Profile) { seen = *profile })
+
+		require.NoError(t, err)
+		assert.Equal(t, components.Profile{BrokerURL: "https://broker.globex.internal"}, seen)
+		written, err := os.ReadFile(path)
+		require.NoError(t, err)
+		assert.JSONEq(t, content, string(written))
+	})
+
+	t.Run("turns an existing 0644 file into 0600", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("Windows has no Unix permission bits")
+		}
+		path := filepath.Join(t.TempDir(), "config.json")
+		require.NoError(t, os.WriteFile(path, []byte(`{"profiles":{}}`), 0o600))
+		require.NoError(t, os.Chmod(path, 0o644))
+
+		err := components.ConfigFile{Path: path}.WriteProfile("default", setBrokerURL("https://broker.acme.internal"))
+
+		require.NoError(t, err)
+		fileInfo, err := os.Stat(path)
+		require.NoError(t, err)
+		assert.Equal(t, os.FileMode(0o600), fileInfo.Mode().Perm())
+	})
+
+	t.Run("leaves only the config file in its folder", func(t *testing.T) {
+		folder := t.TempDir()
+		path := filepath.Join(folder, "config.json")
+		require.NoError(t, os.WriteFile(path, []byte(`{"profiles":{}}`), 0o600))
+
+		err := components.ConfigFile{Path: path}.WriteProfile("default", setBrokerURL("https://broker.acme.internal"))
+
+		require.NoError(t, err)
+		entries, err := os.ReadDir(folder)
+		require.NoError(t, err)
+		var names []string
+		for _, entry := range entries {
+			names = append(names, entry.Name())
+		}
+		assert.Equal(t, []string{"config.json"}, names)
+	})
+
 	t.Run("leaves a file it cannot read untouched", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "config.json")
 		require.NoError(t, os.WriteFile(path, []byte(`{"profiles":`), 0o600))
 
-		err := components.ConfigFile{Path: path}.WriteProfile("default", components.Profile{BrokerURL: "https://broker.acme.internal"})
+		err := components.ConfigFile{Path: path}.WriteProfile("default", setBrokerURL("https://broker.acme.internal"))
 
 		assert.ErrorContains(t, err, "invalid config file "+path+":")
 		written, readErr := os.ReadFile(path)
 		require.NoError(t, readErr)
 		assert.Equal(t, `{"profiles":`, string(written))
 	})
+}
+
+func setBrokerURL(brokerURL string) func(profile *components.Profile) {
+	return func(profile *components.Profile) { profile.BrokerURL = brokerURL }
 }
