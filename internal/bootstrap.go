@@ -24,7 +24,7 @@ import (
 // Overridden at link time by the release pipeline (-ldflags "-X github.com/bidirekt/cli/internal.version=<tag>").
 var version = "dev"
 
-var errNoBrokerConfigured = errors.New(`no broker configured — pass --broker-url, set BIDIREKT_BROKER_URL, or run "bidirekt configure"`)
+var errNoBrokerConfigured = errors.New(`no broker configured — run "bidirekt login" or set BIDIREKT_BROKER_URL and BIDIREKT_API_KEY`)
 
 func Run() {
 	rootCommand := newRootCommand(components.New())
@@ -66,13 +66,12 @@ func newRootCommand(dependencies *components.Components) *cobra.Command {
 			if _, err := fmt.Fprintf(command.ErrOrStderr(), "Broker: %s (%s)\n", components.RedactedURL(broker.BrokerURL), broker.Origin); err != nil {
 				return err
 			}
-			dependencies.HTTPClient.SetBaseURL(broker.BrokerURL)
+			dependencies.HTTPClient.UseBroker(broker.BrokerURL, broker.APIKey)
 
 			return nil
 		},
 	}
 
-	rootCommand.PersistentFlags().String("broker-url", "", "Broker base URL")
 	rootCommand.PersistentFlags().String("profile", "", `Profile in the config file (falls back to BIDIREKT_PROFILE, then "default")`)
 
 	create_participant.Register(rootCommand, dependencies)
@@ -96,11 +95,6 @@ func newRootCommand(dependencies *components.Components) *cobra.Command {
 }
 
 func resolveBroker(command *cobra.Command, config *components.Config) (components.ResolvedProfile, error) {
-	flagBrokerURL, err := command.Flags().GetString("broker-url")
-	if err != nil {
-		return components.ResolvedProfile{}, err
-	}
-
 	flagProfile, err := command.Flags().GetString("profile")
 	if err != nil {
 		return components.ResolvedProfile{}, err
@@ -112,11 +106,11 @@ func resolveBroker(command *cobra.Command, config *components.Config) (component
 	}
 
 	resolved, err := components.ResolveProfile(components.ProfileSources{
-		FlagBrokerURL: flagBrokerURL,
-		EnvBrokerURL:  config.BrokerURL,
-		FlagProfile:   flagProfile,
-		EnvProfile:    config.Profile,
-		ReadProfiles:  configFile.ReadProfiles,
+		EnvBrokerURL: config.BrokerURL,
+		EnvAPIKey:    config.APIKey,
+		FlagProfile:  flagProfile,
+		EnvProfile:   config.Profile,
+		ReadProfiles: configFile.ReadProfiles,
 	})
 	if err != nil || resolved.BrokerURL != "" {
 		return resolved, err

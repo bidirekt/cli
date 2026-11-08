@@ -18,10 +18,11 @@ All install options: https://bidirekt.com/docs/start/install/
 
 ## Quickstart
 
-Point the CLI at your broker, then create the environment and the participant once:
+Point the CLI at your broker with an API key created at `<broker>/profile/api-keys/new`, then create the environment and the participant once:
 
 ```sh
 export BIDIREKT_BROKER_URL=http://localhost:8080
+export BIDIREKT_API_KEY=bdk_...
 bidirekt create-environment production
 bidirekt create-participant petstore_web
 ```

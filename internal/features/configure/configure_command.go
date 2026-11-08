@@ -8,6 +8,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const brokerURLFlagOrigin = "from --broker-url"
+
 var errNoTerminalToAsk = errors.New("no terminal to ask for the broker URL — pass --broker-url")
 
 func NewConfigureCommand(config *components.Config, isTerminal func(stream any) bool) *cobra.Command {
@@ -30,7 +32,7 @@ func NewConfigureCommand(config *components.Config, isTerminal func(stream any) 
 
 		switch {
 		case brokerURL != "":
-			err = components.ValidateBrokerURL(brokerURL, components.BrokerURLFlagOrigin)
+			err = components.ValidateBrokerURL(brokerURL, brokerURLFlagOrigin)
 		case isTerminal(command.InOrStdin()):
 			brokerURL, err = promptBrokerURLOfProfile(command, configFile, profile)
 		default:

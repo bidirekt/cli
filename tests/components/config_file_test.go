@@ -87,14 +87,14 @@ func TestConfigFileReadProfiles(t *testing.T) {
 
 	t.Run("reads every profile", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "config.json")
-		content := `{"profiles":{"default":{"brokerUrl":"https://broker.acme.internal"},"globex":{"brokerUrl":"http://localhost:8080"}}}`
+		content := `{"profiles":{"default":{"brokerUrl":"https://broker.acme.internal","apiKey":"bdk_acme"},"globex":{"brokerUrl":"http://localhost:8080"}}}`
 		require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
 
 		profiles, err := components.ConfigFile{Path: path}.ReadProfiles()
 
 		require.NoError(t, err)
 		assert.Equal(t, map[string]components.Profile{
-			"default": {BrokerURL: "https://broker.acme.internal"},
+			"default": {BrokerURL: "https://broker.acme.internal", APIKey: "bdk_acme"},
 			"globex":  {BrokerURL: "http://localhost:8080"},
 		}, profiles)
 	})
@@ -173,6 +173,32 @@ func TestConfigFileWriteProfile(t *testing.T) {
 		written, err := os.ReadFile(path)
 		require.NoError(t, err)
 		assert.JSONEq(t, content, string(written))
+	})
+
+	t.Run("saving the URL keeps the API key", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "config.json")
+		content := `{"profiles":{"acme":{"brokerUrl":"http://old.internal","apiKey":"bdk_acme"}}}`
+		require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+
+		err := components.ConfigFile{Path: path}.WriteProfile("acme", setBrokerURL("https://broker.acme.internal"))
+
+		require.NoError(t, err)
+		written, err := os.ReadFile(path)
+		require.NoError(t, err)
+		assert.JSONEq(t, `{"profiles":{"acme":{"brokerUrl":"https://broker.acme.internal","apiKey":"bdk_acme"}}}`, string(written))
+	})
+
+	t.Run("removing the API key keeps the URL and drops the field", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "config.json")
+		content := `{"profiles":{"acme":{"brokerUrl":"https://broker.acme.internal","apiKey":"bdk_acme"}}}`
+		require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+
+		err := components.ConfigFile{Path: path}.WriteProfile("acme", func(profile *components.Profile) { profile.APIKey = "" })
+
+		require.NoError(t, err)
+		written, err := os.ReadFile(path)
+		require.NoError(t, err)
+		assert.JSONEq(t, `{"profiles":{"acme":{"brokerUrl":"https://broker.acme.internal"}}}`, string(written))
 	})
 
 	t.Run("turns an existing 0644 file into 0600", func(t *testing.T) {

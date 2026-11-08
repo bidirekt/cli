@@ -28,8 +28,11 @@ func (this *HTTPClient) StdClient() *http.Client {
 	return this.restClient.Client()
 }
 
-func (this *HTTPClient) SetBaseURL(url string) {
-	this.restClient.SetBaseURL(url)
+func (this *HTTPClient) UseBroker(brokerURL, apiKey string) {
+	this.restClient.SetBaseURL(brokerURL)
+	if apiKey != "" {
+		this.restClient.SetHeader("Authorization", "Bearer "+apiKey)
+	}
 }
 
 func (this *HTTPClient) Get(ctx context.Context, url string) (*resty.Response, error) {

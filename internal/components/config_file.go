@@ -12,6 +12,7 @@ import (
 
 type Profile struct {
 	BrokerURL string `json:"brokerUrl"`
+	APIKey    string `json:"apiKey,omitempty"`
 }
 
 type ConfigFile struct {

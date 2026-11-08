@@ -59,3 +59,31 @@ func TestHTTPClientAbortsTheRequestWhenItsContextExpires(t *testing.T) {
 		})
 	}
 }
+
+func TestHTTPClientUseBrokerSendsTheKeyAsABearerToken(t *testing.T) {
+	tests := []struct {
+		name          string
+		apiKey        string
+		authorization string
+	}{
+		{name: "with a key", apiKey: "bdk_acme", authorization: "Bearer bdk_acme"},
+		{name: "without a key", apiKey: "", authorization: ""},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			authorizations := make(chan string, 1)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				authorizations <- r.Header.Get("Authorization")
+			}))
+			t.Cleanup(server.Close)
+
+			client := components.NewHTTPClient(&components.Config{})
+			client.UseBroker(server.URL, test.apiKey)
+			_, err := client.Get(context.Background(), "/api/participants")
+
+			require.NoError(t, err)
+			assert.Equal(t, test.authorization, <-authorizations)
+		})
+	}
+}

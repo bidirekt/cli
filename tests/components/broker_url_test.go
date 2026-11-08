@@ -16,7 +16,7 @@ func TestValidateBrokerURLAcceptsHTTPAndHTTPSWithAHost(t *testing.T) {
 		"http://[::1]:8080",
 	} {
 		t.Run(brokerURL, func(t *testing.T) {
-			assert.NoError(t, components.ValidateBrokerURL(brokerURL, "from --broker-url"))
+			assert.NoError(t, components.ValidateBrokerURL(brokerURL, "from BIDIREKT_BROKER_URL"))
 		})
 	}
 }
@@ -34,8 +34,8 @@ func TestValidateBrokerURLRejectsAnythingElseWithoutNormalizing(t *testing.T) {
 		},
 		{
 			rawURL: "ftp://x",
-			origin: "from --broker-url",
-			err:    `invalid broker URL "ftp://x" (from --broker-url) — use http:// or https:// followed by a host`,
+			origin: "from BIDIREKT_BROKER_URL",
+			err:    `invalid broker URL "ftp://x" (from BIDIREKT_BROKER_URL) — use http:// or https:// followed by a host`,
 		},
 		{
 			rawURL: "http://",
@@ -44,13 +44,13 @@ func TestValidateBrokerURLRejectsAnythingElseWithoutNormalizing(t *testing.T) {
 		},
 		{
 			rawURL: "http://:8080",
-			origin: "from --broker-url",
-			err:    `invalid broker URL "http://:8080" (from --broker-url) — use http:// or https:// followed by a host`,
+			origin: "from BIDIREKT_BROKER_URL",
+			err:    `invalid broker URL "http://:8080" (from BIDIREKT_BROKER_URL) — use http:// or https:// followed by a host`,
 		},
 		{
 			rawURL: "http://localhost:80a",
-			origin: "from --broker-url",
-			err:    `invalid broker URL "http://localhost:80a" (from --broker-url) — use http:// or https:// followed by a host`,
+			origin: "from BIDIREKT_BROKER_URL",
+			err:    `invalid broker URL "http://localhost:80a" (from BIDIREKT_BROKER_URL) — use http:// or https:// followed by a host`,
 		},
 		{
 			rawURL: "https://ci:segredo@",

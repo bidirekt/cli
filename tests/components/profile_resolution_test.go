@@ -9,16 +9,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestResolveProfileTakesTheFirstSourceThatHasOne(t *testing.T) {
+func TestResolveProfileTakesTheEnvironmentPairOrTheActiveProfile(t *testing.T) {
 	const (
-		flagURL    = "http://flag.internal"
 		envURL     = "http://env.internal"
+		envKey     = "bdk_env"
 		defaultURL = "http://default.internal"
+		defaultKey = "bdk_default"
 		globexURL  = "http://globex.internal"
+		globexKey  = "bdk_globex"
 	)
 	profiles := map[string]components.Profile{
-		"default": {BrokerURL: defaultURL},
-		"globex":  {BrokerURL: globexURL},
+		"default": {BrokerURL: defaultURL, APIKey: defaultKey},
+		"globex":  {BrokerURL: globexURL, APIKey: globexKey},
 	}
 
 	tests := []struct {
@@ -28,57 +30,51 @@ func TestResolveProfileTakesTheFirstSourceThatHasOne(t *testing.T) {
 		resolved components.ResolvedProfile
 	}{
 		{
-			name:     "--broker-url wins over BIDIREKT_BROKER_URL and the profile",
-			sources:  components.ProfileSources{FlagBrokerURL: flagURL, EnvBrokerURL: envURL},
+			name:     "BIDIREKT_BROKER_URL and BIDIREKT_API_KEY win over the profile",
+			sources:  components.ProfileSources{EnvBrokerURL: envURL, EnvAPIKey: envKey},
 			profiles: profiles,
-			resolved: components.ResolvedProfile{BrokerURL: flagURL, Origin: "from --broker-url", Profile: "default"},
-		},
-		{
-			name:     "BIDIREKT_BROKER_URL wins over the profile",
-			sources:  components.ProfileSources{EnvBrokerURL: envURL},
-			profiles: profiles,
-			resolved: components.ResolvedProfile{BrokerURL: envURL, Origin: "from BIDIREKT_BROKER_URL", Profile: "default"},
+			resolved: components.ResolvedProfile{BrokerURL: envURL, APIKey: envKey, Origin: "from BIDIREKT_BROKER_URL", Profile: "default"},
 		},
 		{
 			name:     "the default profile without --profile and BIDIREKT_PROFILE",
 			profiles: profiles,
-			resolved: components.ResolvedProfile{BrokerURL: defaultURL, Origin: "profile: default", Profile: "default", OtherProfiles: []string{"globex"}},
+			resolved: components.ResolvedProfile{BrokerURL: defaultURL, APIKey: defaultKey, Origin: "profile: default", Profile: "default", OtherProfiles: []string{"globex"}},
 		},
 		{
 			name:     "--profile selects the profile",
 			sources:  components.ProfileSources{FlagProfile: "globex"},
 			profiles: profiles,
-			resolved: components.ResolvedProfile{BrokerURL: globexURL, Origin: "profile: globex", Profile: "globex", OtherProfiles: []string{"default"}},
+			resolved: components.ResolvedProfile{BrokerURL: globexURL, APIKey: globexKey, Origin: "profile: globex", Profile: "globex", OtherProfiles: []string{"default"}},
 		},
 		{
 			name:     "BIDIREKT_PROFILE selects the profile",
 			sources:  components.ProfileSources{EnvProfile: "globex"},
 			profiles: profiles,
-			resolved: components.ResolvedProfile{BrokerURL: globexURL, Origin: "profile: globex", Profile: "globex", OtherProfiles: []string{"default"}},
+			resolved: components.ResolvedProfile{BrokerURL: globexURL, APIKey: globexKey, Origin: "profile: globex", Profile: "globex", OtherProfiles: []string{"default"}},
 		},
 		{
 			name:     "--profile wins over BIDIREKT_PROFILE",
 			sources:  components.ProfileSources{FlagProfile: "globex", EnvProfile: "default"},
 			profiles: profiles,
-			resolved: components.ResolvedProfile{BrokerURL: globexURL, Origin: "profile: globex", Profile: "globex", OtherProfiles: []string{"default"}},
+			resolved: components.ResolvedProfile{BrokerURL: globexURL, APIKey: globexKey, Origin: "profile: globex", Profile: "globex", OtherProfiles: []string{"default"}},
 		},
 		{
-			name:     "--broker-url wins over the selected profile, which stays the active one",
-			sources:  components.ProfileSources{FlagBrokerURL: flagURL, FlagProfile: "globex"},
+			name:     "a profile without apiKey resolves without a key",
+			sources:  components.ProfileSources{FlagProfile: "globex"},
+			profiles: map[string]components.Profile{"globex": {BrokerURL: globexURL}},
+			resolved: components.ResolvedProfile{BrokerURL: globexURL, Origin: "profile: globex", Profile: "globex"},
+		},
+		{
+			name:     "the environment pair makes a missing profile irrelevant",
+			sources:  components.ProfileSources{EnvBrokerURL: envURL, EnvAPIKey: envKey, FlagProfile: "missing"},
 			profiles: profiles,
-			resolved: components.ResolvedProfile{BrokerURL: flagURL, Origin: "from --broker-url", Profile: "globex"},
+			resolved: components.ResolvedProfile{BrokerURL: envURL, APIKey: envKey, Origin: "from BIDIREKT_BROKER_URL", Profile: "missing"},
 		},
 		{
-			name:     "BIDIREKT_BROKER_URL makes a missing profile irrelevant",
-			sources:  components.ProfileSources{EnvBrokerURL: envURL, FlagProfile: "missing"},
-			profiles: profiles,
-			resolved: components.ResolvedProfile{BrokerURL: envURL, Origin: "from BIDIREKT_BROKER_URL", Profile: "missing"},
-		},
-		{
-			name:     "a lower source with an invalid URL is never looked at",
-			sources:  components.ProfileSources{EnvBrokerURL: envURL},
-			profiles: map[string]components.Profile{"default": {BrokerURL: "broker.acme.com"}},
-			resolved: components.ResolvedProfile{BrokerURL: envURL, Origin: "from BIDIREKT_BROKER_URL", Profile: "default"},
+			name:     "a profile with an invalid URL or key is never looked at",
+			sources:  components.ProfileSources{EnvBrokerURL: envURL, EnvAPIKey: envKey},
+			profiles: map[string]components.Profile{"default": {BrokerURL: "broker.acme.com", APIKey: "acme"}},
+			resolved: components.ResolvedProfile{BrokerURL: envURL, APIKey: envKey, Origin: "from BIDIREKT_BROKER_URL", Profile: "default"},
 		},
 	}
 
@@ -95,21 +91,71 @@ func TestResolveProfileTakesTheFirstSourceThatHasOne(t *testing.T) {
 	}
 }
 
-func TestResolveProfileReadsTheConfigFileOnlyWhenNoFlagOrEnvironmentHasAURL(t *testing.T) {
+func TestResolveProfileReadsTheConfigFileOnlyWithoutTheEnvironmentPair(t *testing.T) {
+	readCount := 0
 	unreadable := func() (map[string]components.Profile, error) {
+		readCount++
 		return nil, errors.New("invalid config file /home/ci/.config/bidirekt/config.json: unexpected end of JSON input")
 	}
 
-	fromFlag, err := components.ResolveProfile(components.ProfileSources{FlagBrokerURL: "http://flag.internal", ReadProfiles: unreadable})
-	require.NoError(t, err)
-	assert.Equal(t, "http://flag.internal", fromFlag.BrokerURL)
-
-	fromEnv, err := components.ResolveProfile(components.ProfileSources{EnvBrokerURL: "http://env.internal", ReadProfiles: unreadable})
+	fromEnv, err := components.ResolveProfile(components.ProfileSources{EnvBrokerURL: "http://env.internal", EnvAPIKey: "bdk_env", ReadProfiles: unreadable})
 	require.NoError(t, err)
 	assert.Equal(t, "http://env.internal", fromEnv.BrokerURL)
+	assert.Equal(t, "bdk_env", fromEnv.APIKey)
+	assert.Zero(t, readCount)
 
 	_, err = components.ResolveProfile(components.ProfileSources{ReadProfiles: unreadable})
 	assert.EqualError(t, err, "invalid config file /home/ci/.config/bidirekt/config.json: unexpected end of JSON input")
+	assert.Equal(t, 1, readCount)
+}
+
+func TestResolveProfileRejectsOnlyOneOfTheEnvironmentPair(t *testing.T) {
+	for _, sources := range []components.ProfileSources{
+		{EnvBrokerURL: "http://env.internal"},
+		{EnvAPIKey: "bdk_env"},
+	} {
+		t.Run(sources.EnvBrokerURL+sources.EnvAPIKey, func(t *testing.T) {
+			sources.ReadProfiles = func() (map[string]components.Profile, error) {
+				return map[string]components.Profile{"default": {BrokerURL: "http://default.internal", APIKey: "bdk_default"}}, nil
+			}
+
+			_, err := components.ResolveProfile(sources)
+
+			assert.EqualError(t, err, "set both BIDIREKT_BROKER_URL and BIDIREKT_API_KEY, or neither")
+		})
+	}
+}
+
+func TestResolveProfileRejectsAKeyWithoutThePrefixNamingItsOrigin(t *testing.T) {
+	tests := []struct {
+		name     string
+		sources  components.ProfileSources
+		profiles map[string]components.Profile
+		err      string
+	}{
+		{
+			name:    "from BIDIREKT_API_KEY",
+			sources: components.ProfileSources{EnvBrokerURL: "http://env.internal", EnvAPIKey: "acme_key"},
+			err:     "the API key from BIDIREKT_API_KEY doesn't start with bdk_",
+		},
+		{
+			name:     "in the profile",
+			sources:  components.ProfileSources{FlagProfile: "acme"},
+			profiles: map[string]components.Profile{"acme": {BrokerURL: "https://broker.acme.internal", APIKey: "BDK_acme"}},
+			err:      "the API key in profile acme doesn't start with bdk_",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			sources := test.sources
+			sources.ReadProfiles = func() (map[string]components.Profile, error) { return test.profiles, nil }
+
+			_, err := components.ResolveProfile(sources)
+
+			assert.EqualError(t, err, test.err)
+		})
+	}
 }
 
 func TestResolveProfileReportsAMissingURL(t *testing.T) {
@@ -179,13 +225,8 @@ func TestResolveProfileRejectsAnInvalidURLNamingItsOrigin(t *testing.T) {
 		err      string
 	}{
 		{
-			name:    "from --broker-url",
-			sources: components.ProfileSources{FlagBrokerURL: "broker.acme.com"},
-			err:     `invalid broker URL "broker.acme.com" (from --broker-url) — use http:// or https:// followed by a host`,
-		},
-		{
 			name:    "from BIDIREKT_BROKER_URL",
-			sources: components.ProfileSources{EnvBrokerURL: "broker.acme.com"},
+			sources: components.ProfileSources{EnvBrokerURL: "broker.acme.com", EnvAPIKey: "bdk_env"},
 			err:     `invalid broker URL "broker.acme.com" (from BIDIREKT_BROKER_URL) — use http:// or https:// followed by a host`,
 		},
 		{
