@@ -104,4 +104,36 @@ func TestListParticipantsCommand(t *testing.T) {
 		assert.Contains(t, err.Error(), `unknown command "billing"`)
 		assert.Zero(t, httpmock.GetTotalCallCount())
 	})
+
+	for _, test := range []struct {
+		name   string
+		status int
+		err    error
+	}{
+		{name: "a 401 returns NotSignedInError", status: http.StatusUnauthorized, err: components.NotSignedInError{BrokerURL: brokerURL}},
+		{name: "a 403 returns ForbiddenError", status: http.StatusForbidden, err: components.ForbiddenError{BrokerURL: brokerURL}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			httpClient := components.NewHTTPClient()
+			httpClient.UseBroker(brokerURL, "bdk_acme")
+			httpClient.ExplainAuthFailures(brokerURL)
+			httpmock.ActivateNonDefault(httpClient.StdClient())
+			defer httpmock.DeactivateAndReset()
+
+			httpmock.RegisterMatcherResponder(http.MethodGet, endpoint, httpmock.HeaderIs("Authorization", "Bearer bdk_acme"),
+				httpmock.NewStringResponder(test.status, `{"message":"refused"}`))
+
+			command := list_participants.NewListParticipantsCommand(list_participants.NewListParticipantsClient(httpClient))
+			var out, errOut bytes.Buffer
+			command.SetOut(&out)
+			command.SetErr(&errOut)
+			command.SetArgs([]string{})
+
+			err := command.Execute()
+
+			require.ErrorIs(t, err, test.err)
+			assert.Equal(t, 1, httpmock.GetTotalCallCount())
+			assert.Empty(t, out.String())
+		})
+	}
 }

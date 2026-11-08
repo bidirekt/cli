@@ -2,6 +2,7 @@ package internal
 
 import (
 	"bytes"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -523,4 +524,79 @@ func TestDotEnvInTheWorkingDirectoryIsIgnored(t *testing.T) {
 
 	require.EqualError(t, execution.err, noBrokerConfigured)
 	assert.Zero(t, broker.requests.Load())
+}
+
+func TestAuthFailuresPrintOnlyTheirHint(t *testing.T) {
+	statuses := []struct {
+		status int
+		hint   func(brokerURL string) string
+	}{
+		{status: http.StatusUnauthorized, hint: func(brokerURL string) string {
+			return "not signed in to " + brokerURL + ` — run "bidirekt login" or set BIDIREKT_BROKER_URL and BIDIREKT_API_KEY`
+		}},
+		{status: http.StatusForbidden, hint: func(brokerURL string) string {
+			return "the API key can't do this — check its permission at " + brokerURL + "/profile"
+		}},
+	}
+	commands := [][]string{
+		{"create-participant", "pets"},
+		{"list-participants"},
+		{"can-i-deploy", "pets", "--version", "v1", "--environment", "production"},
+		{"record-deployment", "pets", "--version", "v1", "--environment", "production"},
+	}
+
+	for _, status := range statuses {
+		for _, args := range commands {
+			t.Run(http.StatusText(status.status)+" "+strings.Join(args, " "), func(t *testing.T) {
+				isolateEnvironment(t)
+				server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+					writer.WriteHeader(status.status)
+					_, _ = writer.Write([]byte(`{"message":"refused"}`))
+				}))
+				t.Cleanup(server.Close)
+				t.Setenv("BIDIREKT_BROKER_URL", server.URL)
+				t.Setenv("BIDIREKT_API_KEY", "bdk_acme")
+
+				execution := executeRoot(t, components.New(), args...)
+				var printed bytes.Buffer
+				printError(&printed, execution.err)
+
+				require.Error(t, execution.err)
+				assert.Equal(t, status.hint(server.URL)+"\n", printed.String())
+				assert.Empty(t, execution.stdout)
+				assert.Equal(t, "Broker: "+server.URL+" (from BIDIREKT_BROKER_URL)\n", execution.stderr)
+			})
+		}
+	}
+}
+
+type roundTripFunc func(request *http.Request) (*http.Response, error)
+
+func (this roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return this(request)
+}
+
+func TestKeyOverPlainHTTPToARemoteHostWarnsAndTheRequestProceeds(t *testing.T) {
+	isolateEnvironment(t)
+	const brokerURL = "http://broker.acme.internal:8080"
+	t.Setenv("BIDIREKT_BROKER_URL", brokerURL)
+	t.Setenv("BIDIREKT_API_KEY", "bdk_acme")
+	dependencies := components.New()
+	var requested []string
+	dependencies.HTTPClient.StdClient().Transport = roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		requested = append(requested, request.URL.String())
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"message":"participant created"}`)),
+			Request:    request,
+		}, nil
+	})
+
+	execution := executeRoot(t, dependencies, "create-participant", "pets")
+
+	require.NoError(t, execution.err)
+	assert.Equal(t, "Broker: "+brokerURL+" (from BIDIREKT_BROKER_URL)\nwarning: the API key travels unencrypted to "+brokerURL+"\n", execution.stderr)
+	assert.Equal(t, []string{brokerURL + "/api/participants"}, requested)
+	assert.NotContains(t, execution.stderr, "bdk_acme")
 }

@@ -35,6 +35,20 @@ func (this *HTTPClient) UseBroker(brokerURL, apiKey string) {
 	}
 }
 
+func (this *HTTPClient) ExplainAuthFailures(brokerURL string) {
+	broker := RedactedURL(brokerURL)
+	this.restClient.AddResponseMiddleware(func(_ *resty.Client, response *resty.Response) error {
+		switch response.StatusCode() {
+		case http.StatusUnauthorized:
+			return NotSignedInError{BrokerURL: broker}
+		case http.StatusForbidden:
+			return ForbiddenError{BrokerURL: broker}
+		default:
+			return nil
+		}
+	})
+}
+
 func (this *HTTPClient) Get(ctx context.Context, url string) (*resty.Response, error) {
 	return this.restClient.R().SetContext(ctx).Get(url)
 }

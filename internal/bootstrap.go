@@ -3,6 +3,7 @@ package internal
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -30,13 +31,28 @@ func Run() {
 	rootCommand := newRootCommand(components.New())
 
 	if err := rootCommand.Execute(); err != nil {
-		if !errors.Is(err, reports.ErrSilent) {
-			errWriter := rootCommand.ErrOrStderr()
-			_, _ = fmt.Fprintln(errWriter, paint.For(errWriter).Red(err.Error()))
-		}
-
+		printError(rootCommand.ErrOrStderr(), err)
 		os.Exit(1)
 	}
+}
+
+func printError(errWriter io.Writer, err error) {
+	if errors.Is(err, reports.ErrSilent) {
+		return
+	}
+	_, _ = fmt.Fprintln(errWriter, paint.For(errWriter).Red(userText(err)))
+}
+
+func userText(err error) string {
+	var notSignedIn components.NotSignedInError
+	if errors.As(err, &notSignedIn) {
+		return notSignedIn.Error()
+	}
+	var forbidden components.ForbiddenError
+	if errors.As(err, &forbidden) {
+		return forbidden.Error()
+	}
+	return err.Error()
 }
 
 func newRootCommand(dependencies *components.Components) *cobra.Command {
@@ -66,7 +82,11 @@ func newRootCommand(dependencies *components.Components) *cobra.Command {
 			if _, err := fmt.Fprintf(command.ErrOrStderr(), "Broker: %s (%s)\n", components.RedactedURL(broker.BrokerURL), broker.Origin); err != nil {
 				return err
 			}
+			if err := components.WarnIfKeyTravelsUnencrypted(command.ErrOrStderr(), broker.BrokerURL, broker.APIKey); err != nil {
+				return err
+			}
 			dependencies.HTTPClient.UseBroker(broker.BrokerURL, broker.APIKey)
+			dependencies.HTTPClient.ExplainAuthFailures(broker.BrokerURL)
 
 			return nil
 		},
