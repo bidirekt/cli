@@ -14,11 +14,11 @@ func TestResolveBrokerURLTakesTheFirstSourceThatHasOne(t *testing.T) {
 		flagURL    = "http://flag.internal"
 		envURL     = "http://env.internal"
 		defaultURL = "http://default.internal"
-		stagingURL = "http://staging.internal"
+		globexURL  = "http://globex.internal"
 	)
 	profiles := map[string]components.Profile{
 		"default": {BrokerURL: defaultURL},
-		"staging": {BrokerURL: stagingURL},
+		"globex":  {BrokerURL: globexURL},
 	}
 
 	tests := []struct {
@@ -42,31 +42,31 @@ func TestResolveBrokerURLTakesTheFirstSourceThatHasOne(t *testing.T) {
 		{
 			name:     "the default profile without --profile and BIDIREKT_PROFILE",
 			profiles: profiles,
-			resolved: components.ResolvedBrokerURL{BrokerURL: defaultURL, Origin: "profile: default", Profile: "default", OtherProfiles: []string{"staging"}},
+			resolved: components.ResolvedBrokerURL{BrokerURL: defaultURL, Origin: "profile: default", Profile: "default", OtherProfiles: []string{"globex"}},
 		},
 		{
 			name:     "--profile selects the profile",
-			sources:  components.BrokerURLSources{FlagProfile: "staging"},
+			sources:  components.BrokerURLSources{FlagProfile: "globex"},
 			profiles: profiles,
-			resolved: components.ResolvedBrokerURL{BrokerURL: stagingURL, Origin: "profile: staging", Profile: "staging", OtherProfiles: []string{"default"}},
+			resolved: components.ResolvedBrokerURL{BrokerURL: globexURL, Origin: "profile: globex", Profile: "globex", OtherProfiles: []string{"default"}},
 		},
 		{
 			name:     "BIDIREKT_PROFILE selects the profile",
-			sources:  components.BrokerURLSources{EnvProfile: "staging"},
+			sources:  components.BrokerURLSources{EnvProfile: "globex"},
 			profiles: profiles,
-			resolved: components.ResolvedBrokerURL{BrokerURL: stagingURL, Origin: "profile: staging", Profile: "staging", OtherProfiles: []string{"default"}},
+			resolved: components.ResolvedBrokerURL{BrokerURL: globexURL, Origin: "profile: globex", Profile: "globex", OtherProfiles: []string{"default"}},
 		},
 		{
 			name:     "--profile wins over BIDIREKT_PROFILE",
-			sources:  components.BrokerURLSources{FlagProfile: "staging", EnvProfile: "default"},
+			sources:  components.BrokerURLSources{FlagProfile: "globex", EnvProfile: "default"},
 			profiles: profiles,
-			resolved: components.ResolvedBrokerURL{BrokerURL: stagingURL, Origin: "profile: staging", Profile: "staging", OtherProfiles: []string{"default"}},
+			resolved: components.ResolvedBrokerURL{BrokerURL: globexURL, Origin: "profile: globex", Profile: "globex", OtherProfiles: []string{"default"}},
 		},
 		{
 			name:     "--broker-url wins over the selected profile, which stays the active one",
-			sources:  components.BrokerURLSources{FlagBrokerURL: flagURL, FlagProfile: "staging"},
+			sources:  components.BrokerURLSources{FlagBrokerURL: flagURL, FlagProfile: "globex"},
 			profiles: profiles,
-			resolved: components.ResolvedBrokerURL{BrokerURL: flagURL, Origin: "from --broker-url", Profile: "staging"},
+			resolved: components.ResolvedBrokerURL{BrokerURL: flagURL, Origin: "from --broker-url", Profile: "globex"},
 		},
 		{
 			name:     "BIDIREKT_BROKER_URL makes a missing profile irrelevant",
@@ -126,26 +126,26 @@ func TestResolveBrokerURLReportsAMissingURL(t *testing.T) {
 		},
 		{
 			name:     "the default profile missing is not a profile not found",
-			profiles: map[string]components.Profile{"staging": {BrokerURL: "http://staging.internal"}},
-			resolved: components.ResolvedBrokerURL{Origin: "profile: default", Profile: "default", OtherProfiles: []string{"staging"}},
+			profiles: map[string]components.Profile{"globex": {BrokerURL: "http://globex.internal"}},
+			resolved: components.ResolvedBrokerURL{Origin: "profile: default", Profile: "default", OtherProfiles: []string{"globex"}},
 		},
 		{
 			name:     "a profile named by --profile and missing from the file is not found",
-			sources:  components.BrokerURLSources{FlagProfile: "staging"},
+			sources:  components.BrokerURLSources{FlagProfile: "globex"},
 			profiles: map[string]components.Profile{},
-			resolved: components.ResolvedBrokerURL{Origin: "profile: staging", Profile: "staging", ProfileNotFound: true},
+			resolved: components.ResolvedBrokerURL{Origin: "profile: globex", Profile: "globex", ProfileNotFound: true},
 		},
 		{
 			name:     "a profile named by BIDIREKT_PROFILE and missing from the file is not found",
-			sources:  components.BrokerURLSources{EnvProfile: "staging"},
+			sources:  components.BrokerURLSources{EnvProfile: "globex"},
 			profiles: map[string]components.Profile{},
-			resolved: components.ResolvedBrokerURL{Origin: "profile: staging", Profile: "staging", ProfileNotFound: true},
+			resolved: components.ResolvedBrokerURL{Origin: "profile: globex", Profile: "globex", ProfileNotFound: true},
 		},
 		{
 			name:     "a profile without brokerUrl exists but has no URL",
-			sources:  components.BrokerURLSources{FlagProfile: "staging"},
-			profiles: map[string]components.Profile{"staging": {}},
-			resolved: components.ResolvedBrokerURL{Origin: "profile: staging", Profile: "staging"},
+			sources:  components.BrokerURLSources{FlagProfile: "globex"},
+			profiles: map[string]components.Profile{"globex": {}},
+			resolved: components.ResolvedBrokerURL{Origin: "profile: globex", Profile: "globex"},
 		},
 		{
 			name: "the other profiles of the file come in alphabetical order",
@@ -190,9 +190,9 @@ func TestResolveBrokerURLRejectsAnInvalidURLNamingItsOrigin(t *testing.T) {
 		},
 		{
 			name:     "from the profile",
-			sources:  components.BrokerURLSources{EnvProfile: "staging"},
-			profiles: map[string]components.Profile{"staging": {BrokerURL: "broker.acme.com"}},
-			err:      `invalid broker URL "broker.acme.com" (profile: staging) — use http:// or https:// followed by a host`,
+			sources:  components.BrokerURLSources{EnvProfile: "globex"},
+			profiles: map[string]components.Profile{"globex": {BrokerURL: "broker.acme.com"}},
+			err:      `invalid broker URL "broker.acme.com" (profile: globex) — use http:// or https:// followed by a host`,
 		},
 	}
 
@@ -209,7 +209,7 @@ func TestResolveBrokerURLRejectsAnInvalidURLNamingItsOrigin(t *testing.T) {
 }
 
 func TestActiveProfileNamePrefersTheFlagThenTheEnvironment(t *testing.T) {
-	assert.Equal(t, "staging", components.ActiveProfileName("staging", "other"))
+	assert.Equal(t, "globex", components.ActiveProfileName("globex", "other"))
 	assert.Equal(t, "other", components.ActiveProfileName("", "other"))
 	assert.Equal(t, "default", components.ActiveProfileName("", ""))
 }

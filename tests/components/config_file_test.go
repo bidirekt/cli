@@ -87,7 +87,7 @@ func TestConfigFileReadProfiles(t *testing.T) {
 
 	t.Run("reads every profile", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "config.json")
-		content := `{"profiles":{"default":{"brokerUrl":"https://broker.acme.internal"},"staging":{"brokerUrl":"http://localhost:8080"}}}`
+		content := `{"profiles":{"default":{"brokerUrl":"https://broker.acme.internal"},"globex":{"brokerUrl":"http://localhost:8080"}}}`
 		require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
 
 		profiles, err := components.ConfigFile{Path: path}.ReadProfiles()
@@ -95,7 +95,7 @@ func TestConfigFileReadProfiles(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, map[string]components.Profile{
 			"default": {BrokerURL: "https://broker.acme.internal"},
-			"staging": {BrokerURL: "http://localhost:8080"},
+			"globex":  {BrokerURL: "http://localhost:8080"},
 		}, profiles)
 	})
 
@@ -149,15 +149,15 @@ func TestConfigFileWriteProfile(t *testing.T) {
 
 	t.Run("keeps the other profiles and replaces the written one", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "config.json")
-		content := `{"profiles":{"default":{"brokerUrl":"https://broker.acme.internal"},"staging":{"brokerUrl":"http://old.internal"}}}`
+		content := `{"profiles":{"default":{"brokerUrl":"https://broker.acme.internal"},"globex":{"brokerUrl":"http://old.internal"}}}`
 		require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
 
-		err := components.ConfigFile{Path: path}.WriteProfile("staging", components.Profile{BrokerURL: "http://localhost:8080"})
+		err := components.ConfigFile{Path: path}.WriteProfile("globex", components.Profile{BrokerURL: "http://localhost:8080"})
 
 		require.NoError(t, err)
 		written, err := os.ReadFile(path)
 		require.NoError(t, err)
-		assert.JSONEq(t, `{"profiles":{"default":{"brokerUrl":"https://broker.acme.internal"},"staging":{"brokerUrl":"http://localhost:8080"}}}`, string(written))
+		assert.JSONEq(t, `{"profiles":{"default":{"brokerUrl":"https://broker.acme.internal"},"globex":{"brokerUrl":"http://localhost:8080"}}}`, string(written))
 	})
 
 	t.Run("leaves a file it cannot read untouched", func(t *testing.T) {

@@ -154,8 +154,8 @@ func TestBrokerURLComesFromTheFirstSourceThatHasOneAndIsAnnouncedOnStderr(t *tes
 	flagBroker := startBrokerStub(t)
 	envBroker := startBrokerStub(t)
 	defaultBroker := startBrokerStub(t)
-	stagingBroker := startBrokerStub(t)
-	configFileContent := `{"profiles":{"default":{"brokerUrl":"` + defaultBroker.url + `"},"staging":{"brokerUrl":"` + stagingBroker.url + `"}}}`
+	globexBroker := startBrokerStub(t)
+	configFileContent := `{"profiles":{"default":{"brokerUrl":"` + defaultBroker.url + `"},"globex":{"brokerUrl":"` + globexBroker.url + `"}}}`
 
 	tests := []struct {
 		name       string
@@ -185,22 +185,22 @@ func TestBrokerURLComesFromTheFirstSourceThatHasOneAndIsAnnouncedOnStderr(t *tes
 		},
 		{
 			name:       "--profile selects the profile",
-			args:       []string{"--profile", "staging"},
-			broker:     stagingBroker,
-			brokerLine: "Broker: " + stagingBroker.url + " (profile: staging)\n",
+			args:       []string{"--profile", "globex"},
+			broker:     globexBroker,
+			brokerLine: "Broker: " + globexBroker.url + " (profile: globex)\n",
 		},
 		{
 			name:       "BIDIREKT_PROFILE selects the profile",
-			envProfile: "staging",
-			broker:     stagingBroker,
-			brokerLine: "Broker: " + stagingBroker.url + " (profile: staging)\n",
+			envProfile: "globex",
+			broker:     globexBroker,
+			brokerLine: "Broker: " + globexBroker.url + " (profile: globex)\n",
 		},
 		{
 			name:       "--profile wins over BIDIREKT_PROFILE",
 			envProfile: "default",
-			args:       []string{"--profile", "staging"},
-			broker:     stagingBroker,
-			brokerLine: "Broker: " + stagingBroker.url + " (profile: staging)\n",
+			args:       []string{"--profile", "globex"},
+			broker:     globexBroker,
+			brokerLine: "Broker: " + globexBroker.url + " (profile: globex)\n",
 		},
 	}
 
@@ -273,9 +273,9 @@ func TestInvalidBrokerURLFailsNamingItsOrigin(t *testing.T) {
 		},
 		{
 			name:              "from the profile",
-			configFileContent: `{"profiles":{"staging":{"brokerUrl":"http://"}}}`,
-			args:              []string{"--profile", "staging"},
-			err:               `invalid broker URL "http://" (profile: staging) — use http:// or https:// followed by a host`,
+			configFileContent: `{"profiles":{"globex":{"brokerUrl":"http://"}}}`,
+			args:              []string{"--profile", "globex"},
+			err:               `invalid broker URL "http://" (profile: globex) — use http:// or https:// followed by a host`,
 		},
 		{
 			name:   "with the password hidden",

@@ -39,8 +39,8 @@ func TestValidateBrokerURLRejectsAnythingElseWithoutNormalizing(t *testing.T) {
 		},
 		{
 			rawURL: "http://",
-			origin: "profile: staging",
-			err:    `invalid broker URL "http://" (profile: staging) — use http:// or https:// followed by a host`,
+			origin: "profile: globex",
+			err:    `invalid broker URL "http://" (profile: globex) — use http:// or https:// followed by a host`,
 		},
 		{
 			rawURL: "http://:8080",
