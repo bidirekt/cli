@@ -1,4 +1,4 @@
-package configure
+package login
 
 import (
 	"github.com/bidirekt/cli/internal/components"
@@ -6,6 +6,7 @@ import (
 )
 
 func Register(rootCommand *cobra.Command, dependencies *components.Components) {
-	command := NewConfigureCommand(dependencies.Config, components.IsTerminal)
+	client := NewLoginClient(dependencies.HTTPClient)
+	command := NewLoginCommand(dependencies.Config, client, components.IsTerminal, components.ReadSecret)
 	rootCommand.AddCommand(command)
 }

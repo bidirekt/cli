@@ -1,6 +1,7 @@
 package components_test
 
 import (
+	"bufio"
 	"bytes"
 	"strings"
 	"testing"
@@ -75,7 +76,7 @@ func TestPromptBrokerURL(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var stderr bytes.Buffer
 
-			brokerURL, err := components.PromptBrokerURL(strings.NewReader(test.stdin), &stderr, test.current)
+			brokerURL, err := components.PromptBrokerURL(bufio.NewScanner(strings.NewReader(test.stdin)), &stderr, test.current)
 
 			require.NoError(t, err)
 			assert.Equal(t, test.brokerURL, brokerURL)
@@ -89,9 +90,22 @@ func TestPromptBrokerURLFailsAtTheEndOfStdin(t *testing.T) {
 		t.Run(stdin, func(t *testing.T) {
 			var stderr bytes.Buffer
 
-			_, err := components.PromptBrokerURL(strings.NewReader(stdin), &stderr, "")
+			_, err := components.PromptBrokerURL(bufio.NewScanner(strings.NewReader(stdin)), &stderr, "")
 
 			assert.EqualError(t, err, "no broker URL entered")
 		})
 	}
+}
+
+func TestPromptBrokerURLAnswersInARowEachTakeTheirOwnLine(t *testing.T) {
+	lines := bufio.NewScanner(strings.NewReader("https://broker.acme.internal\nhttps://broker.globex.internal\n"))
+	var stderr bytes.Buffer
+
+	first, err := components.PromptBrokerURL(lines, &stderr, "")
+	require.NoError(t, err)
+	second, err := components.PromptBrokerURL(lines, &stderr, "")
+	require.NoError(t, err)
+
+	assert.Equal(t, "https://broker.acme.internal", first)
+	assert.Equal(t, "https://broker.globex.internal", second)
 }

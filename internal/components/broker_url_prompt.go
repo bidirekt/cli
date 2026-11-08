@@ -7,13 +7,12 @@ import (
 	"io"
 )
 
-func PromptBrokerURL(stdin io.Reader, stderr io.Writer, current string) (string, error) {
+func PromptBrokerURL(lines *bufio.Scanner, stderr io.Writer, current string) (string, error) {
 	label := "Broker URL: "
 	if current != "" {
 		label = fmt.Sprintf("Broker URL [%s]: ", RedactedURL(current))
 	}
 
-	lines := bufio.NewScanner(stdin)
 	for {
 		if _, err := fmt.Fprint(stderr, label); err != nil {
 			return "", err

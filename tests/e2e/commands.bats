@@ -23,14 +23,6 @@ setup() {
   assert_line "Broker: $BIDIREKT_BROKER_URL (profile: e2e_$RUN)"
 }
 
-@test "configure keeps the API key of profile e2e" {
-  run bidirekt configure --profile "e2e_$RUN" --broker-url "$BIDIREKT_BROKER_URL"
-  assert_success
-
-  run env -u BIDIREKT_BROKER_URL -u BIDIREKT_API_KEY bidirekt list-participants --profile "e2e_$RUN"
-  assert_success
-}
-
 @test "fails without BIDIREKT_BROKER_URL, BIDIREKT_API_KEY or profile, naming profile e2e" {
   run env -u BIDIREKT_BROKER_URL -u BIDIREKT_API_KEY -u BIDIREKT_PROFILE bidirekt list-participants
   assert_failure 1
