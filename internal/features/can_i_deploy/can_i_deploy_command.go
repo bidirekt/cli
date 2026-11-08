@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/bidirekt/cli/internal/paint"
 	"github.com/bidirekt/cli/internal/reports"
 	"github.com/spf13/cobra"
 )
@@ -40,11 +39,7 @@ func NewCanIDeployCommand(client *CanIDeployClient) *cobra.Command {
 
 		resp, err := client.Check(ctx, requestBody)
 		if err != nil {
-			errWriter := command.ErrOrStderr()
-			if _, err := fmt.Fprintln(errWriter, paint.For(errWriter).Red(err.Error())); err != nil {
-				return err
-			}
-			return reports.ErrSilent
+			return err
 		}
 
 		checkedSideLabel := participant + " " + version
