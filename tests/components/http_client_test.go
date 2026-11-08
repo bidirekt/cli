@@ -39,8 +39,6 @@ func TestHTTPClientAbortsTheRequestWhenItsContextExpires(t *testing.T) {
 	}{
 		{name: "Get", call: func(ctx context.Context) error { _, err := client.Get(ctx, "/slow"); return err }},
 		{name: "Post", call: func(ctx context.Context) error { _, err := client.Post(ctx, "/slow", body); return err }},
-		{name: "Put", call: func(ctx context.Context) error { _, err := client.Put(ctx, "/slow", body); return err }},
-		{name: "Delete", call: func(ctx context.Context) error { _, err := client.Delete(ctx, "/slow"); return err }},
 	}
 
 	for _, test := range tests {

@@ -39,11 +39,3 @@ func (this *HTTPClient) Get(ctx context.Context, url string) (*resty.Response, e
 func (this *HTTPClient) Post(ctx context.Context, url string, body any) (*resty.Response, error) {
 	return this.restClient.R().SetContext(ctx).SetBody(body).Post(url)
 }
-
-func (this *HTTPClient) Put(ctx context.Context, url string, body any) (*resty.Response, error) {
-	return this.restClient.R().SetContext(ctx).SetBody(body).Put(url)
-}
-
-func (this *HTTPClient) Delete(ctx context.Context, url string) (*resty.Response, error) {
-	return this.restClient.R().SetContext(ctx).Delete(url)
-}
