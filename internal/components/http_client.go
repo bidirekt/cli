@@ -11,9 +11,9 @@ type HTTPClient struct {
 	restClient *resty.Client
 }
 
-func NewHTTPClient(config *Config) *HTTPClient {
+func NewHTTPClient() *HTTPClient {
 	httpClient := &HTTPClient{
-		restClient: resty.New().SetBaseURL(config.BrokerURL),
+		restClient: resty.New(),
 	}
 
 	httpClient.

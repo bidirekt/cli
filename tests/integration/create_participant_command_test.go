@@ -21,7 +21,8 @@ func TestCreateParticipantCommand(t *testing.T) {
 	)
 
 	t.Run("creates a participant, posts name, prints the message, exits 0", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
@@ -57,7 +58,8 @@ func TestCreateParticipantCommand(t *testing.T) {
 		t.Setenv("NO_COLOR", "")
 		t.Setenv("CLICOLOR_FORCE", "1")
 
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
@@ -80,7 +82,8 @@ func TestCreateParticipantCommand(t *testing.T) {
 	})
 
 	t.Run("existing participant prints already exists, exits 0", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
@@ -103,7 +106,8 @@ func TestCreateParticipantCommand(t *testing.T) {
 	})
 
 	t.Run("non-200 response surfaces the broker body and exits non-zero", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 

@@ -37,7 +37,8 @@ func TestValidateContractCommand(t *testing.T) {
 	}
 
 	t.Run("compatible verdict posts participant+environment+contracts, prints can be deployed, exits 0", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
@@ -78,7 +79,8 @@ func TestValidateContractCommand(t *testing.T) {
 	})
 
 	t.Run("compatible verdict names the counterparts it was compared with, in alphabetical order", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
@@ -113,7 +115,8 @@ func TestValidateContractCommand(t *testing.T) {
 	})
 
 	t.Run("incompatible verdict prints the break tree on stdout, exits silently non-zero", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
@@ -175,7 +178,8 @@ payments (v2, deployed):
 	})
 
 	t.Run("validation failure prints the violation report on stderr, exits silently non-zero", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
@@ -202,7 +206,8 @@ payments (v2, deployed):
 	})
 
 	t.Run("optional on array items prints where it is and how to fix it", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
@@ -229,7 +234,8 @@ payments (v2, deployed):
 	})
 
 	t.Run("property name that confuses the path prints where it is and why", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
@@ -256,7 +262,8 @@ payments (v2, deployed):
 	})
 
 	t.Run("unknown participant suggests creating it with create-participant", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
@@ -283,7 +290,8 @@ payments (v2, deployed):
 	})
 
 	t.Run("unknown environment returns the broker message as the error", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
@@ -310,7 +318,8 @@ payments (v2, deployed):
 	})
 
 	t.Run("unsupported extension fails before any request", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 		httpmock.RegisterNoResponder(httpmock.NewErrorResponder(errors.New("unexpected request to the broker")))
@@ -334,7 +343,8 @@ payments (v2, deployed):
 	})
 
 	t.Run("missing --environment fails before any request", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 		httpmock.RegisterNoResponder(httpmock.NewErrorResponder(errors.New("unexpected request to the broker")))

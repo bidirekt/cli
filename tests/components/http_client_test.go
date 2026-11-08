@@ -30,7 +30,8 @@ func TestHTTPClientAbortsTheRequestWhenItsContextExpires(t *testing.T) {
 	// registered after server.Close so it runs first: Close waits for the handler to return
 	t.Cleanup(func() { close(release) })
 
-	client := components.NewHTTPClient(&components.Config{BrokerURL: server.URL})
+	client := components.NewHTTPClient()
+	client.UseBroker(server.URL, "")
 	body := map[string]string{"participant": "orders"}
 
 	tests := []struct {
@@ -78,7 +79,7 @@ func TestHTTPClientUseBrokerSendsTheKeyAsABearerToken(t *testing.T) {
 			}))
 			t.Cleanup(server.Close)
 
-			client := components.NewHTTPClient(&components.Config{})
+			client := components.NewHTTPClient()
 			client.UseBroker(server.URL, test.apiKey)
 			_, err := client.Get(context.Background(), "/api/participants")
 

@@ -25,7 +25,8 @@ func TestCanIDeployCommand(t *testing.T) {
 	)
 
 	t.Run("deployable verdict posts participant+version+environment, prints deployable, exits 0", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
@@ -58,7 +59,8 @@ func TestCanIDeployCommand(t *testing.T) {
 	})
 
 	t.Run("deployable verdict names the counterparts it was compared with, in alphabetical order", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
@@ -92,7 +94,8 @@ func TestCanIDeployCommand(t *testing.T) {
 	})
 
 	t.Run("not-deployable verdict prints the human report, exits non-zero, no Error: line", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
@@ -159,7 +162,8 @@ payments (v2, deployed):
 	})
 
 	t.Run("counterpart version omitted from the block header when null", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
@@ -205,7 +209,8 @@ payments (v2, deployed):
 	})
 
 	t.Run("a status or request body the provider lacks on a method it has is told apart from a missing method", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
@@ -276,7 +281,8 @@ api:
 	})
 
 	t.Run("non-2xx response returns the broker message as the error", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
@@ -301,7 +307,8 @@ api:
 	})
 
 	t.Run("missing --version fails before any request", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 		httpmock.RegisterNoResponder(httpmock.NewErrorResponder(errors.New("unexpected request to the broker")))

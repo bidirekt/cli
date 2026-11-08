@@ -22,7 +22,8 @@ func TestCanIDeployCommandRemovedResourceStillConsumed(t *testing.T) {
 		endpoint    = brokerURL + "/api/can-i-deploy"
 	)
 
-	httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+	httpClient := components.NewHTTPClient()
+	httpClient.UseBroker(brokerURL, "")
 	httpmock.ActivateNonDefault(httpClient.StdClient())
 	defer httpmock.DeactivateAndReset()
 

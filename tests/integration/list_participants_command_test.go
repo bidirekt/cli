@@ -20,7 +20,8 @@ func TestListParticipantsCommand(t *testing.T) {
 	)
 
 	t.Run("prints one name per line in the broker's order, exits 0", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
@@ -42,7 +43,8 @@ func TestListParticipantsCommand(t *testing.T) {
 	})
 
 	t.Run("empty list prints nothing, exits 0", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
@@ -63,7 +65,8 @@ func TestListParticipantsCommand(t *testing.T) {
 	})
 
 	t.Run("non-200 response surfaces the broker message and exits non-zero", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
@@ -83,7 +86,8 @@ func TestListParticipantsCommand(t *testing.T) {
 	})
 
 	t.Run("rejects an argument without calling the broker", func(t *testing.T) {
-		httpClient := components.NewHTTPClient(&components.Config{BrokerURL: brokerURL})
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 		httpmock.RegisterNoResponder(httpmock.NewErrorResponder(errors.New("unexpected request to the broker")))
