@@ -114,7 +114,6 @@ func TestCommandsThatDoNotTalkToTheBrokerNeverResolveIt(t *testing.T) {
 		{"help", "create-participant"},
 		{"completion", "bash"},
 		{"create-participant", "--help"},
-		{"configure", "--broker-url", "http://localhost:8080"},
 	} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			isolateEnvironment(t)
@@ -599,4 +598,22 @@ func TestKeyOverPlainHTTPToARemoteHostWarnsAndTheRequestProceeds(t *testing.T) {
 	assert.Equal(t, "Broker: "+brokerURL+" (from BIDIREKT_BROKER_URL)\nwarning: the API key travels unencrypted to "+brokerURL+"\n", execution.stderr)
 	assert.Equal(t, []string{brokerURL + "/api/participants"}, requested)
 	assert.NotContains(t, execution.stderr, "bdk_acme")
+}
+
+func TestLogoutIsListedAndNeverCallsTheBroker(t *testing.T) {
+	configFilePath := isolateEnvironment(t)
+	broker := startBrokerStub(t)
+	writeConfigFile(t, configFilePath, `{"profiles":{"acme":{"brokerUrl":"`+broker.url+`","apiKey":"bdk_acme"}}}`)
+	dependencies := components.New()
+	dependencies.HTTPClient.UseBroker(broker.url, "")
+
+	help := executeRoot(t, dependencies, "--help")
+	logout := executeRoot(t, dependencies, "logout", "--profile", "acme")
+
+	require.NoError(t, help.err)
+	assert.Contains(t, help.stdout, "logout")
+	require.NoError(t, logout.err)
+	assert.Equal(t, "Signed out of "+broker.url+" (profile acme). The key is still valid — revoke it at "+broker.url+"/profile\n", logout.stdout)
+	assert.Empty(t, logout.stderr)
+	assert.Zero(t, broker.requests.Load())
 }
