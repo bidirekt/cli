@@ -31,6 +31,12 @@ func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
 		{Code: "schema.duplicate", Path: "schemas;Pet", Source: "schemas.yaml", Details: map[string]string{"schema": "Pet", "declaredIn": "billing.yaml"}},
 		{Code: "schema.unresolved_name", Path: "provides;rest;/pets;get;responses;200", Source: "pets.yaml", Details: map[string]string{"schema": "Pets", "resource": "provides GET /pets 200"}},
 		{Code: "schema.unresolved_ref", Path: "schemas;Invoice;properties;payment", Source: "billing.yaml", Details: map[string]string{"schema": "Payment", "property": "Invoice.payment"}},
+		{Code: "members.required", Path: "schemas;Pet;properties;status", Source: "api.yaml", Details: map[string]string{"type": "enum"}},
+		{Code: "members.empty", Path: "schemas;Order;properties;payment;members", Source: "api.yaml", Details: map[string]string{"type": "union"}},
+		{Code: "members.duplicate", Path: "schemas;Pet;properties;status;members;2", Source: "api.yaml", Details: map[string]string{"value": "sold"}},
+		{Code: "members.not_text", Path: "schemas;Pet;properties;status;members;1", Source: "api.yaml"},
+		{Code: "member.ref_required", Path: "schemas;Order;properties;payment;members;card", Source: "api.yaml", Details: map[string]string{"member": "card"}},
+		{Code: "member.name_syntax", Path: "schemas;Order;properties;payment;members;card(x)", Source: "api.yaml", Details: map[string]string{"key": "card(x)", "error": `must not contain ".", "[", "]", "{", "}", ";", "(" or ")"`}},
 		{Code: "something.new", Path: "provides;rest;/pets", Source: "api.yaml", Details: map[string]string{"hint": "x"}},
 	})
 
@@ -54,6 +60,12 @@ func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
   - schemas.yaml: duplicate schema "Pet", also declared in billing.yaml
   - pets.yaml: unresolved schema "Pets" referenced by provides GET /pets 200
   - billing.yaml: unresolved ref "Payment" in Invoice.payment
+  - api.yaml: "type: enum" needs "members" at schemas Pet properties status: list its values
+  - api.yaml: "members" is empty at schemas Order properties payment: list at least one member
+  - api.yaml: value "sold" is repeated in "members" at schemas Pet properties status
+  - api.yaml: each value in "members" must be non-empty text at schemas Pet properties status
+  - api.yaml: member "card" needs a "ref" to a schema at schemas Order properties payment
+  - api.yaml: member key "card(x)" must not contain ".", "[", "]", "{", "}", ";", "(" or ")" at schemas Order properties payment
   - api.yaml: something.new at provides rest /pets (hint: x)
 `, report)
 }
@@ -358,6 +370,30 @@ func TestFormatViolationLine(t *testing.T) {
 		assert.Equal(t, `use it with "type: map"`, explanation)
 	})
 
+	t.Run("schema.key_not_allowed members on a string", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "schema.key_not_allowed",
+			Path:    "schemas;Pet;properties;name",
+			Source:  "api.yaml",
+			Details: map[string]string{"key": "members", "type": "string"},
+		})
+
+		assert.Equal(t, `"members" is not allowed on a string schema at schemas Pet properties name`, headline)
+		assert.Equal(t, `use it with "type: enum" or "type: union"`, explanation)
+	})
+
+	t.Run("schema.key_not_allowed on a union", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "schema.key_not_allowed",
+			Path:    "schemas;Order;properties;payment",
+			Source:  "api.yaml",
+			Details: map[string]string{"key": "properties", "type": "union"},
+		})
+
+		assert.Equal(t, `"properties" is not allowed on a union schema at schemas Order properties payment`, headline)
+		assert.Equal(t, `use it with "type: object"`, explanation)
+	})
+
 	t.Run("schema.key_not_allowed beside ref", func(t *testing.T) {
 		headline, explanation := FormatViolationLine(Violation{
 			Code:    "schema.key_not_allowed",
@@ -469,6 +505,133 @@ func TestFormatViolationLine(t *testing.T) {
 		})
 
 		assert.Equal(t, `conflicting type for property "$.id" of consumes payments GET /invoices 200: integer here, string in a.yaml`, headline)
+		assert.Empty(t, explanation)
+	})
+
+	t.Run("resource.type_conflict between enum values", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:   "resource.type_conflict",
+			Path:   "consumes;petstore_api;rest;/pets;get;responses;200",
+			Source: "pets.yaml",
+			Details: map[string]string{
+				"resource":       "consumes petstore_api GET /pets 200",
+				"property":       "status",
+				"type":           "enum",
+				"values":         "a, b",
+				"declaredIn":     "other.yaml",
+				"declaredType":   "enum",
+				"declaredValues": "a, c",
+			},
+		})
+
+		assert.Equal(t, `conflicting values for property "status" of consumes petstore_api GET /pets 200: [a, b] here, [a, c] in other.yaml`, headline)
+		assert.Empty(t, explanation)
+	})
+
+	t.Run("members.required on an enum", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "members.required",
+			Path:    "schemas;Pet;properties;status",
+			Source:  "api.yaml",
+			Details: map[string]string{"type": "enum"},
+		})
+
+		assert.Equal(t, `"type: enum" needs "members" at schemas Pet properties status: list its values`, headline)
+		assert.Empty(t, explanation)
+	})
+
+	t.Run("members.required on a union", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "members.required",
+			Path:    "schemas;Order;properties;payment",
+			Source:  "api.yaml",
+			Details: map[string]string{"type": "union"},
+		})
+
+		assert.Equal(t, `"type: union" needs "members" at schemas Order properties payment: map each key to a ref`, headline)
+		assert.Empty(t, explanation)
+	})
+
+	t.Run("members.empty on an enum", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "members.empty",
+			Path:    "schemas;Pet;properties;status;members",
+			Source:  "api.yaml",
+			Details: map[string]string{"type": "enum"},
+		})
+
+		assert.Equal(t, `"members" is empty at schemas Pet properties status: list at least one value`, headline)
+		assert.Empty(t, explanation)
+	})
+
+	t.Run("members.empty on a union", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "members.empty",
+			Path:    "schemas;Order;properties;payment;members",
+			Source:  "api.yaml",
+			Details: map[string]string{"type": "union"},
+		})
+
+		assert.Equal(t, `"members" is empty at schemas Order properties payment: list at least one member`, headline)
+		assert.Empty(t, explanation)
+	})
+
+	t.Run("members.duplicate", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "members.duplicate",
+			Path:    "schemas;Pet;properties;status;members;2",
+			Source:  "api.yaml",
+			Details: map[string]string{"value": "sold"},
+		})
+
+		assert.Equal(t, `value "sold" is repeated in "members" at schemas Pet properties status`, headline)
+		assert.Empty(t, explanation)
+	})
+
+	t.Run("members.not_text", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:   "members.not_text",
+			Path:   "schemas;Pet;properties;status;members;1",
+			Source: "api.yaml",
+		})
+
+		assert.Equal(t, `each value in "members" must be non-empty text at schemas Pet properties status`, headline)
+		assert.Empty(t, explanation)
+	})
+
+	t.Run("member.ref_required", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "member.ref_required",
+			Path:    "schemas;Order;properties;payment;members;card",
+			Source:  "api.yaml",
+			Details: map[string]string{"member": "card"},
+		})
+
+		assert.Equal(t, `member "card" needs a "ref" to a schema at schemas Order properties payment`, headline)
+		assert.Empty(t, explanation)
+	})
+
+	t.Run("member.name_syntax", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "member.name_syntax",
+			Path:    "schemas;Order;properties;payment;members;card(x)",
+			Source:  "api.yaml",
+			Details: map[string]string{"key": "card(x)", "error": `must not contain ".", "[", "]", "{", "}", ";", "(" or ")"`},
+		})
+
+		assert.Equal(t, `member key "card(x)" must not contain ".", "[", "]", "{", "}", ";", "(" or ")" at schemas Order properties payment`, headline)
+		assert.Empty(t, explanation)
+	})
+
+	t.Run("member.name_syntax with a semicolon in the key keeps the location at the schema", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "member.name_syntax",
+			Path:    "schemas;Order;properties;payment;members;a;members;b",
+			Source:  "api.yaml",
+			Details: map[string]string{"key": "a;members;b", "error": `must not contain ".", "[", "]", "{", "}", ";", "(" or ")"`},
+		})
+
+		assert.Equal(t, `member key "a;members;b" must not contain ".", "[", "]", "{", "}", ";", "(" or ")" at schemas Order properties payment`, headline)
 		assert.Empty(t, explanation)
 	})
 
