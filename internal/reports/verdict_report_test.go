@@ -491,6 +491,98 @@ petstore_api:
 `, report)
 }
 
+func TestFormatNotDeployableReportGathersAMissingValuesPlacesInOneBlock(t *testing.T) {
+	results := map[string]CanIDeployResult{
+		"petstore_api": {
+			Deployable: false,
+			Endpoints: map[string]map[string]map[string][]ContractBreak{
+				"/pets/*": {
+					"get": {
+						"200": {
+							{Reason: "property_member_missing_in_provider", Role: "consumer", Details: map[string]string{
+								"consumerField": "Pet.status", "providerField": "PetRecord.status", "property": "$.status", "member": "adopted",
+								"consumerName": "petstore_web", "providerName": "petstore_api",
+							}},
+						},
+					},
+				},
+				"/pets": {
+					"get": {
+						"200": {
+							{Reason: "property_member_missing_in_provider", Role: "consumer", Details: map[string]string{
+								"consumerField": "Pet.status", "providerField": "PetRecord.status", "property": "$[].status", "member": "adopted",
+								"consumerName": "petstore_web", "providerName": "petstore_api",
+							}},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	report := FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 2.0.0", "petstore_web", "production", results)
+
+	assert.Equal(t, `petstore_web 2.0.0 cannot be deployed to production
+
+petstore_api:
+  Pet.status — petstore_web reads "adopted", but petstore_api doesn't provide it (2 places)
+    → petstore_web: stop reading "adopted"
+    → petstore_api: provide "adopted" there
+      · GET /pets response 200 at "$[].status" (petstore_api: PetRecord.status)
+      · GET /pets/* response 200 at "$.status" (petstore_api: PetRecord.status)
+`, report)
+}
+
+func TestFormatNotDeployableReportKeepsAFieldsMissingValuesInSeparateBlocks(t *testing.T) {
+	results := map[string]CanIDeployResult{
+		"petstore_api": {
+			Deployable: false,
+			Endpoints: map[string]map[string]map[string][]ContractBreak{
+				"/pets/*": {
+					"get": {
+						"200": {
+							{Reason: "property_member_missing_in_provider", Role: "consumer", Details: map[string]string{
+								"consumerField": "Pet.status", "providerField": "PetRecord.status", "property": "$.status", "member": "lost",
+								"consumerName": "petstore_web", "providerName": "petstore_api",
+							}},
+						},
+					},
+				},
+				"/pets": {
+					"get": {
+						"200": {
+							{Reason: "property_member_missing_in_provider", Role: "consumer", Details: map[string]string{
+								"consumerField": "Pet.status", "providerField": "PetRecord.status", "property": "$[].status", "member": "lost",
+								"consumerName": "petstore_web", "providerName": "petstore_api",
+							}},
+							{Reason: "property_member_missing_in_provider", Role: "consumer", Details: map[string]string{
+								"consumerField": "Pet.status", "providerField": "PetRecord.status", "property": "$[].status", "member": "adopted",
+								"consumerName": "petstore_web", "providerName": "petstore_api",
+							}},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	report := FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 2.0.0", "petstore_web", "production", results)
+
+	assert.Equal(t, `petstore_web 2.0.0 cannot be deployed to production
+
+petstore_api:
+  Pet.status — petstore_web reads "adopted", but petstore_api doesn't provide it
+    → petstore_web: stop reading "adopted"
+    → petstore_api: provide "adopted" there
+      · GET /pets response 200 at "$[].status" (petstore_api: PetRecord.status)
+  Pet.status — petstore_web reads "lost", but petstore_api doesn't provide it (2 places)
+    → petstore_web: stop reading "lost"
+    → petstore_api: provide "lost" there
+      · GET /pets response 200 at "$[].status" (petstore_api: PetRecord.status)
+      · GET /pets/* response 200 at "$.status" (petstore_api: PetRecord.status)
+`, report)
+}
+
 func TestFormatNotDeployableReportPutsAFieldsReasonsInSeparateBlocks(t *testing.T) {
 	results := map[string]CanIDeployResult{
 		"petstore_api": {
@@ -1042,6 +1134,128 @@ func TestFormatNotDeployableReportWritesAPropertyBreakAsAFieldBlock(t *testing.T
     → petstore_api: handle null in the code, then mark it nullable
     → petstore_web: stop sending null there
       · POST /pets request at "$.birthDate" (petstore_web: NewPet.birthDate)
+`,
+		},
+		{
+			name:  "property_member_missing_in_provider for an enum value as consumer on a response",
+			place: webGetsPet,
+			contractBreak: ContractBreak{Reason: "property_member_missing_in_provider", Role: "consumer", Details: map[string]string{
+				"consumerField": "Pet.status", "providerField": "Pet.status", "property": "$[].status", "member": "adopted", "consumerName": "petstore_web", "providerName": "petstore_api",
+			}},
+			block: `  Pet.status — petstore_web reads "adopted", but petstore_api doesn't provide it
+    → petstore_web: stop reading "adopted"
+    → petstore_api: provide "adopted" there
+      · GET /pets/* response 200 at "$[].status" (petstore_api: Pet.status)
+`,
+		},
+		{
+			name:  "property_member_missing_in_provider for an enum value as provider on a response",
+			place: apiServesPet,
+			contractBreak: ContractBreak{Reason: "property_member_missing_in_provider", Role: "provider", Details: map[string]string{
+				"consumerField": "Pet.status", "providerField": "PetRecord.status", "property": "$.status", "member": "adopted", "consumerName": "petstore_web", "providerName": "petstore_api",
+			}},
+			block: `  PetRecord.status — petstore_api doesn't provide "adopted", but petstore_web reads it
+    → petstore_api: provide "adopted"
+    → petstore_web: stop reading "adopted" there
+      · GET /pets/* response 200 at "$.status" (petstore_web: Pet.status)
+`,
+		},
+		{
+			name:  "property_member_missing_in_provider for an enum value as consumer on a request",
+			place: webPostsPet,
+			contractBreak: ContractBreak{Reason: "property_member_missing_in_provider", Role: "consumer", Details: map[string]string{
+				"consumerField": "Pet.status", "providerField": "Pet.status", "property": "$.status", "member": "sold", "consumerName": "petstore_web", "providerName": "petstore_api",
+			}},
+			block: `  Pet.status — petstore_web sends "sold", but petstore_api doesn't accept it
+    → petstore_web: stop sending "sold"
+    → petstore_api: accept "sold" there
+      · POST /pets request at "$.status" (petstore_api: Pet.status)
+`,
+		},
+		{
+			name:  "property_member_missing_in_provider for an enum value as provider on a request",
+			place: apiReceivesPet,
+			contractBreak: ContractBreak{Reason: "property_member_missing_in_provider", Role: "provider", Details: map[string]string{
+				"consumerField": "NewPet.status", "providerField": "NewPetRecord.status", "property": "$.status", "member": "sold", "consumerName": "petstore_web", "providerName": "petstore_api",
+			}},
+			block: `  NewPetRecord.status — petstore_api doesn't accept "sold", but petstore_web sends it
+    → petstore_api: accept "sold"
+    → petstore_web: stop sending "sold" there
+      · POST /pets request at "$.status" (petstore_web: NewPet.status)
+`,
+		},
+		{
+			name:  "property_member_missing_in_provider for a union member as consumer on a response",
+			place: webGetsPet,
+			contractBreak: ContractBreak{Reason: "property_member_missing_in_provider", Role: "consumer", Details: map[string]string{
+				"consumerField": "Pet.payment", "providerField": "PetRecord.payment", "property": "$.payment", "member": "card", "consumerName": "petstore_web", "providerName": "petstore_api",
+			}},
+			block: `  Pet.payment — petstore_web reads "card", but petstore_api doesn't provide it
+    → petstore_web: stop reading "card"
+    → petstore_api: provide "card" there
+      · GET /pets/* response 200 at "$.payment" (petstore_api: PetRecord.payment)
+`,
+		},
+		{
+			name:  "property_member_missing_in_provider for a union member as provider on a response",
+			place: apiServesPet,
+			contractBreak: ContractBreak{Reason: "property_member_missing_in_provider", Role: "provider", Details: map[string]string{
+				"consumerField": "Pet.payment", "providerField": "PetRecord.payment", "property": "$.payment", "member": "card", "consumerName": "petstore_web", "providerName": "petstore_api",
+			}},
+			block: `  PetRecord.payment — petstore_api doesn't provide "card", but petstore_web reads it
+    → petstore_api: provide "card"
+    → petstore_web: stop reading "card" there
+      · GET /pets/* response 200 at "$.payment" (petstore_web: Pet.payment)
+`,
+		},
+		{
+			name:  "property_member_missing_in_provider for a union member as consumer on a request",
+			place: webPostsPet,
+			contractBreak: ContractBreak{Reason: "property_member_missing_in_provider", Role: "consumer", Details: map[string]string{
+				"consumerField": "NewPet.payment", "providerField": "NewPetRecord.payment", "property": "$.payment", "member": "pix", "consumerName": "petstore_web", "providerName": "petstore_api",
+			}},
+			block: `  NewPet.payment — petstore_web sends "pix", but petstore_api doesn't accept it
+    → petstore_web: stop sending "pix"
+    → petstore_api: accept "pix" there
+      · POST /pets request at "$.payment" (petstore_api: NewPetRecord.payment)
+`,
+		},
+		{
+			name:  "property_member_missing_in_provider for a union member as provider on a request",
+			place: apiReceivesPet,
+			contractBreak: ContractBreak{Reason: "property_member_missing_in_provider", Role: "provider", Details: map[string]string{
+				"consumerField": "NewPet.payment", "providerField": "NewPetRecord.payment", "property": "$.payment", "member": "pix", "consumerName": "petstore_web", "providerName": "petstore_api",
+			}},
+			block: `  NewPetRecord.payment — petstore_api doesn't accept "pix", but petstore_web sends it
+    → petstore_api: accept "pix"
+    → petstore_web: stop sending "pix" there
+      · POST /pets request at "$.payment" (petstore_web: NewPet.payment)
+`,
+		},
+		{
+			name:  "property_type_mismatch of an enum reader against a string as consumer on a response",
+			place: webGetsPet,
+			contractBreak: ContractBreak{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
+				"consumerField": "Pet.status", "providerField": "PetRecord.status", "property": "$.status", "consumerPropertyType": "enum", "providerPropertyType": "string",
+				"consumerName": "petstore_web", "providerName": "petstore_api",
+			}},
+			block: `  Pet.status — petstore_web reads it as enum, but petstore_api provides string
+    → petstore_web: read it as string
+    → petstore_api: provide it as enum there
+      · GET /pets/* response 200 at "$.status" (petstore_api: PetRecord.status)
+`,
+		},
+		{
+			name:  "property_type_mismatch of a string sent to an enum as consumer on a request",
+			place: webPostsPet,
+			contractBreak: ContractBreak{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
+				"consumerField": "NewPet.status", "providerField": "NewPetRecord.status", "property": "$.status", "consumerPropertyType": "string", "providerPropertyType": "enum",
+				"consumerName": "petstore_web", "providerName": "petstore_api",
+			}},
+			block: `  NewPet.status — petstore_web sends it as string, but petstore_api expects enum
+    → petstore_web: send enum
+    → petstore_api: accept string there
+      · POST /pets request at "$.status" (petstore_api: NewPetRecord.status)
 `,
 		},
 		{

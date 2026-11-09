@@ -72,9 +72,9 @@ func FormatViolationLine(violation Violation) (headline, explanation string) {
 		if details["type"] == "ref" {
 			return fmt.Sprintf(`%q is not allowed beside "ref"%s`, details["key"], pathAt), ""
 		}
-		if rightType, known := typeOwningKey[details["key"]]; known {
+		if rightTypes, known := typesOwningKey[details["key"]]; known {
 			return fmt.Sprintf(`%q is not allowed on %s schema%s`, details["key"], withArticle(details["type"]), pathAt),
-				fmt.Sprintf(`use it with "type: %s"`, rightType)
+				"use it with " + strings.Join(rightTypes, " or ")
 		}
 		return fallbackViolationLine(violation), ""
 	case "schema.optional_not_allowed":
@@ -95,6 +95,10 @@ func FormatViolationLine(violation Violation) (headline, explanation string) {
 		}
 		return fmt.Sprintf("duplicate resource %q, also declared in %s", details["resource"], details["declaredIn"]), ""
 	case "resource.type_conflict":
+		if details["values"] != "" {
+			return fmt.Sprintf("conflicting values for property %q of %s: [%s] here, [%s] in %s",
+				details["property"], details["resource"], details["values"], details["declaredValues"], details["declaredIn"]), ""
+		}
 		return fmt.Sprintf("conflicting type for property %q of %s: %s here, %s in %s",
 			details["property"], details["resource"], details["type"], details["declaredType"], details["declaredIn"]), ""
 	case "schema.duplicate":
@@ -106,19 +110,48 @@ func FormatViolationLine(violation Violation) (headline, explanation string) {
 		return fmt.Sprintf("unresolved schema %q referenced by %s", details["schema"], details["resource"]), ""
 	case "schema.unresolved_ref":
 		return fmt.Sprintf("unresolved ref %q in %s", details["schema"], details["property"]), ""
+	case "members.required":
+		if details["type"] == "union" {
+			return `"type: union" needs "members"` + pathAt + `: map each key to a ref`, ""
+		}
+		return `"type: enum" needs "members"` + pathAt + `: list its values`, ""
+	case "members.empty":
+		membersAt := at(location(violation.Path, "members"))
+		if details["type"] == "union" {
+			return `"members" is empty` + membersAt + `: list at least one member`, ""
+		}
+		return `"members" is empty` + membersAt + `: list at least one value`, ""
+	case "members.duplicate":
+		return fmt.Sprintf(`value %q is repeated in "members"%s`, details["value"], membersOwnerAt(violation.Path, lastSegment(violation.Path))), ""
+	case "members.not_text":
+		return `each value in "members" must be non-empty text` + membersOwnerAt(violation.Path, lastSegment(violation.Path)), ""
+	case "member.ref_required":
+		return fmt.Sprintf(`member %q needs a "ref" to a schema%s`, details["member"], membersOwnerAt(violation.Path, details["member"])), ""
+	case "member.name_syntax":
+		return fmt.Sprintf(`member key %q %s%s`, details["key"], details["error"], membersOwnerAt(violation.Path, details["key"])), ""
 	default:
 		return fallbackViolationLine(violation), ""
 	}
 }
 
-var typeOwningKey = map[string]string{
-	"properties": "object",
-	"items":      "array",
-	"values":     "map",
+var typesOwningKey = map[string][]string{
+	"properties": {`"type: object"`},
+	"items":      {`"type: array"`},
+	"values":     {`"type: map"`},
+	"members":    {`"type: enum"`, `"type: union"`},
+}
+
+func membersOwnerAt(path, entry string) string {
+	return at(location(strings.TrimSuffix(path, ";members;"+entry), ""))
+}
+
+func lastSegment(path string) string {
+	return path[strings.LastIndex(path, ";")+1:]
 }
 
 func withArticle(schemaType string) string {
-	if strings.IndexAny(schemaType, "aeiou") == 0 {
+	// "union" starts with a vowel letter but not a vowel sound.
+	if strings.IndexAny(schemaType, "aeio") == 0 {
 		return "an " + schemaType
 	}
 

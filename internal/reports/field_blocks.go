@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -12,6 +13,7 @@ type fieldBlockKey struct {
 	field                                    string
 	reason                                   string
 	consumerType, providerType, propertyType string
+	member                                   string
 	direction, role                          string
 	propertyBreakLine
 }
@@ -47,6 +49,7 @@ func toFieldBlock(checked checkedInteraction, interaction string, contractBreak 
 			consumerType:      details["consumerPropertyType"],
 			providerType:      details["providerPropertyType"],
 			propertyType:      details["propertyType"],
+			member:            details["member"],
 			direction:         direction,
 			role:              contractBreak.Role,
 			propertyBreakLine: line,
@@ -93,6 +96,7 @@ func compareFieldBlockKeys(a, b fieldBlockKey) int {
 		strings.Compare(a.consumerType, b.consumerType),
 		strings.Compare(a.providerType, b.providerType),
 		strings.Compare(a.propertyType, b.propertyType),
+		strings.Compare(a.member, b.member),
 		strings.Compare(a.direction, b.direction),
 		strings.Compare(a.role, b.role),
 	)
@@ -151,6 +155,7 @@ func formatPropertyBreakLine(interaction checkedInteraction, contractBreak Contr
 		path:              details["property"],
 		consumerIsChecked: asConsumer,
 	}
+	member := strconv.Quote(details["member"])
 	onRequest, onResponse := interaction.isRequest, !interaction.isRequest
 
 	switch {
@@ -184,6 +189,13 @@ func formatPropertyBreakLine(interaction checkedInteraction, contractBreak Contr
 			consumerFix:     "handle null in the code, then mark it nullable",
 			providerFix:     "stop providing null",
 		}), true
+	case reason == "property_member_missing_in_provider" && onResponse:
+		return property, property.toPropertyBreakLine(propertyBreakPhrases{
+			consumerChecked: fmt.Sprintf("%s reads %s, but %s doesn't provide it", consumer, member, provider),
+			providerChecked: fmt.Sprintf("%s doesn't provide %s, but %s reads it", provider, member, consumer),
+			consumerFix:     "stop reading " + member,
+			providerFix:     "provide " + member,
+		}), true
 	case reason == "property_missing_in_consumer" && onRequest:
 		return property, property.toPropertyBreakLine(propertyBreakPhrases{
 			consumerChecked: fmt.Sprintf("%s doesn't send it, but %s requires it", consumer, provider),
@@ -211,6 +223,13 @@ func formatPropertyBreakLine(interaction checkedInteraction, contractBreak Contr
 			providerChecked: fmt.Sprintf("%s doesn't accept null, but %s may send it", provider, consumer),
 			consumerFix:     "stop sending null",
 			providerFix:     "handle null in the code, then mark it nullable",
+		}), true
+	case reason == "property_member_missing_in_provider" && onRequest:
+		return property, property.toPropertyBreakLine(propertyBreakPhrases{
+			consumerChecked: fmt.Sprintf("%s sends %s, but %s doesn't accept it", consumer, member, provider),
+			providerChecked: fmt.Sprintf("%s doesn't accept %s, but %s sends it", provider, member, consumer),
+			consumerFix:     "stop sending " + member,
+			providerFix:     "accept " + member,
 		}), true
 	default:
 		return propertyBreak{}, propertyBreakLine{}, false
