@@ -272,6 +272,23 @@ func TestLoginCommand(t *testing.T) {
 		})
 	}
 
+	t.Run("a 426 fails with the broker's message as the text to print and leaves the config file untouched", func(t *testing.T) {
+		const upgradeMessage = "bidirekt 0.0.9 doesn't work with this broker (0.3.0); upgrade bidirekt to 0.1.0 or later"
+		content := `{"profiles":{"acme":{"brokerUrl":"` + acmeURL + `","apiKey":"` + previousKey + `"}}}`
+		configFilePath := isolateConfigFile(t, content)
+		run := signInAcme("\n", "--profile", "acme")
+		run.responder = httpmock.NewStringResponder(http.StatusUpgradeRequired, `{"message":"`+upgradeMessage+`"}`)
+
+		execution := executeLogin(t, run)
+
+		var upgradeRequired components.UpgradeRequiredError
+		require.ErrorAs(t, execution.err, &upgradeRequired)
+		assert.Equal(t, upgradeMessage, upgradeRequired.UserText())
+		assert.Equal(t, 1, execution.calls)
+		assert.Empty(t, execution.stdout)
+		assert.Equal(t, content, readConfigFile(t, configFilePath))
+	})
+
 	t.Run("the key never appears on stdout or stderr", func(t *testing.T) {
 		isolateConfigFile(t, `{"profiles":{"acme":{"brokerUrl":"`+acmeURL+`","apiKey":"`+previousKey+`"}}}`)
 		t.Setenv("BIDIREKT_API_KEY", "bdk_globex")

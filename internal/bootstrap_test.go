@@ -600,6 +600,79 @@ func TestKeyOverPlainHTTPToARemoteHostWarnsAndTheRequestProceeds(t *testing.T) {
 	assert.NotContains(t, execution.stderr, "bdk_acme")
 }
 
+func TestBrokerRequestsCarryTheVersionOfAReleaseBuildOnly(t *testing.T) {
+	tests := []struct {
+		name        string
+		version     string
+		cliVersions []string
+	}{
+		{name: "a release build sends its version", version: "0.2.0", cliVersions: []string{"0.2.0"}},
+		{name: "a dev build sends none", version: "dev"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			isolateEnvironment(t)
+			t.Setenv("BIDIREKT_BROKER_URL", "https://broker.acme.internal")
+			t.Setenv("BIDIREKT_API_KEY", "bdk_acme")
+			builtVersion := version
+			version = test.version
+			t.Cleanup(func() { version = builtVersion })
+			dependencies := components.New()
+			var sent [][]string
+			dependencies.HTTPClient.StdClient().Transport = roundTripFunc(func(request *http.Request) (*http.Response, error) {
+				sent = append(sent, request.Header.Values("Bidirekt-Cli-Version"))
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Header:     http.Header{"Content-Type": []string{"application/json"}},
+					Body:       io.NopCloser(strings.NewReader(`{"message":"participant created"}`)),
+					Request:    request,
+				}, nil
+			})
+
+			execution := executeRoot(t, dependencies, "create-participant", "pets")
+
+			require.NoError(t, execution.err)
+			assert.Equal(t, [][]string{test.cliVersions}, sent)
+		})
+	}
+}
+
+func TestUpgradeRequiredPrintsOnlyTheBrokerMessage(t *testing.T) {
+	const upgradeMessage = "bidirekt 0.0.9 doesn't work with this broker (0.3.0); upgrade bidirekt to 0.1.0 or later"
+	commands := [][]string{
+		{"create-participant", "pets"},
+		{"list-participants"},
+		{"can-i-deploy", "pets", "--version", "v1", "--environment", "production"},
+		{"record-deployment", "pets", "--version", "v1", "--environment", "production"},
+	}
+
+	for _, args := range commands {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			isolateEnvironment(t)
+			t.Setenv("BIDIREKT_BROKER_URL", "https://broker.acme.internal")
+			t.Setenv("BIDIREKT_API_KEY", "bdk_acme")
+			dependencies := components.New()
+			dependencies.HTTPClient.StdClient().Transport = roundTripFunc(func(request *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: http.StatusUpgradeRequired,
+					Header:     http.Header{"Content-Type": []string{"application/json"}},
+					Body:       io.NopCloser(strings.NewReader(`{"message":"` + upgradeMessage + `"}`)),
+					Request:    request,
+				}, nil
+			})
+
+			execution := executeRoot(t, dependencies, args...)
+			var printed bytes.Buffer
+			printError(&printed, execution.err)
+
+			require.Error(t, execution.err)
+			assert.Equal(t, upgradeMessage+"\n", printed.String())
+			assert.Empty(t, execution.stdout)
+		})
+	}
+}
+
 func TestLogoutIsListedAndNeverCallsTheBroker(t *testing.T) {
 	configFilePath := isolateEnvironment(t)
 	broker := startBrokerStub(t)

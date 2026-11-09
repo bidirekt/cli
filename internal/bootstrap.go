@@ -23,8 +23,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const devVersion = "dev"
+
 // Overridden at link time by the release pipeline (-ldflags "-X github.com/bidirekt/cli/internal.version=<tag>").
-var version = "dev"
+var version = devVersion
 
 var errNoBrokerConfigured = errors.New(`no broker configured — run "bidirekt login" or set BIDIREKT_BROKER_URL and BIDIREKT_API_KEY`)
 
@@ -45,18 +47,18 @@ func printError(errWriter io.Writer, err error) {
 }
 
 func userText(err error) string {
-	var notSignedIn components.NotSignedInError
-	if errors.As(err, &notSignedIn) {
-		return notSignedIn.Error()
-	}
-	var forbidden components.ForbiddenError
-	if errors.As(err, &forbidden) {
-		return forbidden.Error()
+	var userFacing interface{ UserText() string }
+	if errors.As(err, &userFacing) {
+		return userFacing.UserText()
 	}
 	return err.Error()
 }
 
 func newRootCommand(dependencies *components.Components) *cobra.Command {
+	if version != devVersion {
+		dependencies.HTTPClient.UseCliVersion(version)
+	}
+
 	rootCommand := &cobra.Command{
 		Use:           "bidirekt",
 		Short:         "CLI for Bidirekt",

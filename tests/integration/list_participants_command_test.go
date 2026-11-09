@@ -136,4 +136,29 @@ func TestListParticipantsCommand(t *testing.T) {
 			assert.Empty(t, out.String())
 		})
 	}
+
+	t.Run("a 426 fails with the broker's message as the text to print", func(t *testing.T) {
+		const upgradeMessage = "bidirekt 0.0.9 doesn't work with this broker (0.3.0); upgrade bidirekt to 0.1.0 or later"
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "bdk_acme")
+		httpmock.ActivateNonDefault(httpClient.StdClient())
+		defer httpmock.DeactivateAndReset()
+
+		httpmock.RegisterResponder(http.MethodGet, endpoint,
+			httpmock.NewStringResponder(http.StatusUpgradeRequired, `{"message":"`+upgradeMessage+`"}`))
+
+		command := list_participants.NewListParticipantsCommand(list_participants.NewListParticipantsClient(httpClient))
+		var out, errOut bytes.Buffer
+		command.SetOut(&out)
+		command.SetErr(&errOut)
+		command.SetArgs([]string{})
+
+		err := command.Execute()
+
+		var upgradeRequired components.UpgradeRequiredError
+		require.ErrorAs(t, err, &upgradeRequired)
+		assert.Equal(t, upgradeMessage, upgradeRequired.UserText())
+		assert.Equal(t, 1, httpmock.GetTotalCallCount())
+		assert.Empty(t, out.String())
+	})
 }
