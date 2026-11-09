@@ -2,6 +2,8 @@ package components
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"resty.dev/v3"
@@ -19,7 +21,8 @@ func NewHTTPClient() *HTTPClient {
 	httpClient.
 		restClient.
 		SetHeader("Content-Type", "application/json").
-		SetHeader("Accept", "application/json")
+		SetHeader("Accept", "application/json").
+		AddResponseMiddleware(explainUpgradeRequired)
 
 	return httpClient
 }
@@ -33,6 +36,10 @@ func (this *HTTPClient) UseBroker(brokerURL, apiKey string) {
 	if apiKey != "" {
 		this.restClient.SetHeader("Authorization", "Bearer "+apiKey)
 	}
+}
+
+func (this *HTTPClient) UseCliVersion(version string) {
+	this.restClient.SetHeader("Bidirekt-Cli-Version", version)
 }
 
 func (this *HTTPClient) ExplainAuthFailures(brokerURL string) {
@@ -55,4 +62,16 @@ func (this *HTTPClient) Get(ctx context.Context, url string) (*resty.Response, e
 
 func (this *HTTPClient) Post(ctx context.Context, url string, body any) (*resty.Response, error) {
 	return this.restClient.R().SetContext(ctx).SetBody(body).Post(url)
+}
+
+func explainUpgradeRequired(_ *resty.Client, response *resty.Response) error {
+	if response.StatusCode() != http.StatusUpgradeRequired {
+		return nil
+	}
+
+	var upgradeRequired UpgradeRequiredError
+	if err := json.Unmarshal(response.Bytes(), &upgradeRequired); err != nil {
+		return fmt.Errorf("cannot parse upgrade required response: %w", err)
+	}
+	return upgradeRequired
 }

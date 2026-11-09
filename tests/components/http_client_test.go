@@ -89,6 +89,43 @@ func TestHTTPClientUseBrokerSendsTheKeyAsABearerToken(t *testing.T) {
 	}
 }
 
+func TestHTTPClientUseCliVersionSendsTheVersionOnEveryRequest(t *testing.T) {
+	cliVersions := make(chan []string, 2)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cliVersions <- r.Header.Values("Bidirekt-Cli-Version")
+	}))
+	t.Cleanup(server.Close)
+
+	client := components.NewHTTPClient()
+	client.UseBroker(server.URL, "bdk_acme")
+	client.UseCliVersion("0.2.0")
+	_, getErr := client.Get(context.Background(), "/api/participants")
+	_, postErr := client.Post(context.Background(), "/api/participants", map[string]string{"participant": "orders"})
+
+	require.NoError(t, getErr)
+	require.NoError(t, postErr)
+	assert.Equal(t, []string{"0.2.0"}, <-cliVersions)
+	assert.Equal(t, []string{"0.2.0"}, <-cliVersions)
+}
+
+func TestHTTPClientTurnsA426IntoUpgradeRequiredErrorWithTheBrokerMessage(t *testing.T) {
+	const message = "bidirekt 0.0.9 doesn't work with this broker (0.3.0); upgrade bidirekt to 0.1.0 or later"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUpgradeRequired)
+		_, _ = w.Write([]byte(`{"message":"` + message + `"}`))
+	}))
+	t.Cleanup(server.Close)
+
+	client := components.NewHTTPClient()
+	client.UseBroker(server.URL, "bdk_acme")
+	_, err := client.Get(context.Background(), "/api/participants")
+
+	var upgradeRequired components.UpgradeRequiredError
+	require.ErrorAs(t, err, &upgradeRequired)
+	assert.Equal(t, message, upgradeRequired.UserText())
+}
+
 func TestHTTPClientExplainAuthFailuresTurnsA401AndA403IntoTheirErrors(t *testing.T) {
 	tests := []struct {
 		name      string
