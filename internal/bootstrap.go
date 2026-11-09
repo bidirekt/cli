@@ -45,13 +45,9 @@ func printError(errWriter io.Writer, err error) {
 }
 
 func userText(err error) string {
-	var notSignedIn components.NotSignedInError
-	if errors.As(err, &notSignedIn) {
-		return notSignedIn.Error()
-	}
-	var forbidden components.ForbiddenError
-	if errors.As(err, &forbidden) {
-		return forbidden.Error()
+	var userFacing interface{ UserText() string }
+	if errors.As(err, &userFacing) {
+		return userFacing.UserText()
 	}
 	return err.Error()
 }
