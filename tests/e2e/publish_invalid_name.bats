@@ -32,21 +32,21 @@ setup() {
   run bidirekt publish ./api_v2.yaml --participant "$API" --version v2
   assert_failure
   assert_output --partial "contract validation failed
-  - ./api_v2.yaml: invalid property name \"user.name\" at schemas Pet properties, must not contain \".\", \"[\", \"]\", \"{\", \"}\" or \";\""
+  - ./api_v2.yaml: invalid property name \"user.name\" at schemas Pet properties, must not contain \".\", \"[\", \"]\", \"{\", \"}\", \";\", \"(\" or \")\""
 }
 
 @test "publish todo_api v3 (property tags[]): blocked, invalid property name" {
   run bidirekt publish ./api_v3.yaml --participant "$API" --version v3
   assert_failure
   assert_output --partial "contract validation failed
-  - ./api_v3.yaml: invalid property name \"tags[]\" at schemas Pet properties, must not contain \".\", \"[\", \"]\", \"{\", \"}\" or \";\""
+  - ./api_v3.yaml: invalid property name \"tags[]\" at schemas Pet properties, must not contain \".\", \"[\", \"]\", \"{\", \"}\", \";\", \"(\" or \")\""
 }
 
 @test "publish todo_api v4 (property a;b): blocked, invalid property name" {
   run bidirekt publish ./api_v4.yaml --participant "$API" --version v4
   assert_failure
   assert_output --partial "contract validation failed
-  - ./api_v4.yaml: invalid property name \"a;b\" at schemas Pet properties, must not contain \".\", \"[\", \"]\", \"{\", \"}\" or \";\""
+  - ./api_v4.yaml: invalid property name \"a;b\" at schemas Pet properties, must not contain \".\", \"[\", \"]\", \"{\", \"}\", \";\", \"(\" or \")\""
 }
 
 @test "publish todo_api v5 (empty property name): blocked, invalid property name" {
@@ -67,5 +67,5 @@ setup() {
   run bidirekt publish ./api_v7.yaml --participant "$API" --version v7
   assert_failure
   assert_output --partial "contract validation failed
-  - ./api_v7.yaml: invalid schema name \"Pet.v2\" at schemas, must not contain \".\", \"[\", \"]\", \"{\", \"}\" or \";\""
+  - ./api_v7.yaml: invalid schema name \"Pet.v2\" at schemas, must not contain \".\", \"[\", \"]\", \"{\", \"}\", \";\", \"(\" or \")\""
 }

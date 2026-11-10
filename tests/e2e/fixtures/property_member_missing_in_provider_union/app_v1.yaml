@@ -1,0 +1,53 @@
+consumes:
+  ${API}:
+    rest:
+      "/orders":
+        post:
+          request: CreateOrderRequest
+          responses:
+            "201": Order
+      "/orders/*":
+        get:
+          responses:
+            "200": Order
+
+schemas:
+  Order:
+    type: object
+    properties:
+      orderId:
+        type: integer
+      payment:
+        type: union
+        members:
+          card:
+            ref: CardPayment
+          pix:
+            ref: PixPayment
+
+  CreateOrderRequest:
+    type: object
+    properties:
+      payment:
+        type: union
+        members:
+          card:
+            ref: CardPayment
+
+  CardPayment:
+    type: object
+    properties:
+      number:
+        type: string
+
+  PixPayment:
+    type: object
+    properties:
+      key:
+        type: string
+
+  BoletoPayment:
+    type: object
+    properties:
+      barcode:
+        type: string
