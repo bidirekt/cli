@@ -1,0 +1,15 @@
+consumes:
+  ${API}:
+    rest:
+      "/orders/*":
+        get:
+          responses:
+            "200": OrderReadingPlacedShipped
+
+schemas:
+  OrderReadingPlacedShipped:
+    type: object
+    properties:
+      status:
+        type: enum
+        members: [placed, shipped]

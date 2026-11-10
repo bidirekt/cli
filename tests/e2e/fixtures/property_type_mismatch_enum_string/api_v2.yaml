@@ -1,0 +1,32 @@
+provides:
+  rest:
+    "/pets":
+      get:
+        responses:
+          "200": Pets
+      post:
+        request: CreatePetRequest
+        responses:
+          "201": Pet
+
+schemas:
+  Pet:
+    type: object
+    properties:
+      petId:
+        type: integer
+      status:
+        type: enum
+        members: [available, pending]
+
+  Pets:
+    type: array
+    items:
+      ref: Pet
+
+  CreatePetRequest:
+    type: object
+    properties:
+      status:
+        type: enum
+        members: [available, pending]
