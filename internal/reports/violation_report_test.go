@@ -43,7 +43,7 @@ func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
 	assert.Equal(t, `contract validation failed
   - api.yaml: unknown key "patch" at provides rest /pets
   - api.yaml: unexpected string at provides rest /pets get, expected mapping
-  - api.yaml: invalid endpoint "/users/{userId}" at provides rest, dynamic path segments must use *
+  - api.yaml: invalid endpoint "/users/{userId}" in provides, dynamic path segments must use *
   - api.yaml: invalid service name "Payments-API" at consumes, must be snake_case
   - api.yaml: invalid property name "user.name" at schemas Pet properties, must not contain ".", "[", "]", "{", "}" or ";"
   - api.yaml: invalid schema name "Pet.v2" at schemas, must not contain ".", "[", "]", "{", "}" or ";"
@@ -141,7 +141,55 @@ func TestFormatViolationLine(t *testing.T) {
 			Details: map[string]string{"key": "/users/{userId}", "error": "dynamic path segments must use *"},
 		})
 
-		assert.Equal(t, `invalid endpoint "/users/{userId}" at provides rest`, headline)
+		assert.Equal(t, `invalid endpoint "/users/{userId}" in provides`, headline)
+		assert.Equal(t, `dynamic path segments must use *`, explanation)
+	})
+
+	t.Run("endpoint.syntax with a suggestion shows the corrected path", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "endpoint.syntax",
+			Path:    "provides;rest;/adoptions/{petId}",
+			Source:  "contracts/generated.yaml",
+			Details: map[string]string{"key": "/adoptions/{petId}", "error": "dynamic path segments must use *", "suggestion": "/adoptions/*"},
+		})
+
+		assert.Equal(t, `invalid endpoint "/adoptions/{petId}" in provides`, headline)
+		assert.Equal(t, `write "/adoptions/*" (dynamic path segments must use *)`, explanation)
+	})
+
+	t.Run("endpoint.syntax without a suggestion keeps the broker error", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "endpoint.syntax",
+			Path:    "provides;rest;/pets/p*",
+			Source:  "api.yaml",
+			Details: map[string]string{"key": "/pets/p*", "error": "dynamic path segments must use *"},
+		})
+
+		assert.Equal(t, `invalid endpoint "/pets/p*" in provides`, headline)
+		assert.Equal(t, `dynamic path segments must use *`, explanation)
+	})
+
+	t.Run("endpoint.syntax under consumes names the service", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "endpoint.syntax",
+			Path:    "consumes;petstore;rest;/adoptions/{petId}",
+			Source:  "api.yaml",
+			Details: map[string]string{"key": "/adoptions/{petId}", "error": "dynamic path segments must use *", "suggestion": "/adoptions/*"},
+		})
+
+		assert.Equal(t, `invalid endpoint "/adoptions/{petId}" in consumes petstore`, headline)
+		assert.Equal(t, `write "/adoptions/*" (dynamic path segments must use *)`, explanation)
+	})
+
+	t.Run("endpoint.syntax at an unexpected path falls back to the full location", func(t *testing.T) {
+		headline, explanation := FormatViolationLine(Violation{
+			Code:    "endpoint.syntax",
+			Path:    "provides;graphql;/pets/{petId}",
+			Source:  "api.yaml",
+			Details: map[string]string{"key": "/pets/{petId}", "error": "dynamic path segments must use *"},
+		})
+
+		assert.Equal(t, `invalid endpoint "/pets/{petId}" at provides graphql`, headline)
 		assert.Equal(t, `dynamic path segments must use *`, explanation)
 	})
 
