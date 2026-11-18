@@ -48,7 +48,11 @@ func FormatViolationLine(violation Violation) (headline, explanation string) {
 	case "value.invalid_kind":
 		return fmt.Sprintf("unexpected %s%s, expected %s", details["got"], pathAt, details["expected"]), ""
 	case "endpoint.syntax":
-		return fmt.Sprintf("invalid endpoint %q%s", details["key"], keyAt), details["error"]
+		headline = fmt.Sprintf("invalid endpoint %q%s", details["key"], endpointOwner(violation.Path, details["key"]))
+		if suggestion := details["suggestion"]; suggestion != "" {
+			return headline, fmt.Sprintf("write %q (%s)", suggestion, details["error"])
+		}
+		return headline, details["error"]
 	case "service.name_syntax":
 		return fmt.Sprintf("invalid service name %q%s", details["key"], keyAt), details["error"]
 	case "property.name_syntax":
@@ -177,6 +181,20 @@ func fallbackViolationLine(violation Violation) string {
 	}
 
 	return fmt.Sprintf("%s (%s)", line, strings.Join(pairs, ", "))
+}
+
+func endpointOwner(path, key string) string {
+	owner, isRest := strings.CutSuffix(path, ";rest;"+key)
+	service, isConsumes := strings.CutPrefix(owner, "consumes;")
+
+	switch {
+	case isRest && owner == "provides":
+		return " in provides"
+	case isRest && isConsumes && service != "" && !strings.Contains(service, ";"):
+		return " in consumes " + service
+	default:
+		return at(location(path, key))
+	}
 }
 
 func location(path, quoted string) string {
