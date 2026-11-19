@@ -33,6 +33,10 @@ func FormatDeployableReport(brush paint.Brush, checkedSideLabel, environment str
 	return report + "compared with: " + strings.Join(sortedKeys(results), ", ") + "\n"
 }
 
+func FormatSyntaxValidReport(brush paint.Brush) string {
+	return brush.Green("contract is valid; add --participant and --environment to compare it with what is deployed") + "\n"
+}
+
 func FormatNotDeployableReport(brush paint.Brush, checkedSideLabel, participant, environment string, results map[string]CanIDeployResult) string {
 	var report strings.Builder
 	report.WriteString(brush.Red(checkedSideLabel+" cannot be deployed to "+environment) + "\n")

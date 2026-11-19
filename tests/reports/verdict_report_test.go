@@ -44,6 +44,21 @@ func TestFormatDeployableReportPaintsOnlyTheVerdictGreen(t *testing.T) {
 	assert.Equal(t, "\x1b[32mpetstore_web 3.0.0 can be deployed to production\x1b[0m\ncompared with: petstore_api\n", report)
 }
 
+func TestFormatSyntaxValidReportSaysTheContractIsValidAndHowToCompareIt(t *testing.T) {
+	report := reports.FormatSyntaxValidReport(paint.For(&bytes.Buffer{}))
+
+	assert.Equal(t, "contract is valid; add --participant and --environment to compare it with what is deployed\n", report)
+}
+
+func TestFormatSyntaxValidReportPaintsTheLineGreen(t *testing.T) {
+	t.Setenv("NO_COLOR", "")
+	t.Setenv("CLICOLOR_FORCE", "1")
+
+	report := reports.FormatSyntaxValidReport(paint.For(&bytes.Buffer{}))
+
+	assert.Equal(t, "\x1b[32mcontract is valid; add --participant and --environment to compare it with what is deployed\x1b[0m\n", report)
+}
+
 func TestFormatNotDeployableReportWalksTheTree(t *testing.T) {
 	apiVersion := "4.0.0"
 	paymentsVersion := "1.4.0"

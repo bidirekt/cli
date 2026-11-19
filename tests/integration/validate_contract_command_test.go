@@ -36,24 +36,14 @@ func TestValidateContractCommand(t *testing.T) {
 		return file
 	}
 
-	t.Run("compatible verdict posts participant+environment+contracts, prints can be deployed, exits 0", func(t *testing.T) {
+	runValidate := func(t *testing.T, responder httpmock.Responder, args ...string) (string, string, error) {
+		t.Helper()
+
 		httpClient := components.NewHTTPClient()
 		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
-		defer httpmock.DeactivateAndReset()
-
-		file := writeContract(t)
-
-		var capturedBody []byte
-		httpmock.RegisterResponder(http.MethodPost, endpoint,
-			func(req *http.Request) (*http.Response, error) {
-				body, err := io.ReadAll(req.Body)
-				if err != nil {
-					return nil, err
-				}
-				capturedBody = body
-				return httpmock.NewStringResponse(http.StatusOK, `{"message":"contract validated successfully","participant":"front","environment":"production","deployable":true,"results":{}}`), nil
-			})
+		t.Cleanup(httpmock.DeactivateAndReset)
+		httpmock.RegisterResponder(http.MethodPost, endpoint, responder)
 
 		command := validate_contract.NewValidateCommand(
 			validate_contract.NewValidateContractClient(httpClient),
@@ -61,9 +51,29 @@ func TestValidateContractCommand(t *testing.T) {
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
 		command.SetErr(&errOut)
-		command.SetArgs([]string{file, "--participant", participant, "--environment", environment})
+		command.SetArgs(args)
 
 		err := command.Execute()
+
+		return out.String(), errOut.String(), err
+	}
+
+	unexpectedRequest := httpmock.NewErrorResponder(errors.New("unexpected request to the broker"))
+
+	t.Run("compatible verdict posts participant+environment+contracts, prints can be deployed, exits 0", func(t *testing.T) {
+		file := writeContract(t)
+
+		var capturedBody []byte
+		responder := func(req *http.Request) (*http.Response, error) {
+			body, err := io.ReadAll(req.Body)
+			if err != nil {
+				return nil, err
+			}
+			capturedBody = body
+			return httpmock.NewStringResponse(http.StatusOK, `{"message":"contract validated successfully","participant":"front","environment":"production","deployable":true,"results":{}}`), nil
+		}
+
+		out, errOut, err := runValidate(t, responder, file, "--participant", participant, "--environment", environment)
 
 		require.NoError(t, err)
 		assert.Equal(t, 1, httpmock.GetCallCountInfo()["POST "+endpoint])
@@ -74,16 +84,11 @@ func TestValidateContractCommand(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.JSONEq(t, string(expectedBody), string(capturedBody))
-		assert.Equal(t, "front local contract can be deployed to production\nnothing deployed in production to compare with\n", out.String())
-		assert.Empty(t, errOut.String())
+		assert.Equal(t, "front local contract can be deployed to production\nnothing deployed in production to compare with\n", out)
+		assert.Empty(t, errOut)
 	})
 
 	t.Run("compatible verdict names the counterparts it was compared with, in alphabetical order", func(t *testing.T) {
-		httpClient := components.NewHTTPClient()
-		httpClient.UseBroker(brokerURL, "")
-		httpmock.ActivateNonDefault(httpClient.StdClient())
-		defer httpmock.DeactivateAndReset()
-
 		file := writeContract(t)
 
 		responseBody := `{
@@ -96,30 +101,16 @@ func TestValidateContractCommand(t *testing.T) {
 		    "admin": { "deployable": true, "participantVersion": "v2", "endpoints": {} }
 		  }
 		}`
-		httpmock.RegisterResponder(http.MethodPost, endpoint,
-			httpmock.NewStringResponder(http.StatusOK, responseBody))
+		responder := httpmock.NewStringResponder(http.StatusOK, responseBody)
 
-		command := validate_contract.NewValidateCommand(
-			validate_contract.NewValidateContractClient(httpClient),
-		)
-		var out, errOut bytes.Buffer
-		command.SetOut(&out)
-		command.SetErr(&errOut)
-		command.SetArgs([]string{file, "--participant", participant, "--environment", environment})
-
-		err := command.Execute()
+		out, errOut, err := runValidate(t, responder, file, "--participant", participant, "--environment", environment)
 
 		require.NoError(t, err)
-		assert.Equal(t, "front local contract can be deployed to production\ncompared with: admin, site\n", out.String())
-		assert.Empty(t, errOut.String())
+		assert.Equal(t, "front local contract can be deployed to production\ncompared with: admin, site\n", out)
+		assert.Empty(t, errOut)
 	})
 
 	t.Run("incompatible verdict prints the break tree on stdout, exits silently non-zero", func(t *testing.T) {
-		httpClient := components.NewHTTPClient()
-		httpClient.UseBroker(brokerURL, "")
-		httpmock.ActivateNonDefault(httpClient.StdClient())
-		defer httpmock.DeactivateAndReset()
-
 		file := writeContract(t)
 
 		responseBody := `{
@@ -152,18 +143,9 @@ func TestValidateContractCommand(t *testing.T) {
 		    }
 		  }
 		}`
-		httpmock.RegisterResponder(http.MethodPost, endpoint,
-			httpmock.NewStringResponder(http.StatusOK, responseBody))
+		responder := httpmock.NewStringResponder(http.StatusOK, responseBody)
 
-		command := validate_contract.NewValidateCommand(
-			validate_contract.NewValidateContractClient(httpClient),
-		)
-		var out, errOut bytes.Buffer
-		command.SetOut(&out)
-		command.SetErr(&errOut)
-		command.SetArgs([]string{file, "--participant", participant, "--environment", environment})
-
-		err := command.Execute()
+		out, errOut, err := runValidate(t, responder, file, "--participant", participant, "--environment", environment)
 
 		require.ErrorIs(t, err, reports.ErrSilent)
 		assert.Equal(t, `front local contract cannot be deployed to production
@@ -173,196 +155,138 @@ payments (v2, deployed):
     → front: send it
     → payments: stop requiring it, then mark it optional there
       · PUT /payments/* request at "$.currency" (payments: UpdatePaymentRequest.currency)
-`, out.String())
-		assert.Empty(t, errOut.String())
+`, out)
+		assert.Empty(t, errOut)
 	})
 
 	t.Run("validation failure prints the violation report on stderr, exits silently non-zero", func(t *testing.T) {
-		httpClient := components.NewHTTPClient()
-		httpClient.UseBroker(brokerURL, "")
-		httpmock.ActivateNonDefault(httpClient.StdClient())
-		defer httpmock.DeactivateAndReset()
-
 		file := writeContract(t)
 
-		httpmock.RegisterResponder(http.MethodPost, endpoint,
-			httpmock.NewStringResponder(http.StatusBadRequest, `{"message":"contract validation failed","violations":[{"code":"schema.unresolved_name","path":"consumes;payments;rest;/payments/*;put;request","source":"contract.yaml","details":{"schema":"Payment","resource":"consumes payments PUT /payments/* request"}}]}`))
+		responder := httpmock.NewStringResponder(http.StatusBadRequest, `{"message":"contract validation failed","violations":[{"code":"schema.unresolved_name","path":"consumes;payments;rest;/payments/*;put;request","source":"contract.yaml","details":{"schema":"Payment","resource":"consumes payments PUT /payments/* request"}}]}`)
 
-		command := validate_contract.NewValidateCommand(
-			validate_contract.NewValidateContractClient(httpClient),
-		)
-		var out, errOut bytes.Buffer
-		command.SetOut(&out)
-		command.SetErr(&errOut)
-		command.SetArgs([]string{file, "--participant", participant, "--environment", environment})
-
-		err := command.Execute()
+		out, errOut, err := runValidate(t, responder, file, "--participant", participant, "--environment", environment)
 
 		require.ErrorIs(t, err, reports.ErrSilent)
 		assert.Equal(t, "contract validation failed\n"+
 			"  - contract.yaml: unresolved schema \"Payment\" referenced by consumes payments PUT /payments/* request\n",
-			errOut.String())
-		assert.Empty(t, out.String())
+			errOut)
+		assert.Empty(t, out)
 	})
 
 	t.Run("optional on array items prints where it is and how to fix it", func(t *testing.T) {
-		httpClient := components.NewHTTPClient()
-		httpClient.UseBroker(brokerURL, "")
-		httpmock.ActivateNonDefault(httpClient.StdClient())
-		defer httpmock.DeactivateAndReset()
-
 		file := writeContract(t)
 
-		httpmock.RegisterResponder(http.MethodPost, endpoint,
-			httpmock.NewStringResponder(http.StatusBadRequest, `{"message":"contract validation failed","violations":[{"code":"schema.optional_not_allowed","path":"schemas;Pet;properties;tags;items","source":"contract.yaml","details":{"position":"items"}}]}`))
+		responder := httpmock.NewStringResponder(http.StatusBadRequest, `{"message":"contract validation failed","violations":[{"code":"schema.optional_not_allowed","path":"schemas;Pet;properties;tags;items","source":"contract.yaml","details":{"position":"items"}}]}`)
 
-		command := validate_contract.NewValidateCommand(
-			validate_contract.NewValidateContractClient(httpClient),
-		)
-		var out, errOut bytes.Buffer
-		command.SetOut(&out)
-		command.SetErr(&errOut)
-		command.SetArgs([]string{file, "--participant", participant, "--environment", environment})
-
-		err := command.Execute()
+		out, errOut, err := runValidate(t, responder, file, "--participant", participant, "--environment", environment)
 
 		require.ErrorIs(t, err, reports.ErrSilent)
 		assert.Equal(t, "contract validation failed\n"+
 			"  - contract.yaml: \"optional\" is not allowed on array items at schemas Pet properties tags items, mark the property that holds the array optional, or use \"nullable: true\" for an item that may be null\n",
-			errOut.String())
-		assert.Empty(t, out.String())
+			errOut)
+		assert.Empty(t, out)
 	})
 
 	t.Run("property name that confuses the path prints where it is and why", func(t *testing.T) {
-		httpClient := components.NewHTTPClient()
-		httpClient.UseBroker(brokerURL, "")
-		httpmock.ActivateNonDefault(httpClient.StdClient())
-		defer httpmock.DeactivateAndReset()
-
 		file := writeContract(t)
 
-		httpmock.RegisterResponder(http.MethodPost, endpoint,
-			httpmock.NewStringResponder(http.StatusBadRequest, `{"message":"contract validation failed","violations":[{"code":"property.name_syntax","path":"schemas;Pet;properties;user.name","source":"contract.yaml","details":{"key":"user.name","error":"must not contain \".\", \"[\", \"]\", \"{\", \"}\" or \";\""}}]}`))
+		responder := httpmock.NewStringResponder(http.StatusBadRequest, `{"message":"contract validation failed","violations":[{"code":"property.name_syntax","path":"schemas;Pet;properties;user.name","source":"contract.yaml","details":{"key":"user.name","error":"must not contain \".\", \"[\", \"]\", \"{\", \"}\" or \";\""}}]}`)
 
-		command := validate_contract.NewValidateCommand(
-			validate_contract.NewValidateContractClient(httpClient),
-		)
-		var out, errOut bytes.Buffer
-		command.SetOut(&out)
-		command.SetErr(&errOut)
-		command.SetArgs([]string{file, "--participant", participant, "--environment", environment})
-
-		err := command.Execute()
+		out, errOut, err := runValidate(t, responder, file, "--participant", participant, "--environment", environment)
 
 		require.ErrorIs(t, err, reports.ErrSilent)
 		assert.Equal(t, "contract validation failed\n"+
 			"  - contract.yaml: invalid property name \"user.name\" at schemas Pet properties, must not contain \".\", \"[\", \"]\", \"{\", \"}\" or \";\"\n",
-			errOut.String())
-		assert.Empty(t, out.String())
+			errOut)
+		assert.Empty(t, out)
 	})
 
 	t.Run("unknown participant suggests creating it with create-participant", func(t *testing.T) {
-		httpClient := components.NewHTTPClient()
-		httpClient.UseBroker(brokerURL, "")
-		httpmock.ActivateNonDefault(httpClient.StdClient())
-		defer httpmock.DeactivateAndReset()
-
 		file := writeContract(t)
 
-		httpmock.RegisterResponder(http.MethodPost, endpoint,
-			httpmock.NewStringResponder(http.StatusNotFound, `{"message":"participant not found"}`))
+		responder := httpmock.NewStringResponder(http.StatusNotFound, `{"message":"participant not found"}`)
 
-		command := validate_contract.NewValidateCommand(
-			validate_contract.NewValidateContractClient(httpClient),
-		)
-		var out, errOut bytes.Buffer
-		command.SetOut(&out)
-		command.SetErr(&errOut)
-		command.SetArgs([]string{file, "--participant", "ghost", "--environment", environment})
-
-		err := command.Execute()
+		out, errOut, err := runValidate(t, responder, file, "--participant", "ghost", "--environment", environment)
 
 		require.Error(t, err)
 		assert.NotErrorIs(t, err, reports.ErrSilent)
 		assert.Equal(t, `participant "ghost" not found → create it with: bidirekt create-participant ghost`, err.Error())
-		assert.Empty(t, out.String())
-		assert.Empty(t, errOut.String())
+		assert.Empty(t, out)
+		assert.Empty(t, errOut)
 	})
 
 	t.Run("unknown environment returns the broker message as the error", func(t *testing.T) {
-		httpClient := components.NewHTTPClient()
-		httpClient.UseBroker(brokerURL, "")
-		httpmock.ActivateNonDefault(httpClient.StdClient())
-		defer httpmock.DeactivateAndReset()
-
 		file := writeContract(t)
 
-		httpmock.RegisterResponder(http.MethodPost, endpoint,
-			httpmock.NewStringResponder(http.StatusNotFound, `{"message":"environment not found"}`))
+		responder := httpmock.NewStringResponder(http.StatusNotFound, `{"message":"environment not found"}`)
 
-		command := validate_contract.NewValidateCommand(
-			validate_contract.NewValidateContractClient(httpClient),
-		)
-		var out, errOut bytes.Buffer
-		command.SetOut(&out)
-		command.SetErr(&errOut)
-		command.SetArgs([]string{file, "--participant", participant, "--environment", "nowhere"})
-
-		err := command.Execute()
+		out, errOut, err := runValidate(t, responder, file, "--participant", participant, "--environment", "nowhere")
 
 		require.Error(t, err)
 		assert.NotErrorIs(t, err, reports.ErrSilent)
 		assert.Equal(t, "cannot validate contract on broker: environment not found", err.Error())
-		assert.Empty(t, out.String())
-		assert.Empty(t, errOut.String())
+		assert.Empty(t, out)
+		assert.Empty(t, errOut)
 	})
 
 	t.Run("unsupported extension fails before any request", func(t *testing.T) {
-		httpClient := components.NewHTTPClient()
-		httpClient.UseBroker(brokerURL, "")
-		httpmock.ActivateNonDefault(httpClient.StdClient())
-		defer httpmock.DeactivateAndReset()
-		httpmock.RegisterNoResponder(httpmock.NewErrorResponder(errors.New("unexpected request to the broker")))
-
 		notes := filepath.Join(t.TempDir(), "notes.txt")
 		require.NoError(t, os.WriteFile(notes, []byte("not a contract"), 0o600))
 
-		command := validate_contract.NewValidateCommand(
-			validate_contract.NewValidateContractClient(httpClient),
-		)
-		var out, errOut bytes.Buffer
-		command.SetOut(&out)
-		command.SetErr(&errOut)
-		command.SetArgs([]string{notes, "--participant", participant, "--environment", environment})
-
-		err := command.Execute()
+		_, _, err := runValidate(t, unexpectedRequest, notes, "--participant", participant, "--environment", environment)
 
 		require.Error(t, err)
 		assert.Equal(t, `unsupported contract file extension: "`+notes+`"`, err.Error())
 		assert.Zero(t, httpmock.GetTotalCallCount())
 	})
 
-	t.Run("missing --environment fails before any request", func(t *testing.T) {
-		httpClient := components.NewHTTPClient()
-		httpClient.UseBroker(brokerURL, "")
-		httpmock.ActivateNonDefault(httpClient.StdClient())
-		defer httpmock.DeactivateAndReset()
-		httpmock.RegisterNoResponder(httpmock.NewErrorResponder(errors.New("unexpected request to the broker")))
-
+	t.Run("only --participant fails before any request", func(t *testing.T) {
 		file := writeContract(t)
 
-		command := validate_contract.NewValidateCommand(
-			validate_contract.NewValidateContractClient(httpClient),
-		)
-		var out, errOut bytes.Buffer
-		command.SetOut(&out)
-		command.SetErr(&errOut)
-		command.SetArgs([]string{file, "--participant", participant})
-
-		err := command.Execute()
+		_, _, err := runValidate(t, unexpectedRequest, file, "--participant", participant)
 
 		require.Error(t, err)
-		assert.Equal(t, `required flag(s) "environment" not set`, err.Error())
+		assert.Equal(t, "if any flags in the group [participant environment] are set they must all be set; missing [environment]", err.Error())
 		assert.Zero(t, httpmock.GetTotalCallCount())
+	})
+
+	t.Run("no flags posts only the contracts, prints that the contract is valid, exits 0", func(t *testing.T) {
+		file := writeContract(t)
+
+		var capturedBody []byte
+		responder := func(req *http.Request) (*http.Response, error) {
+			body, err := io.ReadAll(req.Body)
+			if err != nil {
+				return nil, err
+			}
+			capturedBody = body
+			return httpmock.NewStringResponse(http.StatusOK, `{"message":"contract validated successfully"}`), nil
+		}
+
+		out, errOut, err := runValidate(t, responder, file)
+
+		require.NoError(t, err)
+		assert.Equal(t, 1, httpmock.GetCallCountInfo()["POST "+endpoint])
+		expectedBody, err := json.Marshal(map[string]any{
+			"contracts": []map[string]string{{"source": file, "content": content}},
+		})
+		require.NoError(t, err)
+		assert.JSONEq(t, string(expectedBody), string(capturedBody))
+		assert.Equal(t, "contract is valid; add --participant and --environment to compare it with what is deployed\n", out)
+		assert.Empty(t, errOut)
+	})
+
+	t.Run("no flags and a validation failure prints the violation report on stderr, exits silently non-zero", func(t *testing.T) {
+		file := writeContract(t)
+
+		responder := httpmock.NewStringResponder(http.StatusBadRequest, `{"message":"contract validation failed","violations":[{"code":"schema.unresolved_name","path":"consumes;payments;rest;/payments/*;put;request","source":"contract.yaml","details":{"schema":"Payment","resource":"consumes payments PUT /payments/* request"}}]}`)
+
+		out, errOut, err := runValidate(t, responder, file)
+
+		require.ErrorIs(t, err, reports.ErrSilent)
+		assert.Equal(t, "contract validation failed\n"+
+			"  - contract.yaml: unresolved schema \"Payment\" referenced by consumes payments PUT /payments/* request\n",
+			errOut)
+		assert.Empty(t, out)
 	})
 }
