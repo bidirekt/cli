@@ -151,6 +151,10 @@ func TestUsageErrorsComeBeforeAnyBrokerResolution(t *testing.T) {
 		{args: []string{"publish", "--participant", "pets", "--version", "v1"}, err: "requires at least 1 arg(s), only received 0"},
 		{args: []string{"can-i-deploy", "pets", "--unknown"}, err: "unknown flag: --unknown"},
 		{args: []string{"list-participants", "--broker-url", "x"}, err: "unknown flag: --broker-url"},
+		{args: []string{"validate", "api.yaml", "--environment", "production"}, err: "if any flags in the group [participant environment] are set they must all be set; missing [participant]"},
+		{args: []string{"validate", "api.yaml", "--participant", "pets"}, err: "if any flags in the group [participant environment] are set they must all be set; missing [environment]"},
+		{args: []string{"validate", "api.yaml", "--participant", "pets", "--environment", ""}, err: "--environment cannot be empty"},
+		{args: []string{"validate", "api.yaml", "--participant", "", "--environment", "production"}, err: "--participant cannot be empty"},
 	}
 
 	for _, test := range tests {

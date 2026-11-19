@@ -240,13 +240,53 @@ payments (v2, deployed):
 		assert.Zero(t, httpmock.GetTotalCallCount())
 	})
 
-	t.Run("missing --environment fails before any request", func(t *testing.T) {
+	t.Run("only --participant fails before any request", func(t *testing.T) {
 		file := writeContract(t)
 
 		_, _, err := runValidate(t, unexpectedRequest, file, "--participant", participant)
 
 		require.Error(t, err)
-		assert.Equal(t, `required flag(s) "environment" not set`, err.Error())
+		assert.Equal(t, "if any flags in the group [participant environment] are set they must all be set; missing [environment]", err.Error())
 		assert.Zero(t, httpmock.GetTotalCallCount())
+	})
+
+	t.Run("no flags posts only the contracts, prints that the contract is valid, exits 0", func(t *testing.T) {
+		file := writeContract(t)
+
+		var capturedBody []byte
+		responder := func(req *http.Request) (*http.Response, error) {
+			body, err := io.ReadAll(req.Body)
+			if err != nil {
+				return nil, err
+			}
+			capturedBody = body
+			return httpmock.NewStringResponse(http.StatusOK, `{"message":"contract validated successfully"}`), nil
+		}
+
+		out, errOut, err := runValidate(t, responder, file)
+
+		require.NoError(t, err)
+		assert.Equal(t, 1, httpmock.GetCallCountInfo()["POST "+endpoint])
+		expectedBody, err := json.Marshal(map[string]any{
+			"contracts": []map[string]string{{"source": file, "content": content}},
+		})
+		require.NoError(t, err)
+		assert.JSONEq(t, string(expectedBody), string(capturedBody))
+		assert.Equal(t, "contract is valid; add --participant and --environment to compare it with what is deployed\n", out)
+		assert.Empty(t, errOut)
+	})
+
+	t.Run("no flags and a validation failure prints the violation report on stderr, exits silently non-zero", func(t *testing.T) {
+		file := writeContract(t)
+
+		responder := httpmock.NewStringResponder(http.StatusBadRequest, `{"message":"contract validation failed","violations":[{"code":"schema.unresolved_name","path":"consumes;payments;rest;/payments/*;put;request","source":"contract.yaml","details":{"schema":"Payment","resource":"consumes payments PUT /payments/* request"}}]}`)
+
+		out, errOut, err := runValidate(t, responder, file)
+
+		require.ErrorIs(t, err, reports.ErrSilent)
+		assert.Equal(t, "contract validation failed\n"+
+			"  - contract.yaml: unresolved schema \"Payment\" referenced by consumes payments PUT /payments/* request\n",
+			errOut)
+		assert.Empty(t, out)
 	})
 }

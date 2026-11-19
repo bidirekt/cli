@@ -8,8 +8,8 @@ import (
 const participantNotFound = "participant not found"
 
 type ValidateContractRequestBody struct {
-	Participant string                           `json:"participant"`
-	Environment string                           `json:"environment"`
+	Participant string                           `json:"participant,omitempty"`
+	Environment string                           `json:"environment,omitempty"`
 	Contracts   []contractfiles.ContractFragment `json:"contracts"`
 }
 
