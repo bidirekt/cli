@@ -59,6 +59,8 @@ func FormatViolationLine(violation Violation) (headline, explanation string) {
 		return fmt.Sprintf("invalid property name %q%s", details["key"], keyAt), details["error"]
 	case "schema.name_syntax":
 		return fmt.Sprintf("invalid schema name %q%s", details["key"], keyAt), details["error"]
+	case "schema.description_syntax":
+		return fmt.Sprintf("invalid description %q%s", details["value"], at(location(violation.Path, "description"))), details["error"]
 	case "status.out_of_range":
 		return fmt.Sprintf("invalid status code %q%s", details["key"], keyAt), details["error"]
 	case "schema.invalid_type":
