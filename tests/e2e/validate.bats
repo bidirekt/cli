@@ -188,6 +188,37 @@ $APP (1.0.0, deployed):
   - ./api_typo.yaml: unresolved schema \"Pets\" referenced by provides GET /pets/* 200"
 }
 
+@test "validate api_v4.yaml without participant and environment: valid" {
+  run bidirekt validate ./api_v4.yaml
+  assert_success
+  assert_output --partial "contract is valid; add --participant and --environment to compare it with what is deployed"
+}
+
+@test "validate api_typo.yaml without participant and environment: unresolved schema" {
+  run bidirekt validate ./api_typo.yaml
+  assert_failure 1
+  assert_output --partial "contract validation failed
+  - ./api_typo.yaml: unresolved schema \"Pets\" referenced by provides GET /pets/* 200"
+}
+
+@test "validate with environment only: participant missing" {
+  run bidirekt validate ./api_v4.yaml --environment "$PRODUCTION"
+  assert_failure 1
+  assert_output --partial "if any flags in the group [participant environment] are set they must all be set; missing [participant]"
+}
+
+@test "validate with participant only: environment missing" {
+  run bidirekt validate ./api_v4.yaml --participant "$API"
+  assert_failure 1
+  assert_output --partial "if any flags in the group [participant environment] are set they must all be set; missing [environment]"
+}
+
+@test "validate with empty environment: rejected" {
+  run bidirekt validate ./api_v4.yaml --participant "$API" --environment ""
+  assert_failure 1
+  assert_output --partial "--environment cannot be empty"
+}
+
 @test "validate with nonexistent participant: blocked" {
   run bidirekt validate ./api_v4.yaml --participant "ghost_$RUN" --environment "$PRODUCTION"
   assert_failure 1
