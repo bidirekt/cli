@@ -19,6 +19,7 @@ func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
 		{Code: "service.name_syntax", Path: "consumes;Payments-API", Source: "api.yaml", Details: map[string]string{"key": "Payments-API", "error": "must be snake_case"}},
 		{Code: "property.name_syntax", Path: "schemas;Pet;properties;user.name", Source: "api.yaml", Details: map[string]string{"key": "user.name", "error": `must not contain ".", "[", "]", "{", "}" or ";"`}},
 		{Code: "schema.name_syntax", Path: "schemas;Pet.v2", Source: "api.yaml", Details: map[string]string{"key": "Pet.v2", "error": `must not contain ".", "[", "]", "{", "}" or ";"`}},
+		{Code: "schema.description_syntax", Path: "schemas;Pet;properties;weight;description", Source: "api.yaml", Details: map[string]string{"value": "In kilograms.", "error": "must be ASCII letters and digits, with single spaces between words"}},
 		{Code: "status.out_of_range", Path: "provides;rest;/pets;get;responses;999", Source: "api.yaml", Details: map[string]string{"key": "999", "error": "must be between 100 and 599"}},
 		{Code: "schema.invalid_type", Path: "schemas;Pet;properties;id;type", Source: "api.yaml", Details: map[string]string{"value": "strng", "allowed": allowedTypes}},
 		{Code: "schema.array_without_items", Path: "schemas;Pets", Source: "api.yaml"},
@@ -48,6 +49,7 @@ func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
   - api.yaml: invalid service name "Payments-API" at consumes, must be snake_case
   - api.yaml: invalid property name "user.name" at schemas Pet properties, must not contain ".", "[", "]", "{", "}" or ";"
   - api.yaml: invalid schema name "Pet.v2" at schemas, must not contain ".", "[", "]", "{", "}" or ";"
+  - api.yaml: invalid description "In kilograms." at schemas Pet properties weight, must be ASCII letters and digits, with single spaces between words
   - api.yaml: invalid status code "999" at provides rest /pets get responses, must be between 100 and 599
   - api.yaml: invalid value "strng" for "type" at schemas Pet properties id, expected one of: object, array, map, string, integer, float, number, boolean
   - api.yaml: array schema without items at schemas Pets
@@ -300,6 +302,30 @@ func TestFormatViolationLine(t *testing.T) {
 
 		assert.Equal(t, `invalid schema name "Pet\x00" at schemas`, headline)
 		assert.Equal(t, `must not contain control characters`, explanation)
+	})
+
+	t.Run("schema.description_syntax", func(t *testing.T) {
+		headline, explanation := reports.FormatViolationLine(reports.Violation{
+			Code:    "schema.description_syntax",
+			Path:    "schemas;Pet;properties;weight;description",
+			Source:  "api.yaml",
+			Details: map[string]string{"value": "In kilograms.", "error": "must be ASCII letters and digits, with single spaces between words"},
+		})
+
+		assert.Equal(t, `invalid description "In kilograms." at schemas Pet properties weight`, headline)
+		assert.Equal(t, `must be ASCII letters and digits, with single spaces between words`, explanation)
+	})
+
+	t.Run("schema.description_syntax with an empty description", func(t *testing.T) {
+		headline, explanation := reports.FormatViolationLine(reports.Violation{
+			Code:    "schema.description_syntax",
+			Path:    "schemas;Pet;description",
+			Source:  "api.yaml",
+			Details: map[string]string{"value": "", "error": "must not be empty"},
+		})
+
+		assert.Equal(t, `invalid description "" at schemas Pet`, headline)
+		assert.Equal(t, `must not be empty`, explanation)
 	})
 
 	t.Run("status.out_of_range", func(t *testing.T) {
