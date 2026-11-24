@@ -10,6 +10,7 @@ import (
 	"github.com/bidirekt/cli/internal/components"
 	"github.com/bidirekt/cli/internal/features/can_i_deploy"
 	"github.com/bidirekt/cli/internal/reports"
+	restreports "github.com/bidirekt/cli/internal/reports/protocols/rest"
 	"github.com/jarcoal/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,6 +24,8 @@ func TestCanIDeployCommand(t *testing.T) {
 		environment = "production"
 		endpoint    = brokerURL + "/api/can-i-deploy"
 	)
+
+	restModules := []reports.Module{{Report: restreports.New()}}
 
 	t.Run("deployable verdict posts participant+version+environment, prints deployable, exits 0", func(t *testing.T) {
 		httpClient := components.NewHTTPClient()
@@ -43,6 +46,7 @@ func TestCanIDeployCommand(t *testing.T) {
 
 		command := can_i_deploy.NewCanIDeployCommand(
 			can_i_deploy.NewCanIDeployClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -80,6 +84,7 @@ func TestCanIDeployCommand(t *testing.T) {
 
 		command := can_i_deploy.NewCanIDeployCommand(
 			can_i_deploy.NewCanIDeployClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -138,6 +143,7 @@ func TestCanIDeployCommand(t *testing.T) {
 
 		command := can_i_deploy.NewCanIDeployCommand(
 			can_i_deploy.NewCanIDeployClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -194,6 +200,7 @@ payments (v2, deployed):
 
 		command := can_i_deploy.NewCanIDeployCommand(
 			can_i_deploy.NewCanIDeployClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -244,6 +251,7 @@ payments (v2, deployed):
 
 		command := can_i_deploy.NewCanIDeployCommand(
 			can_i_deploy.NewCanIDeployClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -280,6 +288,163 @@ api:
 		assert.Empty(t, errOut.String())
 	})
 
+	t.Run("deployable verdict reads the same when the counterparts carry no empty endpoints tree", func(t *testing.T) {
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
+		httpmock.ActivateNonDefault(httpClient.StdClient())
+		defer httpmock.DeactivateAndReset()
+
+		responseBody := `{
+		  "message": "contract checked successfully",
+		  "participant": "front",
+		  "version": "v1",
+		  "environment": "production",
+		  "deployable": true,
+		  "results": {
+		    "site": { "deployable": true, "participantVersion": "v4" },
+		    "admin": { "deployable": true, "participantVersion": "v2" }
+		  }
+		}`
+		httpmock.RegisterResponder(http.MethodPost, endpoint,
+			httpmock.NewStringResponder(http.StatusOK, responseBody))
+
+		command := can_i_deploy.NewCanIDeployCommand(
+			can_i_deploy.NewCanIDeployClient(httpClient),
+			restModules,
+		)
+		var out, errOut bytes.Buffer
+		command.SetOut(&out)
+		command.SetErr(&errOut)
+		command.SetArgs([]string{participant, "--version", version, "--environment", environment})
+
+		err := command.Execute()
+
+		require.NoError(t, err)
+		assert.Equal(t, "front v1 can be deployed to production\ncompared with: admin, site\n", out.String())
+		assert.Empty(t, errOut.String())
+	})
+
+	t.Run("not-deployable verdict reads the same when a compatible counterpart carries no empty endpoints tree", func(t *testing.T) {
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
+		httpmock.ActivateNonDefault(httpClient.StdClient())
+		defer httpmock.DeactivateAndReset()
+
+		responseBody := `{
+		  "message": "contract checked successfully",
+		  "participant": "front",
+		  "version": "v1",
+		  "environment": "production",
+		  "deployable": false,
+		  "results": {
+		    "payments": {
+		      "deployable": false,
+		      "participantVersion": "v2",
+		      "endpoints": {
+		        "/payments/*": {
+		          "put": {
+		            "request": [
+		              {
+		                "reason": "property_missing_in_consumer",
+		                "role": "consumer",
+		                "details": { "providerField": "UpdatePaymentRequest.currency", "property": "$.currency", "propertyType": "string", "consumerName": "front", "providerName": "payments" }
+		              }
+		            ]
+		          }
+		        }
+		      }
+		    },
+		    "users": {
+		      "deployable": true,
+		      "participantVersion": "v3"
+		    }
+		  }
+		}`
+		httpmock.RegisterResponder(http.MethodPost, endpoint,
+			httpmock.NewStringResponder(http.StatusOK, responseBody))
+
+		command := can_i_deploy.NewCanIDeployCommand(
+			can_i_deploy.NewCanIDeployClient(httpClient),
+			restModules,
+		)
+		var out, errOut bytes.Buffer
+		command.SetOut(&out)
+		command.SetErr(&errOut)
+		command.SetArgs([]string{participant, "--version", version, "--environment", environment})
+
+		err := command.Execute()
+
+		require.ErrorIs(t, err, reports.ErrSilent)
+		assert.Equal(t, `front v1 cannot be deployed to production
+
+payments (v2, deployed):
+  UpdatePaymentRequest.currency — front doesn't send it, but payments requires it
+    → front: send it
+    → payments: stop requiring it, then mark it optional there
+      · PUT /payments/* request at "$.currency" (payments: UpdatePaymentRequest.currency)
+`, out.String())
+		assert.Empty(t, errOut.String())
+	})
+
+	for _, test := range []struct {
+		name     string
+		modules  []reports.Module
+		protocol string
+		tree     string
+	}{
+		{
+			name:     "an endpoints tree without any module",
+			protocol: "endpoints",
+			tree:     `{ "/payments/*": { "get": { "200": [{ "reason": "provider_resource_not_found", "role": "consumer" }] } } }`,
+		},
+		{
+			name:     "an operations tree beside the REST module",
+			modules:  restModules,
+			protocol: "operations",
+			tree:     `{ "query": { "payment": { "returns": [{ "reason": "provider_resource_not_found", "role": "consumer" }] } } }`,
+		},
+	} {
+		t.Run(test.name+" fails naming the protocol, printing nothing", func(t *testing.T) {
+			httpClient := components.NewHTTPClient()
+			httpClient.UseBroker(brokerURL, "")
+			httpmock.ActivateNonDefault(httpClient.StdClient())
+			defer httpmock.DeactivateAndReset()
+
+			responseBody := `{
+			  "message": "contract checked successfully",
+			  "participant": "front",
+			  "version": "v1",
+			  "environment": "production",
+			  "deployable": false,
+			  "results": {
+			    "payments": {
+			      "deployable": false,
+			      "participantVersion": "v2",
+			      "` + test.protocol + `": ` + test.tree + `
+			    }
+			  }
+			}`
+			httpmock.RegisterResponder(http.MethodPost, endpoint,
+				httpmock.NewStringResponder(http.StatusOK, responseBody))
+
+			command := can_i_deploy.NewCanIDeployCommand(
+				can_i_deploy.NewCanIDeployClient(httpClient),
+				test.modules,
+			)
+			var out, errOut bytes.Buffer
+			command.SetOut(&out)
+			command.SetErr(&errOut)
+			command.SetArgs([]string{participant, "--version", version, "--environment", environment})
+
+			err := command.Execute()
+
+			require.EqualError(t, err, "the broker reported protocol "+test.protocol+", which this bidirekt doesn't know; update bidirekt")
+			assert.NotErrorIs(t, err, reports.ErrSilent)
+			assert.Empty(t, out.String())
+			assert.Empty(t, errOut.String())
+		})
+	}
+
 	t.Run("non-2xx response returns the broker message as the error", func(t *testing.T) {
 		httpClient := components.NewHTTPClient()
 		httpClient.UseBroker(brokerURL, "")
@@ -291,6 +456,7 @@ api:
 
 		command := can_i_deploy.NewCanIDeployCommand(
 			can_i_deploy.NewCanIDeployClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -315,6 +481,7 @@ api:
 
 		command := can_i_deploy.NewCanIDeployCommand(
 			can_i_deploy.NewCanIDeployClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -347,6 +514,7 @@ api:
 
 			command := can_i_deploy.NewCanIDeployCommand(
 				can_i_deploy.NewCanIDeployClient(httpClient),
+				restModules,
 			)
 			var out, errOut bytes.Buffer
 			command.SetOut(&out)

@@ -14,6 +14,7 @@ import (
 	"github.com/bidirekt/cli/internal/components"
 	"github.com/bidirekt/cli/internal/features/publish_contract"
 	"github.com/bidirekt/cli/internal/reports"
+	restreports "github.com/bidirekt/cli/internal/reports/protocols/rest"
 	"github.com/jarcoal/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,6 +27,8 @@ func TestPublishContractCommand(t *testing.T) {
 		version     = "v1"
 		endpoint    = brokerURL + "/api/contracts"
 	)
+
+	restModules := []reports.Module{{Report: restreports.New()}}
 
 	expectedBody := func(t *testing.T, fragments ...[2]string) string {
 		t.Helper()
@@ -68,6 +71,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		command := publish_contract.NewPublishCommand(
 			publish_contract.NewPublishContractClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -114,6 +118,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		command := publish_contract.NewPublishCommand(
 			publish_contract.NewPublishContractClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -146,6 +151,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		command := publish_contract.NewPublishCommand(
 			publish_contract.NewPublishContractClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -171,6 +177,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		command := publish_contract.NewPublishCommand(
 			publish_contract.NewPublishContractClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -200,6 +207,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		command := publish_contract.NewPublishCommand(
 			publish_contract.NewPublishContractClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -227,6 +235,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		command := publish_contract.NewPublishCommand(
 			publish_contract.NewPublishContractClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -257,6 +266,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		command := publish_contract.NewPublishCommand(
 			publish_contract.NewPublishContractClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -286,6 +296,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		command := publish_contract.NewPublishCommand(
 			publish_contract.NewPublishContractClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -315,6 +326,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		command := publish_contract.NewPublishCommand(
 			publish_contract.NewPublishContractClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -344,6 +356,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		command := publish_contract.NewPublishCommand(
 			publish_contract.NewPublishContractClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -370,6 +383,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		command := publish_contract.NewPublishCommand(
 			publish_contract.NewPublishContractClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)

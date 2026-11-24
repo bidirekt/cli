@@ -8,6 +8,7 @@ import (
 	"github.com/bidirekt/cli/internal/components"
 	"github.com/bidirekt/cli/internal/features/can_i_deploy"
 	"github.com/bidirekt/cli/internal/reports"
+	restreports "github.com/bidirekt/cli/internal/reports/protocols/rest"
 	"github.com/jarcoal/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,6 +22,8 @@ func TestCanIDeployCommandRemovedResourceStillConsumed(t *testing.T) {
 		environment = "production"
 		endpoint    = brokerURL + "/api/can-i-deploy"
 	)
+
+	restModules := []reports.Module{{Report: restreports.New()}}
 
 	httpClient := components.NewHTTPClient()
 	httpClient.UseBroker(brokerURL, "")
@@ -54,6 +57,7 @@ func TestCanIDeployCommandRemovedResourceStillConsumed(t *testing.T) {
 
 	command := can_i_deploy.NewCanIDeployCommand(
 		can_i_deploy.NewCanIDeployClient(httpClient),
+		restModules,
 	)
 	var out, errOut bytes.Buffer
 	command.SetOut(&out)

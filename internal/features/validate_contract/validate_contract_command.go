@@ -13,12 +13,17 @@ import (
 
 const requestTimeout = 30 * time.Second
 
-func NewValidateCommand(validateContractClient *ValidateContractClient) *cobra.Command {
+func NewValidateCommand(validateContractClient *ValidateContractClient, modules []reports.Module) *cobra.Command {
+	var extensions []string
+	for _, module := range modules {
+		extensions = append(extensions, module.Extensions...)
+	}
+
 	commandHandler := func(command *cobra.Command, args []string) error {
 		command.SilenceUsage = true
 		command.SilenceErrors = true
 
-		contracts, err := contractfiles.ToContractFiles(args)
+		contracts, err := contractfiles.ToContractFiles(args, extensions)
 		if err != nil {
 			return err
 		}
@@ -44,7 +49,7 @@ func NewValidateCommand(validateContractClient *ValidateContractClient) *cobra.C
 
 		response, err := validateContractClient.ValidateContract(ctx, requestBody)
 		if err != nil {
-			return reports.WriteValidationFailed(command.ErrOrStderr(), err)
+			return reports.WriteValidationFailed(command.ErrOrStderr(), err, modules)
 		}
 
 		if participant == "" {
@@ -55,7 +60,7 @@ func NewValidateCommand(validateContractClient *ValidateContractClient) *cobra.C
 
 		checkedSideLabel := participant + " local contract"
 
-		return reports.WriteVerdict(command.OutOrStdout(), checkedSideLabel, participant, response.Environment, response.Deployable, response.Results)
+		return reports.WriteVerdict(command.OutOrStdout(), checkedSideLabel, participant, response.Environment, response.Deployable, response.Results, modules)
 	}
 
 	command := &cobra.Command{

@@ -12,6 +12,8 @@ import (
 
 	"github.com/bidirekt/cli/internal/components"
 	"github.com/bidirekt/cli/internal/features/validate_contract"
+	"github.com/bidirekt/cli/internal/reports"
+	restreports "github.com/bidirekt/cli/internal/reports/protocols/rest"
 	"github.com/jarcoal/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,6 +26,8 @@ func TestValidateContractFolderCommand(t *testing.T) {
 		environment = "production"
 		endpoint    = brokerURL + "/api/contracts/validate"
 	)
+
+	restModules := []reports.Module{{Report: restreports.New()}}
 
 	t.Run("validates a folder with its subfolders and the files passed beside it as one request, each YAML file once, in path order", func(t *testing.T) {
 		httpClient := components.NewHTTPClient()
@@ -60,6 +64,7 @@ func TestValidateContractFolderCommand(t *testing.T) {
 
 		command := validate_contract.NewValidateCommand(
 			validate_contract.NewValidateContractClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -98,6 +103,7 @@ func TestValidateContractFolderCommand(t *testing.T) {
 
 		command := validate_contract.NewValidateCommand(
 			validate_contract.NewValidateContractClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)

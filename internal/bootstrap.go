@@ -20,6 +20,7 @@ import (
 	"github.com/bidirekt/cli/internal/features/validate_contract"
 	"github.com/bidirekt/cli/internal/paint"
 	"github.com/bidirekt/cli/internal/reports"
+	restreports "github.com/bidirekt/cli/internal/reports/protocols/rest"
 	"github.com/spf13/cobra"
 )
 
@@ -97,12 +98,14 @@ func newRootCommand(dependencies *components.Components) *cobra.Command {
 
 	rootCommand.PersistentFlags().String("profile", "", `Profile in the config file (falls back to BIDIREKT_PROFILE, then "default")`)
 
+	modules := []reports.Module{{Report: restreports.New()}}
+
 	create_participant.Register(rootCommand, dependencies)
 	create_environment.Register(rootCommand, dependencies)
-	publish_contract.Register(rootCommand, dependencies)
+	publish_contract.Register(rootCommand, dependencies, modules)
 	record_deployment.Register(rootCommand, dependencies)
-	can_i_deploy.Register(rootCommand, dependencies)
-	validate_contract.Register(rootCommand, dependencies)
+	can_i_deploy.Register(rootCommand, dependencies, modules)
+	validate_contract.Register(rootCommand, dependencies, modules)
 	list_participants.Register(rootCommand, dependencies)
 	list_environments.Register(rootCommand, dependencies)
 	login.Register(rootCommand, dependencies)

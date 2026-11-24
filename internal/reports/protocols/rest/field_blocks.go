@@ -1,4 +1,4 @@
-package reports
+package rest
 
 import (
 	"cmp"
@@ -6,6 +6,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/bidirekt/cli/internal/reports"
 )
 
 // One block has one header and one set of fixes, so a break's direction and role are part of its block's key too.
@@ -28,7 +30,7 @@ type breakPlace struct {
 	counterpartField                        string
 }
 
-func toFieldBlock(checked checkedInteraction, interaction string, contractBreak ContractBreak) (fieldBlock, bool) {
+func toFieldBlock(checked checkedInteraction, interaction string, contractBreak reports.ContractBreak) (fieldBlock, bool) {
 	checked.isRequest = interaction == "request"
 	property, line, named := formatPropertyBreakLine(checked, contractBreak)
 	if !named {
@@ -139,7 +141,7 @@ type propertyBreakLine struct {
 	checkedFix, otherFix string
 }
 
-func formatPropertyBreakLine(interaction checkedInteraction, contractBreak ContractBreak) (propertyBreak, propertyBreakLine, bool) {
+func formatPropertyBreakLine(interaction checkedInteraction, contractBreak reports.ContractBreak) (propertyBreak, propertyBreakLine, bool) {
 	reason, details := contractBreak.Reason, contractBreak.Details
 	consumerType, providerType := details["consumerPropertyType"], details["providerPropertyType"]
 	asConsumer, asProvider := contractBreak.Role == "consumer", contractBreak.Role == "provider"

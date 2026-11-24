@@ -21,7 +21,7 @@ func TestToContractFiles(t *testing.T) {
 			"contracts/README.md":      "# contracts\n",
 		})
 
-		files, err := contractfiles.ToContractFiles([]string{"contracts"})
+		files, err := contractfiles.ToContractFiles([]string{"contracts"}, nil)
 
 		require.NoError(t, err)
 		assert.Equal(t, []contractfiles.ContractFile{
@@ -35,7 +35,7 @@ func TestToContractFiles(t *testing.T) {
 		t.Chdir(t.TempDir())
 		writeFiles(t, map[string]string{"contracts/rest/pets.yaml": "# pets\n"})
 
-		files, err := contractfiles.ToContractFiles([]string{"./contracts/"})
+		files, err := contractfiles.ToContractFiles([]string{"./contracts/"}, nil)
 
 		require.NoError(t, err)
 		assert.Equal(t, []contractfiles.ContractFile{
@@ -48,7 +48,7 @@ func TestToContractFiles(t *testing.T) {
 		writeFiles(t, map[string]string{"shared/contracts/rest/pets.yaml": "# pets\n"})
 		require.NoError(t, os.Symlink("shared/contracts", "contracts"))
 
-		files, err := contractfiles.ToContractFiles([]string{"contracts"})
+		files, err := contractfiles.ToContractFiles([]string{"contracts"}, nil)
 
 		require.NoError(t, err)
 		assert.Equal(t, []contractfiles.ContractFile{
@@ -64,13 +64,32 @@ func TestToContractFiles(t *testing.T) {
 			"api.yml":             "# api\n",
 		})
 
-		files, err := contractfiles.ToContractFiles([]string{"zoo.yaml", "contracts", "./api.yml"})
+		files, err := contractfiles.ToContractFiles([]string{"zoo.yaml", "contracts", "./api.yml"}, nil)
 
 		require.NoError(t, err)
 		assert.Equal(t, []contractfiles.ContractFile{
 			{Source: "./api.yml", Content: "# api\n"},
 			{Source: "contracts/pets.yaml", Content: "# pets\n"},
 			{Source: "zoo.yaml", Content: "# zoo\n"},
+		}, files)
+	})
+
+	t.Run("the extensions a module adds are read beside the .yaml and .yml files, in a folder or passed directly", func(t *testing.T) {
+		t.Chdir(t.TempDir())
+		writeFiles(t, map[string]string{
+			"contracts/pets.yaml":        "# pets\n",
+			"contracts/topics/pets.csv":  "# pet topics\n",
+			"contracts/topics/notes.txt": "not a contract\n",
+			"orders.CSV":                 "# order topics\n",
+		})
+
+		files, err := contractfiles.ToContractFiles([]string{"contracts", "orders.CSV"}, []string{".csv"})
+
+		require.NoError(t, err)
+		assert.Equal(t, []contractfiles.ContractFile{
+			{Source: "contracts/pets.yaml", Content: "# pets\n"},
+			{Source: "contracts/topics/pets.csv", Content: "# pet topics\n"},
+			{Source: "orders.CSV", Content: "# order topics\n"},
 		}, files)
 	})
 }
@@ -106,7 +125,7 @@ func TestToContractFilesReadsAFileReachedTwiceOnce(t *testing.T) {
 			t.Chdir(t.TempDir())
 			writeFiles(t, map[string]string{"contracts/rest/pets.yaml": "# pets\n"})
 
-			files, err := contractfiles.ToContractFiles(test.paths)
+			files, err := contractfiles.ToContractFiles(test.paths, nil)
 
 			require.NoError(t, err)
 			assert.Equal(t, []contractfiles.ContractFile{
@@ -121,7 +140,7 @@ func TestToContractFilesFails(t *testing.T) {
 		t.Chdir(t.TempDir())
 		require.NoError(t, os.MkdirAll("contracts/rest", 0o700))
 
-		files, err := contractfiles.ToContractFiles([]string{"./contracts"})
+		files, err := contractfiles.ToContractFiles([]string{"./contracts"}, nil)
 
 		require.EqualError(t, err, `no contract YAML files in folder: "./contracts"`)
 		assert.Nil(t, files)
@@ -135,7 +154,7 @@ func TestToContractFilesFails(t *testing.T) {
 			"docs/drafts/pets.json": "{}\n",
 		})
 
-		files, err := contractfiles.ToContractFiles([]string{"contracts", "docs/"})
+		files, err := contractfiles.ToContractFiles([]string{"contracts", "docs/"}, nil)
 
 		require.EqualError(t, err, `no contract YAML files in folder: "docs/"`)
 		assert.Nil(t, files)
@@ -145,7 +164,7 @@ func TestToContractFilesFails(t *testing.T) {
 		t.Chdir(t.TempDir())
 		writeFiles(t, map[string]string{"contracts/spa/pets.yaml": "# pets\n"})
 
-		files, err := contractfiles.ToContractFiles([]string{"contracts/sap"})
+		files, err := contractfiles.ToContractFiles([]string{"contracts/sap"}, nil)
 
 		require.EqualError(t, err, `contract file or folder not found: "contracts/sap"`)
 		assert.Nil(t, files)
@@ -158,7 +177,7 @@ func TestToContractFilesFails(t *testing.T) {
 			"notes.txt":           "not a contract\n",
 		})
 
-		files, err := contractfiles.ToContractFiles([]string{"contracts", "notes.txt"})
+		files, err := contractfiles.ToContractFiles([]string{"contracts", "notes.txt"}, nil)
 
 		require.EqualError(t, err, `unsupported contract file extension: "notes.txt"`)
 		assert.Nil(t, files)
