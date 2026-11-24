@@ -14,6 +14,7 @@ import (
 	"github.com/bidirekt/cli/internal/components"
 	"github.com/bidirekt/cli/internal/features/publish_contract"
 	"github.com/bidirekt/cli/internal/reports"
+	graphqlreports "github.com/bidirekt/cli/internal/reports/protocols/graphql"
 	restreports "github.com/bidirekt/cli/internal/reports/protocols/rest"
 	"github.com/jarcoal/httpmock"
 	"github.com/stretchr/testify/assert"
@@ -134,6 +135,55 @@ func TestPublishContractCommand(t *testing.T) {
 			[2]string{schemas, schemasContent},
 			[2]string{store, storeContent},
 		), string(capturedBody))
+	})
+
+	t.Run("publishes the GraphQL schema files of the GraphQL module beside the YAML files, content verbatim", func(t *testing.T) {
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
+		httpmock.ActivateNonDefault(httpClient.StdClient())
+		defer httpmock.DeactivateAndReset()
+
+		directory := t.TempDir()
+		graphContent := "provides:\n  graphql:\n    graph: petstore_graph\n"
+		schemaContent := "type Query {\n  pet(id: ID!): Pet\n}\n"
+		petContent := "type Pet {\n  name: String!\n}\n"
+
+		graph := filepath.Join(directory, "graph.yaml")
+		schema := filepath.Join(directory, "schema.graphqls")
+		pet := filepath.Join(directory, "pet.graphql")
+		require.NoError(t, os.WriteFile(graph, []byte(graphContent), 0o600))
+		require.NoError(t, os.WriteFile(schema, []byte(schemaContent), 0o600))
+		require.NoError(t, os.WriteFile(pet, []byte(petContent), 0o600))
+
+		var capturedBody []byte
+		httpmock.RegisterResponder(http.MethodPost, endpoint,
+			func(req *http.Request) (*http.Response, error) {
+				body, err := io.ReadAll(req.Body)
+				if err != nil {
+					return nil, err
+				}
+				capturedBody = body
+				return httpmock.NewStringResponse(http.StatusOK, `{"message":"contract publish successful"}`), nil
+			})
+
+		command := publish_contract.NewPublishCommand(
+			publish_contract.NewPublishContractClient(httpClient),
+			[]reports.Module{{Report: restreports.New()}, {Report: graphqlreports.New(), Extensions: []string{".graphql", ".graphqls"}}},
+		)
+		var out, errOut bytes.Buffer
+		command.SetOut(&out)
+		command.SetErr(&errOut)
+		command.SetArgs([]string{directory, "--participant", participant, "--version", version})
+
+		err := command.Execute()
+
+		require.NoError(t, err)
+		assert.JSONEq(t, expectedBody(t,
+			[2]string{graph, graphContent},
+			[2]string{pet, petContent},
+			[2]string{schema, schemaContent},
+		), string(capturedBody))
+		assert.Equal(t, participant+" contract publish successful\n", out.String())
 	})
 
 	t.Run("unsupported extension in the list fails before any request", func(t *testing.T) {

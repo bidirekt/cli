@@ -102,7 +102,7 @@ func folderToContractFilePaths(folder string, extensions []string) ([]string, er
 	}
 
 	if len(filePaths) == 0 {
-		return nil, fmt.Errorf("no contract YAML files in folder: %q", folder)
+		return nil, fmt.Errorf("no contract files (%s) in folder: %q", strings.Join(extensions, ", "), folder)
 	}
 
 	return filePaths, nil

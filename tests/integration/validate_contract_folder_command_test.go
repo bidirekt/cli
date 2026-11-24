@@ -90,7 +90,7 @@ func TestValidateContractFolderCommand(t *testing.T) {
 		assert.Empty(t, errOut.String())
 	})
 
-	t.Run("a folder without YAML files fails naming the folder before any request", func(t *testing.T) {
+	t.Run("a folder without contract files fails naming the folder before any request", func(t *testing.T) {
 		httpClient := components.NewHTTPClient()
 		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
@@ -113,7 +113,7 @@ func TestValidateContractFolderCommand(t *testing.T) {
 		err := command.Execute()
 
 		require.Error(t, err)
-		assert.Equal(t, `no contract YAML files in folder: "`+docs+`"`, err.Error())
+		assert.Equal(t, `no contract files (.yaml, .yml) in folder: "`+docs+`"`, err.Error())
 		assert.Zero(t, httpmock.GetTotalCallCount())
 		assert.Empty(t, out.String())
 		assert.Empty(t, errOut.String())

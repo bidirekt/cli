@@ -13,6 +13,7 @@ import (
 	"github.com/bidirekt/cli/internal/components"
 	"github.com/bidirekt/cli/internal/features/validate_contract"
 	"github.com/bidirekt/cli/internal/reports"
+	graphqlreports "github.com/bidirekt/cli/internal/reports/protocols/graphql"
 	restreports "github.com/bidirekt/cli/internal/reports/protocols/rest"
 	"github.com/jarcoal/httpmock"
 	"github.com/stretchr/testify/assert"
@@ -277,6 +278,38 @@ payments (v2, deployed):
 			assert.Empty(t, errOut)
 		})
 	}
+
+	t.Run("an operations tree beside the GraphQL module prints its breaks, exits silently non-zero", func(t *testing.T) {
+		file := writeContract(t)
+
+		responder := httpmock.NewStringResponder(http.StatusOK, `{
+		  "message": "contract validated successfully",
+		  "participant": "front",
+		  "environment": "production",
+		  "deployable": false,
+		  "results": {
+		    "payments": {
+		      "deployable": false,
+		      "participantVersion": "v2",
+		      "operations": { "query": { "payment": { "returns": [{ "reason": "provider_resource_not_found", "role": "consumer" }] } } }
+		    }
+		  }
+		}`)
+		modules := []reports.Module{{Report: restreports.New()}, {Report: graphqlreports.New(), Extensions: []string{".graphql", ".graphqls"}}}
+
+		out, errOut, err := runValidate(t, modules, responder, file, "--participant", participant, "--environment", environment)
+
+		require.ErrorIs(t, err, reports.ErrSilent)
+		assert.Equal(t, `front local contract cannot be deployed to production
+
+payments (v2, deployed):
+  query payment
+    - front calls query payment, but payments doesn't provide it
+      → front: stop calling it
+      → payments: publish it
+`, out)
+		assert.Empty(t, errOut)
+	})
 
 	t.Run("validation failure prints the violation report on stderr, exits silently non-zero", func(t *testing.T) {
 		file := writeContract(t)

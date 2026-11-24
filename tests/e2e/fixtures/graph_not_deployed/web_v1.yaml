@@ -1,0 +1,24 @@
+consumes:
+  ${GRAPH}:
+    graphql:
+      query:
+        pet:
+          arguments: PetArgs
+          returns: MaybePet
+
+schemas:
+  PetArgs:
+    type: object
+    properties:
+      id:
+        type: string
+
+  MaybePet:
+    ref: Pet
+    nullable: true
+
+  Pet:
+    type: object
+    properties:
+      name:
+        type: string

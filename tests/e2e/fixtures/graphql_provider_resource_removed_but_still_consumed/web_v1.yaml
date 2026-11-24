@@ -1,0 +1,31 @@
+consumes:
+  ${API}:
+    graphql:
+      query:
+        pet:
+          arguments: PetArgs
+          returns: MaybePet
+        pets:
+          returns: PetList
+
+schemas:
+  PetArgs:
+    type: object
+    properties:
+      id:
+        type: string
+
+  MaybePet:
+    ref: Pet
+    nullable: true
+
+  PetList:
+    type: array
+    items:
+      ref: Pet
+
+  Pet:
+    type: object
+    properties:
+      name:
+        type: string

@@ -10,6 +10,7 @@ import (
 	"github.com/bidirekt/cli/internal/components"
 	"github.com/bidirekt/cli/internal/features/can_i_deploy"
 	"github.com/bidirekt/cli/internal/reports"
+	graphqlreports "github.com/bidirekt/cli/internal/reports/protocols/graphql"
 	restreports "github.com/bidirekt/cli/internal/reports/protocols/rest"
 	"github.com/jarcoal/httpmock"
 	"github.com/stretchr/testify/assert"
@@ -444,6 +445,50 @@ payments (v2, deployed):
 			assert.Empty(t, errOut.String())
 		})
 	}
+
+	t.Run("an operations tree beside the GraphQL module prints its breaks, exits silently non-zero", func(t *testing.T) {
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
+		httpmock.ActivateNonDefault(httpClient.StdClient())
+		defer httpmock.DeactivateAndReset()
+
+		httpmock.RegisterResponder(http.MethodPost, endpoint, httpmock.NewStringResponder(http.StatusOK, `{
+		  "message": "contract checked successfully",
+		  "participant": "front",
+		  "version": "v1",
+		  "environment": "production",
+		  "deployable": false,
+		  "results": {
+		    "payments": {
+		      "deployable": false,
+		      "participantVersion": "v2",
+		      "operations": { "query": { "payment": { "returns": [{ "reason": "provider_resource_not_found", "role": "consumer" }] } } }
+		    }
+		  }
+		}`))
+
+		command := can_i_deploy.NewCanIDeployCommand(
+			can_i_deploy.NewCanIDeployClient(httpClient),
+			[]reports.Module{{Report: restreports.New()}, {Report: graphqlreports.New(), Extensions: []string{".graphql", ".graphqls"}}},
+		)
+		var out, errOut bytes.Buffer
+		command.SetOut(&out)
+		command.SetErr(&errOut)
+		command.SetArgs([]string{participant, "--version", version, "--environment", environment})
+
+		err := command.Execute()
+
+		require.ErrorIs(t, err, reports.ErrSilent)
+		assert.Equal(t, `front v1 cannot be deployed to production
+
+payments (v2, deployed):
+  query payment
+    - front calls query payment, but payments doesn't provide it
+      → front: stop calling it
+      → payments: publish it
+`, out.String())
+		assert.Empty(t, errOut.String())
+	})
 
 	t.Run("non-2xx response returns the broker message as the error", func(t *testing.T) {
 		httpClient := components.NewHTTPClient()
