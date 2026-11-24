@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestToContractFragments(t *testing.T) {
+func TestToContractFiles(t *testing.T) {
 	t.Run("a folder is read with its subfolders, only its .yaml and .yml files, in path order", func(t *testing.T) {
 		t.Chdir(t.TempDir())
 		writeFiles(t, map[string]string{
@@ -21,26 +21,26 @@ func TestToContractFragments(t *testing.T) {
 			"contracts/README.md":      "# contracts\n",
 		})
 
-		fragments, err := contractfiles.ToContractFragments([]string{"contracts"})
+		files, err := contractfiles.ToContractFiles([]string{"contracts"})
 
 		require.NoError(t, err)
-		assert.Equal(t, []contractfiles.ContractFragment{
+		assert.Equal(t, []contractfiles.ContractFile{
 			{Source: "contracts/rest/pets.yaml", Content: "# pets\n"},
 			{Source: "contracts/rest/store.yml", Content: "# store\n"},
 			{Source: "contracts/schemas.yaml", Content: "# schemas\n"},
-		}, fragments)
+		}, files)
 	})
 
 	t.Run("a file found in a folder is named by the folder joined with its path inside it", func(t *testing.T) {
 		t.Chdir(t.TempDir())
 		writeFiles(t, map[string]string{"contracts/rest/pets.yaml": "# pets\n"})
 
-		fragments, err := contractfiles.ToContractFragments([]string{"./contracts/"})
+		files, err := contractfiles.ToContractFiles([]string{"./contracts/"})
 
 		require.NoError(t, err)
-		assert.Equal(t, []contractfiles.ContractFragment{
+		assert.Equal(t, []contractfiles.ContractFile{
 			{Source: "contracts/rest/pets.yaml", Content: "# pets\n"},
-		}, fragments)
+		}, files)
 	})
 
 	t.Run("a symlink to a folder is read as that folder, its files named by the link", func(t *testing.T) {
@@ -48,12 +48,12 @@ func TestToContractFragments(t *testing.T) {
 		writeFiles(t, map[string]string{"shared/contracts/rest/pets.yaml": "# pets\n"})
 		require.NoError(t, os.Symlink("shared/contracts", "contracts"))
 
-		fragments, err := contractfiles.ToContractFragments([]string{"contracts"})
+		files, err := contractfiles.ToContractFiles([]string{"contracts"})
 
 		require.NoError(t, err)
-		assert.Equal(t, []contractfiles.ContractFragment{
+		assert.Equal(t, []contractfiles.ContractFile{
 			{Source: "contracts/rest/pets.yaml", Content: "# pets\n"},
-		}, fragments)
+		}, files)
 	})
 
 	t.Run("folders and files mix in path order, a file passed directly named as typed", func(t *testing.T) {
@@ -64,18 +64,18 @@ func TestToContractFragments(t *testing.T) {
 			"api.yml":             "# api\n",
 		})
 
-		fragments, err := contractfiles.ToContractFragments([]string{"zoo.yaml", "contracts", "./api.yml"})
+		files, err := contractfiles.ToContractFiles([]string{"zoo.yaml", "contracts", "./api.yml"})
 
 		require.NoError(t, err)
-		assert.Equal(t, []contractfiles.ContractFragment{
+		assert.Equal(t, []contractfiles.ContractFile{
 			{Source: "./api.yml", Content: "# api\n"},
 			{Source: "contracts/pets.yaml", Content: "# pets\n"},
 			{Source: "zoo.yaml", Content: "# zoo\n"},
-		}, fragments)
+		}, files)
 	})
 }
 
-func TestToContractFragmentsReadsAFileReachedTwiceOnce(t *testing.T) {
+func TestToContractFilesReadsAFileReachedTwiceOnce(t *testing.T) {
 	for _, test := range []struct {
 		name           string
 		paths          []string
@@ -106,25 +106,25 @@ func TestToContractFragmentsReadsAFileReachedTwiceOnce(t *testing.T) {
 			t.Chdir(t.TempDir())
 			writeFiles(t, map[string]string{"contracts/rest/pets.yaml": "# pets\n"})
 
-			fragments, err := contractfiles.ToContractFragments(test.paths)
+			files, err := contractfiles.ToContractFiles(test.paths)
 
 			require.NoError(t, err)
-			assert.Equal(t, []contractfiles.ContractFragment{
+			assert.Equal(t, []contractfiles.ContractFile{
 				{Source: test.expectedSource, Content: "# pets\n"},
-			}, fragments)
+			}, files)
 		})
 	}
 }
 
-func TestToContractFragmentsFails(t *testing.T) {
+func TestToContractFilesFails(t *testing.T) {
 	t.Run("a folder without any file fails naming the folder", func(t *testing.T) {
 		t.Chdir(t.TempDir())
 		require.NoError(t, os.MkdirAll("contracts/rest", 0o700))
 
-		fragments, err := contractfiles.ToContractFragments([]string{"./contracts"})
+		files, err := contractfiles.ToContractFiles([]string{"./contracts"})
 
 		require.EqualError(t, err, `no contract YAML files in folder: "./contracts"`)
-		assert.Nil(t, fragments)
+		assert.Nil(t, files)
 	})
 
 	t.Run("a folder with files of other extensions only fails naming the folder", func(t *testing.T) {
@@ -135,20 +135,20 @@ func TestToContractFragmentsFails(t *testing.T) {
 			"docs/drafts/pets.json": "{}\n",
 		})
 
-		fragments, err := contractfiles.ToContractFragments([]string{"contracts", "docs/"})
+		files, err := contractfiles.ToContractFiles([]string{"contracts", "docs/"})
 
 		require.EqualError(t, err, `no contract YAML files in folder: "docs/"`)
-		assert.Nil(t, fragments)
+		assert.Nil(t, files)
 	})
 
 	t.Run("a folder that does not exist fails naming it", func(t *testing.T) {
 		t.Chdir(t.TempDir())
 		writeFiles(t, map[string]string{"contracts/spa/pets.yaml": "# pets\n"})
 
-		fragments, err := contractfiles.ToContractFragments([]string{"contracts/sap"})
+		files, err := contractfiles.ToContractFiles([]string{"contracts/sap"})
 
 		require.EqualError(t, err, `contract file or folder not found: "contracts/sap"`)
-		assert.Nil(t, fragments)
+		assert.Nil(t, files)
 	})
 
 	t.Run("a file passed directly still needs a .yaml or .yml extension", func(t *testing.T) {
@@ -158,10 +158,10 @@ func TestToContractFragmentsFails(t *testing.T) {
 			"notes.txt":           "not a contract\n",
 		})
 
-		fragments, err := contractfiles.ToContractFragments([]string{"contracts", "notes.txt"})
+		files, err := contractfiles.ToContractFiles([]string{"contracts", "notes.txt"})
 
 		require.EqualError(t, err, `unsupported contract file extension: "notes.txt"`)
-		assert.Nil(t, fragments)
+		assert.Nil(t, files)
 	})
 }
 

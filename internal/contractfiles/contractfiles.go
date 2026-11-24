@@ -12,18 +12,18 @@ import (
 
 var supportedFileExtensions = map[string]bool{".yaml": true, ".yml": true}
 
-type ContractFragment struct {
+type ContractFile struct {
 	Source  string `json:"source"`
 	Content string `json:"content"`
 }
 
-func ToContractFragments(paths []string) ([]ContractFragment, error) {
+func ToContractFiles(paths []string) ([]ContractFile, error) {
 	filePaths, err := toContractFilePaths(paths)
 	if err != nil {
 		return nil, err
 	}
 
-	contracts := make([]ContractFragment, 0, len(filePaths))
+	contracts := make([]ContractFile, 0, len(filePaths))
 
 	for _, filePath := range filePaths {
 		contractFileContent, err := os.ReadFile(filePath)
@@ -31,7 +31,7 @@ func ToContractFragments(paths []string) ([]ContractFragment, error) {
 			return nil, fmt.Errorf("read contract file: %w", err)
 		}
 
-		contracts = append(contracts, ContractFragment{
+		contracts = append(contracts, ContractFile{
 			Source:  filePath,
 			Content: string(contractFileContent),
 		})

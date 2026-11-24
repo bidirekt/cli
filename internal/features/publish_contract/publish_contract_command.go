@@ -19,7 +19,7 @@ func NewPublishCommand(publishContractClient *PublishContractClient) *cobra.Comm
 		command.SilenceUsage = true
 		command.SilenceErrors = true
 
-		contracts, err := contractfiles.ToContractFragments(args)
+		contracts, err := contractfiles.ToContractFiles(args)
 		if err != nil {
 			return err
 		}
