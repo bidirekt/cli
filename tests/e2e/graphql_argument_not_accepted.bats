@@ -77,5 +77,5 @@ $API (v1, deployed):
   PetArgs.owner — $WEB sends it, but $API doesn't accept it
     → $WEB: stop sending it
     → $API: accept it
-      · query pet arguments at \"\$.owner\""
+      · query pet arguments (argument \"owner\")"
 }

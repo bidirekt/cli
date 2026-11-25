@@ -74,10 +74,10 @@ setup() {
   assert_output --partial "$API v2 cannot be deployed to $PRODUCTION
 
 $WEB (v1, deployed):
-  Query:pets:arguments.limit — $API requires it, but $WEB doesn't send it
+  Query.pets(limit:) — $API requires it, but $WEB doesn't send it
     → $API: stop requiring it, then mark it optional
     → $WEB: send it
-      · query pets arguments at \"\$.limit\""
+      · query pets arguments (argument \"limit\")"
 }
 
 @test "publish petstore_api v3 (limit is optional)" {

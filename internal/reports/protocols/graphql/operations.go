@@ -3,7 +3,6 @@ package graphql
 import (
 	"maps"
 	"slices"
-	"strconv"
 
 	"github.com/bidirekt/cli/internal/reports"
 )
@@ -31,11 +30,4 @@ func splitFieldBlocks(checked checkedOperation, interactions map[string][]report
 		}
 	}
 	return blocks, remaining
-}
-
-func propertyPathPhrase(path string) string {
-	if path == "$" {
-		return "the body"
-	}
-	return strconv.Quote(path)
 }

@@ -10,13 +10,14 @@ import (
 	"github.com/bidirekt/cli/internal/reports"
 )
 
-// One block has one header and one set of fixes, so a break's direction and role are part of its block's key too.
+// One block has one header and one set of fixes, so a break's direction, role and graph are part of its block's key too.
 type fieldBlockKey struct {
 	field                                    string
 	reason                                   string
 	consumerType, providerType, propertyType string
 	member                                   string
 	direction, role                          string
+	graph                                    string
 	propertyBreakLine
 }
 
@@ -47,7 +48,7 @@ func toFieldBlock(checked checkedOperation, interaction string, contractBreak re
 
 	return fieldBlock{
 		fieldBlockKey: fieldBlockKey{
-			field:             cmp.Or(checkedField, otherField, propertyPathPhrase(property.path)),
+			field:             cmp.Or(checkedField, otherField, strconv.Quote(property.path)),
 			reason:            contractBreak.Reason,
 			consumerType:      details["consumerPropertyType"],
 			providerType:      details["providerPropertyType"],
@@ -55,6 +56,7 @@ func toFieldBlock(checked checkedOperation, interaction string, contractBreak re
 			member:            details["member"],
 			direction:         direction,
 			role:              contractBreak.Role,
+			graph:             details["graph"],
 			propertyBreakLine: line,
 		},
 		places: []breakPlace{{
@@ -102,6 +104,7 @@ func compareFieldBlockKeys(a, b fieldBlockKey) int {
 		strings.Compare(a.member, b.member),
 		strings.Compare(a.direction, b.direction),
 		strings.Compare(a.role, b.role),
+		strings.Compare(a.graph, b.graph),
 	)
 }
 
@@ -129,7 +132,11 @@ func writeFieldBlock(report *strings.Builder, counterpart string, block fieldBlo
 	fmt.Fprintf(report, "    → %s\n    → %s\n", block.checkedFix, otherFix)
 
 	for _, place := range block.places {
-		fmt.Fprintf(report, "      · %s %s at %s", place.operation, place.interaction, propertyPathPhrase(place.property))
+		fmt.Fprintf(report, "      · %s %s", place.operation, place.interaction)
+		// The broker places every break of the arguments at "$" and names the argument.
+		if place.interaction != "arguments" {
+			fmt.Fprintf(report, " at %q", place.property)
+		}
 		if place.argument != "" {
 			fmt.Fprintf(report, " (argument %q)", place.argument)
 		}

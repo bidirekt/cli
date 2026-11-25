@@ -74,8 +74,8 @@ setup() {
   assert_output --partial "$API v2 cannot be deployed to $PRODUCTION
 
 $WEB (v1, deployed):
-  Query:pets:arguments.status — $API doesn't accept null, but $WEB may send it
+  Query.pets(status:) — $API doesn't accept null, but $WEB may send it
     → $API: handle null in the code, then mark it nullable
     → $WEB: stop sending null there
-      · query pets arguments at \"\$.status\" ($WEB: PetsArgs.status)"
+      · query pets arguments (argument \"status\") ($WEB: PetsArgs.status)"
 }

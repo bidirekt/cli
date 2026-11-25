@@ -530,6 +530,46 @@ func TestFormatViolationLine(t *testing.T) {
 		assert.Empty(t, explanation)
 	})
 
+	t.Run("resource.type_conflict between arguments", func(t *testing.T) {
+		headline, explanation := reports.FormatViolationLine(reports.Violation{
+			Code:   "resource.type_conflict",
+			Path:   "consumes;petstore_api;graphql;query;pet;returns",
+			Source: "pets.yaml",
+			Details: map[string]string{
+				"resource":          "consumes petstore_api query pet",
+				"property":          "$.reviews",
+				"type":              "array",
+				"arguments":         "ReviewsArgs",
+				"declaredIn":        "other.yaml",
+				"declaredType":      "array",
+				"declaredArguments": "FirstReviewsArgs",
+			},
+		}, nil)
+
+		assert.Equal(t, `conflicting arguments for property "$.reviews" of consumes petstore_api query pet: ReviewsArgs here, FirstReviewsArgs in other.yaml`, headline)
+		assert.Empty(t, explanation)
+	})
+
+	t.Run("resource.type_conflict between arguments and none", func(t *testing.T) {
+		headline, explanation := reports.FormatViolationLine(reports.Violation{
+			Code:   "resource.type_conflict",
+			Path:   "consumes;petstore_api;graphql;query;pet;returns",
+			Source: "pets.yaml",
+			Details: map[string]string{
+				"resource":          "consumes petstore_api query pet",
+				"property":          "$.reviews",
+				"type":              "array",
+				"arguments":         "ReviewsArgs",
+				"declaredIn":        "other.yaml",
+				"declaredType":      "array",
+				"declaredArguments": "",
+			},
+		}, nil)
+
+		assert.Equal(t, `conflicting arguments for property "$.reviews" of consumes petstore_api query pet: ReviewsArgs here, none in other.yaml`, headline)
+		assert.Empty(t, explanation)
+	})
+
 	t.Run("members.required on an enum", func(t *testing.T) {
 		headline, explanation := reports.FormatViolationLine(reports.Violation{
 			Code:    "members.required",

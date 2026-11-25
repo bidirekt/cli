@@ -43,7 +43,7 @@ func brokenApiOperations(t *testing.T) map[string]json.RawMessage {
 			"pet": {
 				"arguments": {
 					{Reason: "property_missing_in_provider", Role: "consumer", Details: map[string]string{
-						"consumerField": "PetArgs.owner", "property": "$.owner", "propertyType": "string",
+						"consumerField": "PetArgs.owner", "property": "$", "argument": "owner", "propertyType": "string",
 						"consumerName": "petstore_web", "providerName": "petstore_api",
 					}},
 				},
@@ -66,7 +66,7 @@ const brokenApiReport = `petstore_api (1.4.0, deployed):
   PetArgs.owner — petstore_web sends it, but petstore_api doesn't accept it
     → petstore_web: stop sending it
     → petstore_api: accept it
-      · query pet arguments at "$.owner"
+      · query pet arguments (argument "owner")
   ReviewsArgs.first — petstore_web sends it, but petstore_api doesn't accept it
     → petstore_web: stop sending it
     → petstore_api: accept it
@@ -145,6 +145,58 @@ petstore_web (3.0.0, deployed):
     → petstore_reviews: provide it as string
     → petstore_web: read it as integer there
       · query pet returns at "$.age" (petstore_web: Pet.age)
+`, report)
+}
+
+func TestFormatNotDeployableReportWritesOneFieldBlockForTheDirectBreaksAndOneForTheBreaksViaTheGraph(t *testing.T) {
+	results := map[string]reports.CanIDeployResult{
+		"petstore_web": {
+			ParticipantVersion: versionOf("3.0.0"),
+			Trees: operationsTree(t, operations{
+				"query": {
+					"pet": {
+						"returns": {
+							{Reason: "property_type_mismatch", Role: "provider", Details: map[string]string{
+								"consumerField": "Pet.age", "providerField": "Pet.age", "property": "$.age", "graph": "petstore_graph",
+								"consumerPropertyType": "string", "providerPropertyType": "integer",
+								"consumerName": "petstore_web", "providerName": "petstore_graph",
+							}},
+							{Reason: "property_type_mismatch", Role: "provider", Details: map[string]string{
+								"consumerField": "Pet.age", "providerField": "Pet.age", "property": "$.age",
+								"consumerPropertyType": "string", "providerPropertyType": "integer",
+								"consumerName": "petstore_web", "providerName": "petstore_reviews",
+							}},
+						},
+					},
+					"pets": {
+						"returns": {
+							{Reason: "property_type_mismatch", Role: "provider", Details: map[string]string{
+								"consumerField": "Pet.age", "providerField": "Pet.age", "property": "$[].age", "graph": "petstore_graph",
+								"consumerPropertyType": "string", "providerPropertyType": "integer",
+								"consumerName": "petstore_web", "providerName": "petstore_graph",
+							}},
+						},
+					},
+				},
+			}),
+		},
+	}
+
+	report, err := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_reviews 2.1.0", "petstore_reviews", "production", results, graphqlModules)
+
+	require.NoError(t, err)
+	assert.Equal(t, `petstore_reviews 2.1.0 cannot be deployed to production
+
+petstore_web (3.0.0, deployed):
+  Pet.age — petstore_reviews provides it as integer, but petstore_web reads string
+    → petstore_reviews: provide it as string
+    → petstore_web: read it as integer there
+      · query pet returns at "$.age" (petstore_web: Pet.age)
+  Pet.age — petstore_reviews (via petstore_graph) provides it as integer, but petstore_web reads string (2 places)
+    → petstore_reviews: provide it as string
+    → petstore_web: read it as integer there
+      · query pet returns at "$.age" (petstore_web: Pet.age)
+      · query pets returns at "$[].age" (petstore_web: Pet.age)
 `, report)
 }
 
@@ -238,7 +290,7 @@ func TestFormatNotDeployableReportWritesTheBreaksOfTheCheckedGraphQLProvider(t *
 					"pet": {
 						"arguments": {
 							{Reason: "property_missing_in_provider", Role: "provider", Details: map[string]string{
-								"consumerField": "PetArgs.owner", "property": "$.owner", "propertyType": "string",
+								"consumerField": "PetArgs.owner", "property": "$", "argument": "owner", "propertyType": "string",
 								"consumerName": "petstore_web", "providerName": "petstore_api",
 							}},
 						},
@@ -275,7 +327,7 @@ petstore_web (3.0.0, deployed):
   PetArgs.owner — petstore_api doesn't accept it, but petstore_web sends it
     → petstore_api: accept it
     → petstore_web: stop sending it there
-      · query pet arguments at "$.owner" (petstore_web: PetArgs.owner)
+      · query pet arguments (argument "owner") (petstore_web: PetArgs.owner)
   ReviewsArgs.filter — petstore_api doesn't accept it, but petstore_web sends it
     → petstore_api: accept it
     → petstore_web: stop sending it there
@@ -283,16 +335,16 @@ petstore_web (3.0.0, deployed):
 `, report)
 }
 
-func TestFormatNotDeployableReportAsksTheConsumerToSendANewRequiredArgumentOfANestedField(t *testing.T) {
+func TestFormatNotDeployableReportNamesANewRequiredArgumentOfARootFieldByItsCoordinate(t *testing.T) {
 	results := map[string]reports.CanIDeployResult{
 		"petstore_api": {
 			ParticipantVersion: versionOf("1.5.0"),
 			Trees: operationsTree(t, operations{
 				"query": {
 					"pet": {
-						"returns": {
+						"arguments": {
 							{Reason: "property_missing_in_consumer", Role: "consumer", Details: map[string]string{
-								"providerField": "Pet:reviews:arguments.first", "property": "$.reviews", "argument": "first", "propertyType": "integer",
+								"providerField": "Query.pet(id:)", "property": "$", "argument": "id", "propertyType": "string",
 								"consumerName": "petstore_web", "providerName": "petstore_api",
 							}},
 						},
@@ -308,10 +360,74 @@ func TestFormatNotDeployableReportAsksTheConsumerToSendANewRequiredArgumentOfANe
 	assert.Equal(t, `petstore_web 3.0.0 cannot be deployed to production
 
 petstore_api (1.5.0, deployed):
-  Pet:reviews:arguments.first — petstore_web doesn't send it, but petstore_api requires it
+  Query.pet(id:) — petstore_web doesn't send it, but petstore_api requires it
     → petstore_web: send it
     → petstore_api: stop requiring it, then mark it optional there
-      · query pet returns at "$.reviews" (argument "first") (petstore_api: Pet:reviews:arguments.first)
+      · query pet arguments (argument "id") (petstore_api: Query.pet(id:))
+`, report)
+}
+
+func TestFormatNotDeployableReportNamesANewRequiredArgumentOfANestedFieldByItsCoordinate(t *testing.T) {
+	results := map[string]reports.CanIDeployResult{
+		"petstore_api": {
+			ParticipantVersion: versionOf("1.5.0"),
+			Trees: operationsTree(t, operations{
+				"query": {
+					"pet": {
+						"returns": {
+							{Reason: "property_missing_in_consumer", Role: "consumer", Details: map[string]string{
+								"providerField": "Pet.reviews(first:)", "property": "$.reviews", "argument": "first", "propertyType": "integer",
+								"consumerName": "petstore_web", "providerName": "petstore_api",
+							}},
+						},
+					},
+				},
+			}),
+		},
+	}
+
+	report, err := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 3.0.0", "petstore_web", "production", results, graphqlModules)
+
+	require.NoError(t, err)
+	assert.Equal(t, `petstore_web 3.0.0 cannot be deployed to production
+
+petstore_api (1.5.0, deployed):
+  Pet.reviews(first:) — petstore_web doesn't send it, but petstore_api requires it
+    → petstore_web: send it
+    → petstore_api: stop requiring it, then mark it optional there
+      · query pet returns at "$.reviews" (argument "first") (petstore_api: Pet.reviews(first:))
+`, report)
+}
+
+func TestFormatNotDeployableReportPlacesABreakAtTheTopOfReturnsAtTheRootPath(t *testing.T) {
+	results := map[string]reports.CanIDeployResult{
+		"petstore_api": {
+			ParticipantVersion: versionOf("1.5.0"),
+			Trees: operationsTree(t, operations{
+				"query": {
+					"pet": {
+						"returns": {
+							{Reason: "property_nullable_in_provider_not_nullable_in_consumer", Role: "consumer", Details: map[string]string{
+								"consumerField": "Pet", "providerField": "Query:pet:returns", "property": "$", "propertyType": "object",
+								"consumerName": "petstore_web", "providerName": "petstore_api",
+							}},
+						},
+					},
+				},
+			}),
+		},
+	}
+
+	report, err := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 3.0.0", "petstore_web", "production", results, graphqlModules)
+
+	require.NoError(t, err)
+	assert.Equal(t, `petstore_web 3.0.0 cannot be deployed to production
+
+petstore_api (1.5.0, deployed):
+  Pet — petstore_web doesn't accept null, but petstore_api may provide null
+    → petstore_web: handle null in the code, then mark it nullable
+    → petstore_api: stop providing null there
+      · query pet returns at "$" (petstore_api: Query:pet:returns)
 `, report)
 }
 

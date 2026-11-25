@@ -91,7 +91,7 @@ $API (v1, deployed):
   assert_output --partial "$API v2 cannot be deployed to $PRODUCTION
 
 $WEB (v1, deployed):
-  Pet:reviews:arguments.first — $API requires it, but $WEB doesn't send it
+  Pet.reviews(first:) — $API requires it, but $WEB doesn't send it
     → $API: stop requiring it, then mark it optional
     → $WEB: send it
       · query pet returns at \"\$.reviews\" (argument \"first\")"

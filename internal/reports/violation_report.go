@@ -1,6 +1,7 @@
 package reports
 
 import (
+	"cmp"
 	"fmt"
 	"slices"
 	"sort"
@@ -97,6 +98,10 @@ func FormatViolationLine(violation Violation, modules []Module) (headline, expla
 		if details["values"] != "" {
 			return fmt.Sprintf("conflicting values for property %q of %s: [%s] here, [%s] in %s",
 				details["property"], details["resource"], details["values"], details["declaredValues"], details["declaredIn"]), ""
+		}
+		if details["arguments"] != "" || details["declaredArguments"] != "" {
+			return fmt.Sprintf("conflicting arguments for property %q of %s: %s here, %s in %s",
+				details["property"], details["resource"], cmp.Or(details["arguments"], "none"), cmp.Or(details["declaredArguments"], "none"), details["declaredIn"]), ""
 		}
 		return fmt.Sprintf("conflicting type for property %q of %s: %s here, %s in %s",
 			details["property"], details["resource"], details["type"], details["declaredType"], details["declaredIn"]), ""
