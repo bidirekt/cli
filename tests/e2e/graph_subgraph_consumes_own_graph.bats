@@ -75,7 +75,7 @@ setup() {
   assert_failure
   assert_output --partial "$API v2 cannot be deployed to $PRODUCTION
 
-$GRAPH ($API v2 + $REVIEWS v1, deployed):
+$GRAPH ($API v2 candidate + $REVIEWS v1, deployed):
   query pet
     - $API calls query pet, but $GRAPH can't be built in $PRODUCTION: $API v2 and $REVIEWS v1 both resolve Pet.reviews without @shareable
       → $GRAPH subgraphs: make it compose (see /graphs/$GRAPH)"

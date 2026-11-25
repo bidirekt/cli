@@ -78,7 +78,7 @@ func FormatNotDeployableReport(brush paint.Brush, checkedSideLabel, participant,
 	for _, name := range counterparts {
 		result := results[name]
 
-		report.WriteString("\n" + counterpartHeader(name, result) + ":\n")
+		report.WriteString("\n" + counterpartHeader(name, participant, result) + ":\n")
 
 		counterpart := Counterpart{Name: name, CheckedParticipant: participant, Environment: environment}
 		if err := writeTrees(&report, counterpart, result.Trees, modules); err != nil {
@@ -98,11 +98,11 @@ func sortedKeys[V any](m map[string]V) []string {
 	return keys
 }
 
-func counterpartHeader(name string, result CanIDeployResult) string {
+func counterpartHeader(name, checkedParticipant string, result CanIDeployResult) string {
 	if len(result.Members) > 0 {
 		members := make([]string, 0, len(result.Members))
 		for _, member := range sortedKeys(result.Members) {
-			members = append(members, member+" "+result.Members[member])
+			members = append(members, memberLabel(member, result.Members[member], checkedParticipant))
 		}
 		return fmt.Sprintf("%s (%s, deployed)", name, strings.Join(members, " + "))
 	}
@@ -112,6 +112,17 @@ func counterpartHeader(name string, result CanIDeployResult) string {
 	}
 
 	return name
+}
+
+// The broker sends "candidate" in place of the version of a candidate that has none, the one validate checks.
+const candidateLabel = "candidate"
+
+func memberLabel(member, version, checkedParticipant string) string {
+	if member != checkedParticipant || version == candidateLabel {
+		return member + " " + version
+	}
+
+	return member + " " + version + " " + candidateLabel
 }
 
 func writeTrees(report *strings.Builder, counterpart Counterpart, trees map[string]json.RawMessage, modules []Module) error {

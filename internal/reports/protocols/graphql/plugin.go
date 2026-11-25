@@ -25,7 +25,7 @@ func (this Plugin) ReportKey() string {
 }
 
 func (this Plugin) SchemaKeys() map[string][]string {
-	return map[string][]string{"name": {`"type: scalar"`}}
+	return map[string][]string{"name": {`"type: scalar" (GraphQL contracts only)`}}
 }
 
 func (this Plugin) WriteTree(report *strings.Builder, counterpart reports.Counterpart, tree json.RawMessage) error {

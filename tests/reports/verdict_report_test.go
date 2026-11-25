@@ -122,6 +122,52 @@ petstore_graph (petstore_api 1.4.0 + petstore_orders 1.0.0 + petstore_reviews 2.
 `, report)
 }
 
+func TestFormatNotDeployableReportMarksTheMemberThatIsTheCheckedParticipantAsTheCandidate(t *testing.T) {
+	results := map[string]reports.CanIDeployResult{
+		"petstore_graph": {
+			Deployable: false,
+			Members:    map[string]string{"petstore_reviews": "v1", "petstore_api": "v2"},
+			Trees: map[string]json.RawMessage{
+				"topics": json.RawMessage(`{"pet_events":[{"reason":"topic_not_found","role":"consumer"}]}`),
+			},
+		},
+	}
+
+	report, err := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_api v2", "petstore_api", "production", results, []reports.Module{
+		{Report: echoProtocol{reportKey: "topics"}},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, `petstore_api v2 cannot be deployed to production
+
+petstore_graph (petstore_api v2 candidate + petstore_reviews v1, deployed):
+  topics of petstore_graph, checked for petstore_api in production: {"pet_events":[{"reason":"topic_not_found","role":"consumer"}]}
+`, report)
+}
+
+func TestFormatNotDeployableReportMarksACandidateWithoutAVersionOnce(t *testing.T) {
+	results := map[string]reports.CanIDeployResult{
+		"petstore_graph": {
+			Deployable: false,
+			Members:    map[string]string{"petstore_reviews": "v1", "petstore_api": "candidate"},
+			Trees: map[string]json.RawMessage{
+				"topics": json.RawMessage(`{"pet_events":[{"reason":"topic_not_found","role":"consumer"}]}`),
+			},
+		},
+	}
+
+	report, err := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_api local contract", "petstore_api", "production", results, []reports.Module{
+		{Report: echoProtocol{reportKey: "topics"}},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, `petstore_api local contract cannot be deployed to production
+
+petstore_graph (petstore_api candidate + petstore_reviews v1, deployed):
+  topics of petstore_graph, checked for petstore_api in production: {"pet_events":[{"reason":"topic_not_found","role":"consumer"}]}
+`, report)
+}
+
 func TestFormatNotDeployableReportWritesTheTreesOfACounterpartInReportKeyOrder(t *testing.T) {
 	results := map[string]reports.CanIDeployResult{
 		"petstore_api": {

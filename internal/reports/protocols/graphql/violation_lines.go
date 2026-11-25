@@ -16,6 +16,15 @@ func (this Plugin) ViolationLine(violation reports.Violation) (headline, explana
 		return `type "scalar" is only allowed in GraphQL contracts` + reports.At(reports.Location(violation.Path, "type")), "", true
 	case "schema.arguments_not_allowed":
 		return `"arguments" is only allowed in GraphQL contracts` + reports.At(reports.Location(violation.Path, "arguments")), "", true
+	case "schema.arguments_not_object":
+		argumentsAt := reports.At(reports.Location(violation.Path, "arguments"))
+		switch details["reason"] {
+		case "not_object":
+			return fmt.Sprintf(`"arguments" must name an object schema%s: %s is %s`, argumentsAt, details["schema"], details["type"]), "", true
+		case "nullable":
+			return fmt.Sprintf(`"arguments" must name a non-nullable schema%s: %s is nullable`, argumentsAt, details["schema"]), "", true
+		}
+		return "", "", false
 	case "schema.scalar_without_name":
 		return "scalar schema without name" + pathAt, "", true
 	case "returns.required":
@@ -34,6 +43,8 @@ func (this Plugin) ViolationLine(violation reports.Violation) (headline, explana
 	case "operation.name_syntax":
 		return fmt.Sprintf("invalid GraphQL field name %q%s", details["name"], reports.At(reports.Location(violation.Path, details["name"]))),
 			`write the field name only; arguments go in "arguments"`, true
+	case "schema.root_name_taken":
+		return fmt.Sprintf(`type %q in %s takes the name of the %s root, which is %q: rename the type`, details["type"], violation.Source, details["operation"], details["root"]), "", true
 	default:
 		return "", "", false
 	}

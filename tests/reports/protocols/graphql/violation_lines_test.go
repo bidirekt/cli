@@ -46,6 +46,36 @@ func TestFormatViolationLine(t *testing.T) {
 			headline: `"arguments" is only allowed in GraphQL contracts at schemas Pet properties reviews`,
 		},
 		{
+			name: "schema.arguments_not_object of a consumed field naming a string",
+			violation: reports.Violation{Code: "schema.arguments_not_object", Path: "consumes;petstore_api;graphql;query;pet;arguments", Source: "petstore_web.yaml",
+				Details: map[string]string{"schema": "PetId", "reason": "not_object", "type": "string"}},
+			headline: `"arguments" must name an object schema at consumes petstore_api graphql query pet: PetId is string`,
+		},
+		{
+			name: "schema.arguments_not_object of a consumed field naming a nullable object",
+			violation: reports.Violation{Code: "schema.arguments_not_object", Path: "consumes;petstore_api;graphql;query;pet;arguments", Source: "petstore_web.yaml",
+				Details: map[string]string{"schema": "MaybeArgs", "reason": "nullable"}},
+			headline: `"arguments" must name a non-nullable schema at consumes petstore_api graphql query pet: MaybeArgs is nullable`,
+		},
+		{
+			name: "schema.arguments_not_object of a property naming an integer",
+			violation: reports.Violation{Code: "schema.arguments_not_object", Path: "schemas;MaybePet;properties;reviews;arguments", Source: "petstore_web.yaml",
+				Details: map[string]string{"schema": "First", "reason": "not_object", "type": "integer"}},
+			headline: `"arguments" must name an object schema at schemas MaybePet properties reviews: First is integer`,
+		},
+		{
+			name: "schema.arguments_not_object of a property naming a nullable object",
+			violation: reports.Violation{Code: "schema.arguments_not_object", Path: "schemas;MaybePet;properties;reviews;arguments", Source: "petstore_web.yaml",
+				Details: map[string]string{"schema": "ReviewsArgs", "reason": "nullable"}},
+			headline: `"arguments" must name a non-nullable schema at schemas MaybePet properties reviews: ReviewsArgs is nullable`,
+		},
+		{
+			name: "schema.arguments_not_object with a reason this bidirekt doesn't know falls back to the code with its sorted details",
+			violation: reports.Violation{Code: "schema.arguments_not_object", Path: "consumes;petstore_api;graphql;query;pet;arguments", Source: "petstore_web.yaml",
+				Details: map[string]string{"schema": "PetId", "reason": "something_new"}},
+			headline: `schema.arguments_not_object at consumes petstore_api graphql query pet arguments (reason: something_new, schema: PetId)`,
+		},
+		{
 			name: "schema.scalar_without_name",
 			violation: reports.Violation{Code: "schema.scalar_without_name", Path: "schemas;Pet;properties;bornAt", Source: "contracts/web.yaml",
 				Details: map[string]string{}},
@@ -99,11 +129,23 @@ func TestFormatViolationLine(t *testing.T) {
 			explanation: `write the field name only; arguments go in "arguments"`,
 		},
 		{
+			name: "schema.root_name_taken by a type named Query",
+			violation: reports.Violation{Code: "schema.root_name_taken", Path: "", Source: "schema.graphqls",
+				Details: map[string]string{"operation": "query", "root": "RootQuery", "type": "Query"}},
+			headline: `type "Query" in schema.graphqls takes the name of the query root, which is "RootQuery": rename the type`,
+		},
+		{
+			name: "schema.root_name_taken by a type named Mutation",
+			violation: reports.Violation{Code: "schema.root_name_taken", Path: "", Source: "schema.graphqls",
+				Details: map[string]string{"operation": "mutation", "root": "RootMutation", "type": "Mutation"}},
+			headline: `type "Mutation" in schema.graphqls takes the name of the mutation root, which is "RootMutation": rename the type`,
+		},
+		{
 			name: "schema.key_not_allowed with name on an object schema points to the scalar type",
 			violation: reports.Violation{Code: "schema.key_not_allowed", Path: "schemas;Pet;properties;bornAt", Source: "contracts/web.yaml",
 				Details: map[string]string{"key": "name", "type": "object"}},
 			headline:    `"name" is not allowed on an object schema at schemas Pet properties bornAt`,
-			explanation: `use it with "type: scalar"`,
+			explanation: `use it with "type: scalar" (GraphQL contracts only)`,
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
