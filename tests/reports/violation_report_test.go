@@ -10,7 +10,31 @@ import (
 	"github.com/bidirekt/cli/internal/paint"
 	"github.com/bidirekt/cli/internal/reports"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestViolationDecodesTheTextAndTheListDetailsTheBrokerSendsTogether(t *testing.T) {
+	var violation reports.Violation
+
+	err := json.Unmarshal([]byte(`{"code": "something.new", "path": "schemas;A", "source": "api.yaml", "details": {"hint": "x", "schemas": ["A", "B"]}}`), &violation)
+
+	require.NoError(t, err)
+	assert.Equal(t, reports.Violation{
+		Code:        "something.new",
+		Path:        "schemas;A",
+		Source:      "api.yaml",
+		Details:     map[string]string{"hint": "x"},
+		ListDetails: map[string][]string{"schemas": {"A", "B"}},
+	}, violation)
+}
+
+func TestViolationFailsOnADetailThatIsNeitherTextNorAListOfText(t *testing.T) {
+	var violation reports.Violation
+
+	err := json.Unmarshal([]byte(`{"code": "something.new", "details": {"count": 2}}`), &violation)
+
+	require.EqualError(t, err, `violation detail "count" is neither text nor a list of text: 2`)
+}
 
 func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
 	const allowedTypes = "object, array, map, string, integer, float, number, boolean"
@@ -34,6 +58,7 @@ func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
 		{Code: "schema.duplicate", Path: "schemas;Pet", Source: "schemas.yaml", Details: map[string]string{"schema": "Pet", "declaredIn": "billing.yaml"}},
 		{Code: "schema.unresolved_name", Path: "provides;rest;/pets;get;responses;200", Source: "pets.yaml", Details: map[string]string{"schema": "Pets", "resource": "provides GET /pets 200"}},
 		{Code: "schema.unresolved_ref", Path: "schemas;Invoice;properties;payment", Source: "billing.yaml", Details: map[string]string{"schema": "Payment", "property": "Invoice.payment"}},
+		{Code: "schema.ref_cycle", Path: "schemas;A", Source: "api.yaml", ListDetails: map[string][]string{"schemas": {"A", "B"}}},
 		{Code: "members.required", Path: "schemas;Pet;properties;status", Source: "api.yaml", Details: map[string]string{"type": "enum"}},
 		{Code: "members.empty", Path: "schemas;Order;properties;payment;members", Source: "api.yaml", Details: map[string]string{"type": "union"}},
 		{Code: "members.duplicate", Path: "schemas;Pet;properties;status;members;2", Source: "api.yaml", Details: map[string]string{"value": "sold"}},
@@ -62,6 +87,7 @@ func TestFormatValidationFailedReportRendersEveryCode(t *testing.T) {
   - schemas.yaml: duplicate schema "Pet", also declared in billing.yaml
   - pets.yaml: unresolved schema "Pets" referenced by provides GET /pets 200
   - billing.yaml: unresolved ref "Payment" in Invoice.payment
+  - api.yaml: schema "A" only refers to itself through ref (A → B → A): give one of them a type
   - api.yaml: "type: enum" needs "members" at schemas Pet properties status: list its values
   - api.yaml: "members" is empty at schemas Order properties payment: list at least one member
   - api.yaml: value "sold" is repeated in "members" at schemas Pet properties status
@@ -725,6 +751,53 @@ func TestFormatViolationLine(t *testing.T) {
 		assert.Empty(t, explanation)
 	})
 
+	t.Run("schema.ref_cycle closes the cycle at its first schema", func(t *testing.T) {
+		headline, explanation := reports.FormatViolationLine(reports.Violation{
+			Code:        "schema.ref_cycle",
+			Path:        "schemas;A",
+			Source:      "api.yaml",
+			ListDetails: map[string][]string{"schemas": {"A", "B"}},
+		}, nil)
+
+		assert.Equal(t, `schema "A" only refers to itself through ref (A → B → A): give one of them a type`, headline)
+		assert.Empty(t, explanation)
+	})
+
+	t.Run("schema.ref_cycle follows the refs in the order the broker sends them", func(t *testing.T) {
+		headline, explanation := reports.FormatViolationLine(reports.Violation{
+			Code:        "schema.ref_cycle",
+			Path:        "schemas;A",
+			Source:      "api.yaml",
+			ListDetails: map[string][]string{"schemas": {"A", "C", "B"}},
+		}, nil)
+
+		assert.Equal(t, `schema "A" only refers to itself through ref (A → C → B → A): give one of them a type`, headline)
+		assert.Empty(t, explanation)
+	})
+
+	t.Run("schema.ref_cycle of a schema that refs itself", func(t *testing.T) {
+		headline, explanation := reports.FormatViolationLine(reports.Violation{
+			Code:        "schema.ref_cycle",
+			Path:        "schemas;Loop",
+			Source:      "api.yaml",
+			ListDetails: map[string][]string{"schemas": {"Loop"}},
+		}, nil)
+
+		assert.Equal(t, `schema "Loop" only refers to itself through ref (Loop → Loop): give one of them a type`, headline)
+		assert.Empty(t, explanation)
+	})
+
+	t.Run("schema.ref_cycle without its schemas falls back to the code", func(t *testing.T) {
+		headline, explanation := reports.FormatViolationLine(reports.Violation{
+			Code:   "schema.ref_cycle",
+			Path:   "schemas;A",
+			Source: "api.yaml",
+		}, nil)
+
+		assert.Equal(t, `schema.ref_cycle at schemas A`, headline)
+		assert.Empty(t, explanation)
+	})
+
 	t.Run("unknown code falls back to the code with its sorted details", func(t *testing.T) {
 		headline, explanation := reports.FormatViolationLine(reports.Violation{
 			Code:    "something.new",
@@ -734,6 +807,19 @@ func TestFormatViolationLine(t *testing.T) {
 		}, nil)
 
 		assert.Equal(t, `something.new at provides rest /pets (area: y, hint: x)`, headline)
+		assert.Empty(t, explanation)
+	})
+
+	t.Run("unknown code falls back to the code with its sorted details, a list in brackets", func(t *testing.T) {
+		headline, explanation := reports.FormatViolationLine(reports.Violation{
+			Code:        "something.new",
+			Path:        "provides;rest;/pets",
+			Source:      "api.yaml",
+			Details:     map[string]string{"hint": "x", "area": "y"},
+			ListDetails: map[string][]string{"names": {"A", "B"}},
+		}, nil)
+
+		assert.Equal(t, `something.new at provides rest /pets (area: y, hint: x, names: [A, B])`, headline)
 		assert.Empty(t, explanation)
 	})
 

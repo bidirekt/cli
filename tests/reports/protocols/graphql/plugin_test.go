@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var graphqlModules = []reports.Module{{Report: graphql.New(), Extensions: []string{".graphql", ".graphqls"}}}
+var graphqlModules = []reports.Module{{Report: graphql.New(), Extensions: []string{".graphql", ".graphqls", ".gql"}}}
 
 type operations map[string]map[string]map[string][]reports.ContractBreak
 
@@ -408,7 +408,7 @@ func TestFormatNotDeployableReportPlacesABreakAtTheTopOfReturnsAtTheRootPath(t *
 					"pet": {
 						"returns": {
 							{Reason: "property_nullable_in_provider_not_nullable_in_consumer", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet", "providerField": "Query:pet:returns", "property": "$", "propertyType": "object",
+								"consumerField": "Pet", "providerField": "Query.pet", "property": "$", "propertyType": "object",
 								"consumerName": "petstore_web", "providerName": "petstore_api",
 							}},
 						},
@@ -427,7 +427,39 @@ petstore_api (1.5.0, deployed):
   Pet — petstore_web doesn't accept null, but petstore_api may provide null
     → petstore_web: handle null in the code, then mark it nullable
     → petstore_api: stop providing null there
-      · query pet returns at "$" (petstore_api: Query:pet:returns)
+      · query pet returns at "$" (petstore_api: Query.pet)
+`, report)
+}
+
+func TestFormatNotDeployableReportTitlesABreakAtTheTopOfReturnsWithTheRootFieldWhenTheProviderIsChecked(t *testing.T) {
+	results := map[string]reports.CanIDeployResult{
+		"petstore_web": {
+			ParticipantVersion: versionOf("3.0.0"),
+			Trees: operationsTree(t, operations{
+				"query": {
+					"pet": {
+						"returns": {
+							{Reason: "property_nullable_in_provider_not_nullable_in_consumer", Role: "provider", Details: map[string]string{
+								"consumerField": "Pet", "providerField": "Query.pet", "property": "$", "propertyType": "object",
+								"consumerName": "petstore_web", "providerName": "petstore_api",
+							}},
+						},
+					},
+				},
+			}),
+		},
+	}
+
+	report, err := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_api 1.5.0", "petstore_api", "production", results, graphqlModules)
+
+	require.NoError(t, err)
+	assert.Equal(t, `petstore_api 1.5.0 cannot be deployed to production
+
+petstore_web (3.0.0, deployed):
+  Query.pet — petstore_api may provide null, but petstore_web doesn't accept it
+    → petstore_api: stop providing null
+    → petstore_web: handle null in the code, then mark it nullable there
+      · query pet returns at "$" (petstore_web: Pet)
 `, report)
 }
 
@@ -461,7 +493,7 @@ func TestFormatNotDeployableReportWritesEachProtocolOfACounterpartAsItsModuleDoe
 	results := map[string]reports.CanIDeployResult{
 		"petstore_api": {ParticipantVersion: versionOf("1.4.0"), Trees: trees},
 	}
-	modules := []reports.Module{{Report: rest.New()}, {Report: graphql.New(), Extensions: []string{".graphql", ".graphqls"}}}
+	modules := []reports.Module{{Report: rest.New()}, {Report: graphql.New(), Extensions: []string{".graphql", ".graphqls", ".gql"}}}
 
 	report, err := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 3.0.0", "petstore_web", "production", results, modules)
 
@@ -474,9 +506,41 @@ petstore_api (1.4.0, deployed):
     → petstore_api: provide it
       · GET /pets/* response 200 at "$.photoUrl"
   Pet.photoUrl — petstore_web reads it, but petstore_api doesn't provide it
-    → petstore_web: stop reading it, or handle its absence in the code and mark it optional
+    → petstore_web: stop reading it
     → petstore_api: provide it
       · query pet returns at "$.photoUrl"
+`, report)
+}
+
+func TestFormatNotDeployableReportTellsTheConsumerToStopReadingAFieldTheCheckedProviderRemoved(t *testing.T) {
+	results := map[string]reports.CanIDeployResult{
+		"petstore_web": {
+			ParticipantVersion: versionOf("3.0.0"),
+			Trees: operationsTree(t, operations{
+				"query": {
+					"pet": {
+						"returns": {
+							{Reason: "property_missing_in_provider", Role: "provider", Details: map[string]string{
+								"consumerField": "Pet.bornAt", "property": "$.bornAt", "propertyType": "string",
+								"consumerName": "petstore_web", "providerName": "petstore_api",
+							}},
+						},
+					},
+				},
+			}),
+		},
+	}
+
+	report, err := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_api 1.5.0", "petstore_api", "production", results, graphqlModules)
+
+	require.NoError(t, err)
+	assert.Equal(t, `petstore_api 1.5.0 cannot be deployed to production
+
+petstore_web (3.0.0, deployed):
+  Pet.bornAt — petstore_api doesn't provide it, but petstore_web reads it
+    → petstore_api: provide it
+    → petstore_web: stop reading it there
+      · query pet returns at "$.bornAt" (petstore_web: Pet.bornAt)
 `, report)
 }
 

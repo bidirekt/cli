@@ -101,7 +101,7 @@ func newRootCommand(dependencies *components.Components) *cobra.Command {
 
 	modules := []reports.Module{
 		{Report: restreports.New()},
-		{Report: graphqlreports.New(), Extensions: []string{".graphql", ".graphqls"}},
+		{Report: graphqlreports.New(), Extensions: []string{".graphql", ".graphqls", ".gql"}},
 	}
 
 	create_participant.Register(rootCommand, dependencies)

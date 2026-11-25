@@ -30,7 +30,7 @@ func (this Plugin) ViolationLine(violation reports.Violation) (headline, explana
 	case "returns.required":
 		return `missing "returns"` + pathAt, "", true
 	case "graph.without_schema":
-		return fmt.Sprintf("graph %q without a GraphQL schema%s", details["graph"], graphAt), "publish its .graphql or .graphqls in the same publish", true
+		return fmt.Sprintf("graph %q without a GraphQL schema%s", details["graph"], graphAt), "publish its .graphql, .graphqls or .gql in the same publish", true
 	case "graph.required_by_federation":
 		return "the GraphQL schema links Apollo Federation, but no graph is declared" + pathAt, "declare it in provides.graphql.graph", true
 	case "graph.name_taken":
@@ -43,8 +43,6 @@ func (this Plugin) ViolationLine(violation reports.Violation) (headline, explana
 	case "operation.name_syntax":
 		return fmt.Sprintf("invalid GraphQL field name %q%s", details["name"], reports.At(reports.Location(violation.Path, details["name"]))),
 			`write the field name only; arguments go in "arguments"`, true
-	case "schema.root_name_taken":
-		return fmt.Sprintf(`type %q in %s takes the name of the %s root, which is %q: rename the type`, details["type"], violation.Source, details["operation"], details["root"]), "", true
 	default:
 		return "", "", false
 	}

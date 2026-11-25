@@ -19,7 +19,7 @@ func TestFormatValidationFailedReportRendersTheGraphQLCodes(t *testing.T) {
 	}, modules)
 
 	assert.Equal(t, `contract validation failed
-  - contracts/api.yaml: graph "petstore_graph" without a GraphQL schema at provides graphql, publish its .graphql or .graphqls in the same publish
+  - contracts/api.yaml: graph "petstore_graph" without a GraphQL schema at provides graphql, publish its .graphql, .graphqls or .gql in the same publish
   - graph/schema.graphqls: the GraphQL schema links Apollo Federation, but no graph is declared, declare it in provides.graphql.graph
 `, report)
 }
@@ -92,7 +92,7 @@ func TestFormatViolationLine(t *testing.T) {
 			violation: reports.Violation{Code: "graph.without_schema", Path: "provides;graphql;graph", Source: "contracts/api.yaml",
 				Details: map[string]string{"graph": "petstore_graph"}},
 			headline:    `graph "petstore_graph" without a GraphQL schema at provides graphql`,
-			explanation: `publish its .graphql or .graphqls in the same publish`,
+			explanation: `publish its .graphql, .graphqls or .gql in the same publish`,
 		},
 		{
 			name:        "graph.required_by_federation",
@@ -127,18 +127,6 @@ func TestFormatViolationLine(t *testing.T) {
 				Details: map[string]string{"name": "pets(first: 10)"}},
 			headline:    `invalid GraphQL field name "pets(first: 10)" at consumes petstore_api graphql query`,
 			explanation: `write the field name only; arguments go in "arguments"`,
-		},
-		{
-			name: "schema.root_name_taken by a type named Query",
-			violation: reports.Violation{Code: "schema.root_name_taken", Path: "", Source: "schema.graphqls",
-				Details: map[string]string{"operation": "query", "root": "RootQuery", "type": "Query"}},
-			headline: `type "Query" in schema.graphqls takes the name of the query root, which is "RootQuery": rename the type`,
-		},
-		{
-			name: "schema.root_name_taken by a type named Mutation",
-			violation: reports.Violation{Code: "schema.root_name_taken", Path: "", Source: "schema.graphqls",
-				Details: map[string]string{"operation": "mutation", "root": "RootMutation", "type": "Mutation"}},
-			headline: `type "Mutation" in schema.graphqls takes the name of the mutation root, which is "RootMutation": rename the type`,
 		},
 		{
 			name: "schema.key_not_allowed with name on an object schema points to the scalar type",

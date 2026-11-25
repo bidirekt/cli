@@ -2,9 +2,10 @@ package reports
 
 import (
 	"cmp"
+	"encoding/json"
 	"fmt"
+	"maps"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/bidirekt/cli/internal/paint"
@@ -15,6 +16,42 @@ type Violation struct {
 	Path    string            `json:"path"`
 	Source  string            `json:"source"`
 	Details map[string]string `json:"details"`
+	// Details that hold a list; the broker sends them in "details" too, beside the text ones.
+	ListDetails map[string][]string `json:"-"`
+}
+
+func (this *Violation) UnmarshalJSON(data []byte) error {
+	type violationFields Violation
+	var wire struct {
+		violationFields
+		Details map[string]json.RawMessage `json:"details"`
+	}
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+
+	*this = Violation(wire.violationFields)
+	if wire.Details != nil {
+		this.Details = map[string]string{}
+	}
+	for key, value := range wire.Details {
+		var text string
+		if json.Unmarshal(value, &text) == nil {
+			this.Details[key] = text
+			continue
+		}
+
+		var list []string
+		if err := json.Unmarshal(value, &list); err != nil {
+			return fmt.Errorf("violation detail %q is neither text nor a list of text: %s", key, value)
+		}
+		if this.ListDetails == nil {
+			this.ListDetails = map[string][]string{}
+		}
+		this.ListDetails[key] = list
+	}
+
+	return nil
 }
 
 func FormatValidationFailedReport(brush paint.Brush, message string, violations []Violation, modules []Module) string {
@@ -114,6 +151,12 @@ func FormatViolationLine(violation Violation, modules []Module) (headline, expla
 		return fmt.Sprintf("unresolved schema %q referenced by %s", details["schema"], details["resource"]), ""
 	case "schema.unresolved_ref":
 		return fmt.Sprintf("unresolved ref %q in %s", details["schema"], details["property"]), ""
+	case "schema.ref_cycle":
+		cycle := violation.ListDetails["schemas"]
+		if len(cycle) == 0 {
+			return fallbackViolationLine(violation), ""
+		}
+		return fmt.Sprintf(`schema %q only refers to itself through ref (%s): give one of them a type`, cycle[0], strings.Join(slices.Concat(cycle, cycle[:1]), " → ")), ""
 	case "members.required":
 		if details["type"] == "union" {
 			return `"type: union" needs "members"` + pathAt + `: map each key to a ref`, ""
@@ -178,19 +221,19 @@ func withArticle(schemaType string) string {
 func fallbackViolationLine(violation Violation) string {
 	line := violation.Code + At(Location(violation.Path, ""))
 
-	if len(violation.Details) == 0 {
+	values := make(map[string]string, len(violation.Details)+len(violation.ListDetails))
+	maps.Copy(values, violation.Details)
+	for key, list := range violation.ListDetails {
+		values[key] = "[" + strings.Join(list, ", ") + "]"
+	}
+
+	if len(values) == 0 {
 		return line
 	}
 
-	keys := make([]string, 0, len(violation.Details))
-	for key := range violation.Details {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	pairs := make([]string, 0, len(keys))
-	for _, key := range keys {
-		pairs = append(pairs, key+": "+violation.Details[key])
+	pairs := make([]string, 0, len(values))
+	for _, key := range slices.Sorted(maps.Keys(values)) {
+		pairs = append(pairs, key+": "+values[key])
 	}
 
 	return fmt.Sprintf("%s (%s)", line, strings.Join(pairs, ", "))

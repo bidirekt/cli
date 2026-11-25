@@ -182,7 +182,7 @@ func formatPropertyBreakLine(operation checkedOperation, contractBreak reports.C
 		return property, property.toPropertyBreakLine(propertyBreakPhrases{
 			consumerChecked: fmt.Sprintf("%s reads it, but %s doesn't provide it", consumer, provider),
 			providerChecked: fmt.Sprintf("%s doesn't provide it, but %s reads it", provider, consumer),
-			consumerFix:     "stop reading it, or handle its absence in the code and mark it optional",
+			consumerFix:     "stop reading it",
 			providerFix:     "provide it",
 		}), true
 	case reason == "property_optional_in_provider_required_in_consumer" && onReturns:

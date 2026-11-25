@@ -82,11 +82,11 @@ nothing deployed in $PRODUCTION to compare with"
 @test "validate a folder without contract files: fails naming the folder" {
   run bidirekt validate ./docs --participant "$API" --environment "$PRODUCTION"
   assert_failure 1
-  assert_output --partial "no contract files (.yaml, .yml, .graphql, .graphqls) in folder: \"./docs\""
+  assert_output --partial "no contract files (.yaml, .yml, .graphql, .graphqls, .gql) in folder: \"./docs\""
 }
 
 @test "publish a folder without contract files: fails naming the folder" {
   run bidirekt publish ./docs --participant "$API" --version v3
   assert_failure 1
-  assert_output --partial "no contract files (.yaml, .yml, .graphql, .graphqls) in folder: \"./docs\""
+  assert_output --partial "no contract files (.yaml, .yml, .graphql, .graphqls, .gql) in folder: \"./docs\""
 }

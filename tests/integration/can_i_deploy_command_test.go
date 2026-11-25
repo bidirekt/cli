@@ -469,7 +469,7 @@ payments (v2, deployed):
 
 		command := can_i_deploy.NewCanIDeployCommand(
 			can_i_deploy.NewCanIDeployClient(httpClient),
-			[]reports.Module{{Report: restreports.New()}, {Report: graphqlreports.New(), Extensions: []string{".graphql", ".graphqls"}}},
+			[]reports.Module{{Report: restreports.New()}, {Report: graphqlreports.New(), Extensions: []string{".graphql", ".graphqls", ".gql"}}},
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)

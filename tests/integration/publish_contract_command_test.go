@@ -168,7 +168,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		command := publish_contract.NewPublishCommand(
 			publish_contract.NewPublishContractClient(httpClient),
-			[]reports.Module{{Report: restreports.New()}, {Report: graphqlreports.New(), Extensions: []string{".graphql", ".graphqls"}}},
+			[]reports.Module{{Report: restreports.New()}, {Report: graphqlreports.New(), Extensions: []string{".graphql", ".graphqls", ".gql"}}},
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -328,6 +328,36 @@ func TestPublishContractCommand(t *testing.T) {
 		require.ErrorIs(t, err, reports.ErrSilent)
 		assert.Equal(t, "contract validation failed\n"+
 			"  - api.yaml: array schema without items at schemas Pets\n",
+			errOut.String())
+		assert.Empty(t, out.String())
+	})
+
+	t.Run("validation failure with a ref cycle names the schemas of the cycle", func(t *testing.T) {
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
+		httpmock.ActivateNonDefault(httpClient.StdClient())
+		defer httpmock.DeactivateAndReset()
+
+		file := filepath.Join(t.TempDir(), "contract.yaml")
+		require.NoError(t, os.WriteFile(file, []byte("provides:\n  rest: {}\n"), 0o600))
+
+		httpmock.RegisterResponder(http.MethodPost, endpoint,
+			httpmock.NewStringResponder(http.StatusBadRequest, `{"message":"contract validation failed","violations":[{"code":"schema.ref_cycle","path":"schemas;A","source":"petstore_web.yaml","details":{"schemas":["A","B"]}}]}`))
+
+		command := publish_contract.NewPublishCommand(
+			publish_contract.NewPublishContractClient(httpClient),
+			restModules,
+		)
+		var out, errOut bytes.Buffer
+		command.SetOut(&out)
+		command.SetErr(&errOut)
+		command.SetArgs([]string{file, "--participant", participant, "--version", version})
+
+		err := command.Execute()
+
+		require.ErrorIs(t, err, reports.ErrSilent)
+		assert.Equal(t, "contract validation failed\n"+
+			"  - petstore_web.yaml: schema \"A\" only refers to itself through ref (A → B → A): give one of them a type\n",
 			errOut.String())
 		assert.Empty(t, out.String())
 	})

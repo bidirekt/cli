@@ -99,16 +99,20 @@ func TestToContractFiles(t *testing.T) {
 			"contracts/graph.yaml":            "provides:\n  graphql:\n    graph: petstore_graph\n",
 			"contracts/graph/schema.graphqls": "type Query { pet(id: ID!): Pet }\n",
 			"contracts/graph/pet.graphql":     "type Pet { name: String! }\n",
+			"contracts/graph/owner.gql":       "type Owner { name: String! }\n",
 			"reviews.graphql":                 "type Review { stars: Int! }\n",
+			"orders.gql":                      "type Order { total: Float! }\n",
 		})
 
-		files, err := contractfiles.ToContractFiles([]string{"contracts", "reviews.graphql"}, []string{".graphql", ".graphqls"})
+		files, err := contractfiles.ToContractFiles([]string{"contracts", "reviews.graphql", "orders.gql"}, []string{".graphql", ".graphqls", ".gql"})
 
 		require.NoError(t, err)
 		assert.Equal(t, []contractfiles.ContractFile{
 			{Source: "contracts/graph.yaml", Content: "provides:\n  graphql:\n    graph: petstore_graph\n"},
+			{Source: "contracts/graph/owner.gql", Content: "type Owner { name: String! }\n"},
 			{Source: "contracts/graph/pet.graphql", Content: "type Pet { name: String! }\n"},
 			{Source: "contracts/graph/schema.graphqls", Content: "type Query { pet(id: ID!): Pet }\n"},
+			{Source: "orders.gql", Content: "type Order { total: Float! }\n"},
 			{Source: "reviews.graphql", Content: "type Review { stars: Int! }\n"},
 		}, files)
 	})
@@ -184,9 +188,9 @@ func TestToContractFilesFails(t *testing.T) {
 		t.Chdir(t.TempDir())
 		writeFiles(t, map[string]string{"contracts/README.md": "# contracts\n"})
 
-		files, err := contractfiles.ToContractFiles([]string{"contracts"}, []string{".graphql", ".graphqls"})
+		files, err := contractfiles.ToContractFiles([]string{"contracts"}, []string{".graphql", ".graphqls", ".gql"})
 
-		require.EqualError(t, err, `no contract files (.yaml, .yml, .graphql, .graphqls) in folder: "contracts"`)
+		require.EqualError(t, err, `no contract files (.yaml, .yml, .graphql, .graphqls, .gql) in folder: "contracts"`)
 		assert.Nil(t, files)
 	})
 

@@ -295,7 +295,7 @@ payments (v2, deployed):
 		    }
 		  }
 		}`)
-		modules := []reports.Module{{Report: restreports.New()}, {Report: graphqlreports.New(), Extensions: []string{".graphql", ".graphqls"}}}
+		modules := []reports.Module{{Report: restreports.New()}, {Report: graphqlreports.New(), Extensions: []string{".graphql", ".graphqls", ".gql"}}}
 
 		out, errOut, err := runValidate(t, modules, responder, file, "--participant", participant, "--environment", environment)
 
@@ -321,6 +321,20 @@ payments (v2, deployed):
 		require.ErrorIs(t, err, reports.ErrSilent)
 		assert.Equal(t, "contract validation failed\n"+
 			"  - contract.yaml: unresolved schema \"Payment\" referenced by consumes payments PUT /payments/* request\n",
+			errOut)
+		assert.Empty(t, out)
+	})
+
+	t.Run("validation failure with a ref cycle names the schemas of the cycle", func(t *testing.T) {
+		file := writeContract(t)
+
+		responder := httpmock.NewStringResponder(http.StatusBadRequest, `{"message":"contract validation failed","violations":[{"code":"schema.ref_cycle","path":"schemas;A","source":"contract.yaml","details":{"schemas":["A","B"]}}]}`)
+
+		out, errOut, err := runValidate(t, restModules, responder, file, "--participant", participant, "--environment", environment)
+
+		require.ErrorIs(t, err, reports.ErrSilent)
+		assert.Equal(t, "contract validation failed\n"+
+			"  - contract.yaml: schema \"A\" only refers to itself through ref (A → B → A): give one of them a type\n",
 			errOut)
 		assert.Empty(t, out)
 	})
