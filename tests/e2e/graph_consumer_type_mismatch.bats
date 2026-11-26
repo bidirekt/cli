@@ -96,9 +96,9 @@ setup() {
   assert_output --partial "$WEB v2 cannot be deployed to $PRODUCTION
 
 $GRAPH ($API v1 + $REVIEWS v1, deployed):
-  Pet.age — $WEB reads it as string, but $GRAPH provides integer
-    → $WEB: read it as integer
-    → $GRAPH: provide it as string there
+  Pet.age — $WEB reads it as String, but $GRAPH provides Int
+    → $WEB: read it as Int
+    → $GRAPH: provide it as String there
       · query pet returns at \"\$.age\" ($GRAPH: Pet.age)"
 }
 
@@ -108,8 +108,8 @@ $GRAPH ($API v1 + $REVIEWS v1, deployed):
   assert_output --partial "$WEB local contract cannot be deployed to $PRODUCTION
 
 $GRAPH ($API v1 + $REVIEWS v1, deployed):
-  Pet.age — $WEB reads it as string, but $GRAPH provides integer
-    → $WEB: read it as integer
-    → $GRAPH: provide it as string there
+  Pet.age — $WEB reads it as String, but $GRAPH provides Int
+    → $WEB: read it as Int
+    → $GRAPH: provide it as String there
       · query pet returns at \"\$.age\" ($GRAPH: Pet.age)"
 }

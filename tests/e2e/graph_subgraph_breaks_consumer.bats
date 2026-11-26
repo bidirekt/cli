@@ -95,9 +95,9 @@ setup() {
   assert_output --partial "$REVIEWS v2 cannot be deployed to $PRODUCTION
 
 $WEB (v1, deployed):
-  Pet.reviews — $REVIEWS (via $GRAPH) provides it as string, but $WEB reads array<string>
-    → $REVIEWS: provide it as array<string>
-    → $WEB: read it as string there
+  Pet.reviews — $REVIEWS (via $GRAPH) provides it as String!, but $WEB reads [String!]!
+    → $REVIEWS: provide it as [String!]!
+    → $WEB: read it as String! there
       · query pet returns at \"\$.reviews\" ($WEB: Pet.reviews)"
 }
 
@@ -107,8 +107,8 @@ $WEB (v1, deployed):
   assert_output --partial "$REVIEWS local contract cannot be deployed to $PRODUCTION
 
 $WEB (v1, deployed):
-  Pet.reviews — $REVIEWS (via $GRAPH) provides it as string, but $WEB reads array<string>
-    → $REVIEWS: provide it as array<string>
-    → $WEB: read it as string there
+  Pet.reviews — $REVIEWS (via $GRAPH) provides it as String!, but $WEB reads [String!]!
+    → $REVIEWS: provide it as [String!]!
+    → $WEB: read it as String! there
       · query pet returns at \"\$.reviews\" ($WEB: Pet.reviews)"
 }
