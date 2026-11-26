@@ -23,7 +23,7 @@ func TestCanIDeployCommandRemovedResourceStillConsumed(t *testing.T) {
 		endpoint    = brokerURL + "/api/can-i-deploy"
 	)
 
-	restModules := []reports.Module{{Report: restreports.New()}}
+	restModules := []reports.Module{restreports.Module()}
 
 	httpClient := components.NewHTTPClient()
 	httpClient.UseBroker(brokerURL, "")

@@ -29,7 +29,7 @@ func TestPublishContractCommand(t *testing.T) {
 		endpoint    = brokerURL + "/api/contracts"
 	)
 
-	restModules := []reports.Module{{Report: restreports.New()}}
+	restModules := []reports.Module{restreports.Module()}
 
 	expectedBody := func(t *testing.T, fragments ...[2]string) string {
 		t.Helper()
@@ -168,7 +168,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		command := publish_contract.NewPublishCommand(
 			publish_contract.NewPublishContractClient(httpClient),
-			[]reports.Module{{Report: restreports.New()}, {Report: graphqlreports.New(), Extensions: []string{".graphql", ".graphqls", ".gql"}}},
+			[]reports.Module{restreports.Module(), graphqlreports.Module()},
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)

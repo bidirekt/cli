@@ -2,6 +2,7 @@ package graphql
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/bidirekt/cli/internal/reports"
 )
@@ -30,7 +31,7 @@ func (this Plugin) ViolationLine(violation reports.Violation) (headline, explana
 	case "returns.required":
 		return `missing "returns"` + pathAt, "", true
 	case "graph.without_schema":
-		return fmt.Sprintf("graph %q without a GraphQL schema%s", details["graph"], graphAt), "publish its .graphql, .graphqls or .gql in the same publish", true
+		return fmt.Sprintf("graph %q without a GraphQL schema%s", details["graph"], graphAt), "publish its " + schemaFileExtensionsText() + " in the same publish", true
 	case "graph.required_by_federation":
 		return "the GraphQL schema links Apollo Federation, but no graph is declared" + pathAt, "declare it in provides.graphql.graph", true
 	case "graph.name_taken":
@@ -46,4 +47,10 @@ func (this Plugin) ViolationLine(violation reports.Violation) (headline, explana
 	default:
 		return "", "", false
 	}
+}
+
+func schemaFileExtensionsText() string {
+	last := len(schemaFileExtensions) - 1
+
+	return strings.Join(schemaFileExtensions[:last], ", ") + " or " + schemaFileExtensions[last]
 }

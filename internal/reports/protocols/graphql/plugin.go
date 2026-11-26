@@ -14,10 +14,16 @@ import (
 // "mutation" and interaction is "arguments" or "returns".
 type operationsTree map[string]map[string]map[string][]reports.ContractBreak
 
+var schemaFileExtensions = []string{".graphql", ".graphqls", ".gql"}
+
 type Plugin struct{}
 
 func New() Plugin {
 	return Plugin{}
+}
+
+func Module() reports.Module {
+	return reports.Module{Report: New(), Extensions: schemaFileExtensions}
 }
 
 func (this Plugin) ReportKey() string {

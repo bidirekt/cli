@@ -100,8 +100,8 @@ func newRootCommand(dependencies *components.Components) *cobra.Command {
 	rootCommand.PersistentFlags().String("profile", "", `Profile in the config file (falls back to BIDIREKT_PROFILE, then "default")`)
 
 	modules := []reports.Module{
-		{Report: restreports.New()},
-		{Report: graphqlreports.New(), Extensions: []string{".graphql", ".graphqls", ".gql"}},
+		restreports.Module(),
+		graphqlreports.Module(),
 	}
 
 	create_participant.Register(rootCommand, dependencies)

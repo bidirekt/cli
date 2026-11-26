@@ -11,7 +11,7 @@ import (
 )
 
 func TestFormatValidationFailedReportRendersTheRestCodes(t *testing.T) {
-	modules := []reports.Module{{Report: rest.New()}}
+	modules := []reports.Module{rest.Module()}
 
 	report := reports.FormatValidationFailedReport(paint.For(&bytes.Buffer{}), "contract validation failed", []reports.Violation{
 		{Code: "endpoint.syntax", Path: "provides;rest;/users/{userId}", Source: "api.yaml", Details: map[string]string{"key": "/users/{userId}", "error": "dynamic path segments must use *"}},
@@ -25,7 +25,7 @@ func TestFormatValidationFailedReportRendersTheRestCodes(t *testing.T) {
 }
 
 func TestFormatViolationLine(t *testing.T) {
-	modules := []reports.Module{{Report: rest.New()}}
+	modules := []reports.Module{rest.Module()}
 
 	t.Run("endpoint.syntax", func(t *testing.T) {
 		headline, explanation := reports.FormatViolationLine(reports.Violation{

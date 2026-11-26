@@ -29,7 +29,7 @@ func TestValidateContractCommand(t *testing.T) {
 		content     = "consumes:\n  payments:\n    rest:\n      /payments/*:\n        put:\n          request: Payment\n"
 	)
 
-	restModules := []reports.Module{{Report: restreports.New()}}
+	restModules := []reports.Module{restreports.Module()}
 
 	writeContract := func(t *testing.T) string {
 		t.Helper()
@@ -295,7 +295,7 @@ payments (v2, deployed):
 		    }
 		  }
 		}`)
-		modules := []reports.Module{{Report: restreports.New()}, {Report: graphqlreports.New(), Extensions: []string{".graphql", ".graphqls", ".gql"}}}
+		modules := []reports.Module{restreports.Module(), graphqlreports.Module()}
 
 		out, errOut, err := runValidate(t, modules, responder, file, "--participant", participant, "--environment", environment)
 

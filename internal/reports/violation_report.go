@@ -227,16 +227,7 @@ func fallbackViolationLine(violation Violation) string {
 		values[key] = "[" + strings.Join(list, ", ") + "]"
 	}
 
-	if len(values) == 0 {
-		return line
-	}
-
-	pairs := make([]string, 0, len(values))
-	for _, key := range slices.Sorted(maps.Keys(values)) {
-		pairs = append(pairs, key+": "+values[key])
-	}
-
-	return fmt.Sprintf("%s (%s)", line, strings.Join(pairs, ", "))
+	return FallbackBreakLine(line, values)
 }
 
 func Location(path, quoted string) string {

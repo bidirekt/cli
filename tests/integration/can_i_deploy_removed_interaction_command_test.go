@@ -23,7 +23,7 @@ func TestCanIDeployCommandRemovedInteractionStillConsumed(t *testing.T) {
 		endpoint    = brokerURL + "/api/can-i-deploy"
 	)
 
-	restModules := []reports.Module{{Report: restreports.New()}}
+	restModules := []reports.Module{restreports.Module()}
 
 	runCanIDeploy := func(t *testing.T, endpoints string) (string, string, error) {
 		t.Helper()

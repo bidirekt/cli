@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var graphqlModules = []reports.Module{{Report: graphql.New(), Extensions: []string{".graphql", ".graphqls", ".gql"}}}
+var graphqlModules = []reports.Module{graphql.Module()}
 
 type operations map[string]map[string]map[string][]reports.ContractBreak
 
@@ -493,7 +493,7 @@ func TestFormatNotDeployableReportWritesEachProtocolOfACounterpartAsItsModuleDoe
 	results := map[string]reports.CanIDeployResult{
 		"petstore_api": {ParticipantVersion: versionOf("1.4.0"), Trees: trees},
 	}
-	modules := []reports.Module{{Report: rest.New()}, {Report: graphql.New(), Extensions: []string{".graphql", ".graphqls", ".gql"}}}
+	modules := []reports.Module{rest.Module(), graphql.Module()}
 
 	report, err := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 3.0.0", "petstore_web", "production", results, modules)
 

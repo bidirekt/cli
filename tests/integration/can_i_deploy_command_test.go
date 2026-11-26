@@ -26,7 +26,7 @@ func TestCanIDeployCommand(t *testing.T) {
 		endpoint    = brokerURL + "/api/can-i-deploy"
 	)
 
-	restModules := []reports.Module{{Report: restreports.New()}}
+	restModules := []reports.Module{restreports.Module()}
 
 	t.Run("deployable verdict posts participant+version+environment, prints deployable, exits 0", func(t *testing.T) {
 		httpClient := components.NewHTTPClient()
@@ -469,7 +469,7 @@ payments (v2, deployed):
 
 		command := can_i_deploy.NewCanIDeployCommand(
 			can_i_deploy.NewCanIDeployClient(httpClient),
-			[]reports.Module{{Report: restreports.New()}, {Report: graphqlreports.New(), Extensions: []string{".graphql", ".graphqls", ".gql"}}},
+			[]reports.Module{restreports.Module(), graphqlreports.Module()},
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)

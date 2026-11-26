@@ -11,7 +11,7 @@ import (
 )
 
 func TestFormatValidationFailedReportRendersTheGraphQLCodes(t *testing.T) {
-	modules := []reports.Module{{Report: graphql.New()}}
+	modules := []reports.Module{graphql.Module()}
 
 	report := reports.FormatValidationFailedReport(paint.For(&bytes.Buffer{}), "contract validation failed", []reports.Violation{
 		{Code: "graph.without_schema", Path: "provides;graphql;graph", Source: "contracts/api.yaml", Details: map[string]string{"graph": "petstore_graph"}},
@@ -25,7 +25,7 @@ func TestFormatValidationFailedReportRendersTheGraphQLCodes(t *testing.T) {
 }
 
 func TestFormatViolationLine(t *testing.T) {
-	modules := []reports.Module{{Report: graphql.New()}}
+	modules := []reports.Module{graphql.Module()}
 
 	for _, test := range []struct {
 		name        string

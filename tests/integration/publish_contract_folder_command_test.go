@@ -27,7 +27,7 @@ func TestPublishContractFolderCommand(t *testing.T) {
 		endpoint    = brokerURL + "/api/contracts"
 	)
 
-	restModules := []reports.Module{{Report: restreports.New()}}
+	restModules := []reports.Module{restreports.Module()}
 
 	t.Run("publishes a folder with its subfolders and the files passed beside it as one request, each YAML file once, in path order", func(t *testing.T) {
 		httpClient := components.NewHTTPClient()

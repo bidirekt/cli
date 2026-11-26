@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var restModules = []reports.Module{{Report: rest.New()}}
+var restModules = []reports.Module{rest.Module()}
 
 type endpoints map[string]map[string]map[string][]reports.ContractBreak
 

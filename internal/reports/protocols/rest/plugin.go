@@ -20,6 +20,10 @@ func New() Plugin {
 	return Plugin{}
 }
 
+func Module() reports.Module {
+	return reports.Module{Report: New()}
+}
+
 func (this Plugin) ReportKey() string {
 	return "endpoints"
 }
