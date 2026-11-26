@@ -14,7 +14,11 @@ func formatBreakLine(checked checkedOperation, contractBreak reports.ContractBre
 	asConsumer, asProvider := contractBreak.Role == "consumer", contractBreak.Role == "provider"
 	meInPhrase := me
 	if asProvider && graph != "" {
-		meInPhrase = fmt.Sprintf("%s (via %s)", me, graph)
+		meInPhrase = viaGraph(me, graph)
+	}
+	toDeploy := "it"
+	if graph != "" {
+		toDeploy = "a subgraph of it"
 	}
 
 	switch {
@@ -23,15 +27,10 @@ func formatBreakLine(checked checkedOperation, contractBreak reports.ContractBre
 			Text:  fmt.Sprintf("%s calls %s, but %s doesn't provide it", me, operation, other),
 			Fixes: []string{me + ": stop calling it", other + ": publish it"},
 		}
-	case reason == "provider_resource_not_deployed_in_environment" && asConsumer && graph != "":
-		return reports.BreakLine{
-			Text:  fmt.Sprintf("%s calls %s, but %s is not deployed in %s", me, operation, graph, environment),
-			Fixes: []string{fmt.Sprintf("%s: deploy a subgraph of it to %s first", graph, environment)},
-		}
 	case reason == "provider_resource_not_deployed_in_environment" && asConsumer:
 		return reports.BreakLine{
 			Text:  fmt.Sprintf("%s calls %s, but %s is not deployed in %s", me, operation, other, environment),
-			Fixes: []string{fmt.Sprintf("%s: deploy it to %s first", other, environment)},
+			Fixes: []string{fmt.Sprintf("%s: deploy %s to %s first", other, toDeploy, environment)},
 		}
 	case reason == "provider_resource_removed_but_still_consumed" && asProvider:
 		return reports.BreakLine{
@@ -51,4 +50,8 @@ func formatBreakLine(checked checkedOperation, contractBreak reports.ContractBre
 	default:
 		return reports.BreakLine{Text: reports.FallbackBreakLine(reason, details)}
 	}
+}
+
+func viaGraph(name, graph string) string {
+	return fmt.Sprintf("%s (via %s)", name, graph)
 }

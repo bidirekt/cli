@@ -544,6 +544,39 @@ petstore_web (3.0.0, deployed):
 `, report)
 }
 
+func TestFormatNotDeployableReportWritesAnEnumTheConsumerReadsWithoutASchemaNameWithItsValues(t *testing.T) {
+	results := map[string]reports.CanIDeployResult{
+		"petstore_api": {
+			ParticipantVersion: versionOf("1.4.0"),
+			Trees: operationsTree(t, operations{
+				"query": {
+					"pet": {
+						"returns": {
+							{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
+								"consumerField": "Pet.status", "providerField": "Pet.status", "property": "$.status",
+								"consumerPropertyType": "enum (AVAILABLE | SOLD)!", "providerPropertyType": "String!",
+								"consumerName": "petstore_web", "providerName": "petstore_api",
+							}},
+						},
+					},
+				},
+			}),
+		},
+	}
+
+	report, err := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 2.0.0", "petstore_web", "production", results, graphqlModules)
+
+	require.NoError(t, err)
+	assert.Equal(t, `petstore_web 2.0.0 cannot be deployed to production
+
+petstore_api (1.4.0, deployed):
+  Pet.status — petstore_web reads it as enum (AVAILABLE | SOLD)!, but petstore_api provides String!
+    → petstore_web: read it as String!
+    → petstore_api: provide it as enum (AVAILABLE | SOLD)! there
+      · query pet returns at "$.status" (petstore_api: Pet.status)
+`, report)
+}
+
 func TestWriteVerdictWritesAnOperationsTreeWithTheGraphQLModule(t *testing.T) {
 	results := map[string]reports.CanIDeployResult{
 		"petstore_api": {

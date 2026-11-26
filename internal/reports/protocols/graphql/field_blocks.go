@@ -172,7 +172,7 @@ func formatPropertyBreakLine(operation checkedOperation, contractBreak reports.C
 	onArguments, onReturns := operation.sendsIt, !operation.sendsIt
 	// Only the phrase names the subgraph through its graph; its fix names the subgraph alone.
 	if asProvider && details["graph"] != "" {
-		provider = fmt.Sprintf("%s (via %s)", provider, details["graph"])
+		provider = viaGraph(provider, details["graph"])
 	}
 
 	switch {
