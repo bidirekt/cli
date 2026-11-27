@@ -26,10 +26,10 @@ bidirekt create-environment production
 bidirekt create-participant petstore_web
 ```
 
-For every version, publish its contract files, ask whether it can be deployed, deploy it, and record the deployment:
+For every version, publish its contract files, ask whether it can be deployed, deploy it, and record the deployment. A contract file is YAML (`.yaml`, `.yml`) or the schema of a GraphQL provider (`.graphql`, `.graphqls`, `.gql`), and a folder sends every contract file inside it:
 
 ```sh
-bidirekt publish contracts/*.yaml --participant petstore_web --version 2.3.0
+bidirekt publish contracts --participant petstore_web --version 2.3.0
 bidirekt can-i-deploy petstore_web --version 2.3.0 --environment production
 # deploy petstore_web 2.3.0 to production
 bidirekt record-deployment petstore_web --version 2.3.0 --environment production
@@ -78,14 +78,6 @@ BIDIREKT_BROKER_URL=http://localhost:8080 bats tests/e2e
 ```
 
 Before the first test, the suite checks that the broker at `BIDIREKT_BROKER_URL` is the version pinned in `tests/e2e/compose.yaml`, and runs no test if it isn't.
-
-The GraphQL bats (`graphql_*.bats`, `graph_*.bats`) need a broker with GraphQL, which no released broker has yet, so they fail against the pinned one. They pass against the GraphQL proof-of-concept images: `build-images.sh` (in the workspace's `.ai/2026-11-08-graphql/poc/`, `$POC` below) builds `bidirekt-broker:graphql-poc` from the broker's `graphql-poc-graph-page` branch, and the `broker-image.yaml` override next to it swaps that image in:
-
-```sh
-sh "$POC/build-images.sh"
-docker compose -f tests/e2e/compose.yaml -f "$POC/broker-image.yaml" up -d --wait
-BIDIREKT_BROKER_URL=http://localhost:8080 bats tests/e2e
-```
 
 Each run uses its own participant and environment names, so running the suite again against the same broker passes. `docker compose -f tests/e2e/compose.yaml down` stops both containers and throws the data away (Postgres keeps it on tmpfs).
 

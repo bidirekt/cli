@@ -17,6 +17,11 @@ type ContractFile struct {
 	Content string `json:"content"`
 }
 
+func FileTypesHelp(extensions []string) string {
+	return fmt.Sprintf("A contract file ends in one of %s. A folder takes every contract file inside it, subfolders included.",
+		strings.Join(slices.Concat(yamlFileExtensions, extensions), ", "))
+}
+
 func ToContractFiles(paths []string, extensions []string) ([]ContractFile, error) {
 	filePaths, err := toContractFilePaths(paths, slices.Concat(yamlFileExtensions, extensions))
 	if err != nil {

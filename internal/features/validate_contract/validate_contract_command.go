@@ -66,6 +66,7 @@ func NewValidateCommand(validateContractClient *ValidateContractClient, modules 
 	command := &cobra.Command{
 		Use:   "validate [file or folder...]",
 		Short: "Validate contract files or folders, and compare them with an environment, without publishing them",
+		Long:  "Validate contract files or folders, and compare them with an environment, without publishing them.\n\n" + contractfiles.FileTypesHelp(extensions),
 		Args:  cobra.MatchAll(cobra.MinimumNArgs(1), rejectEmptyFlags("participant", "environment")),
 		RunE:  commandHandler,
 	}
