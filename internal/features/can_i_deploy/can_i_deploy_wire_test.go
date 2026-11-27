@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/bidirekt/cli/internal/reports"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -72,7 +73,9 @@ func TestCanIDeployResponseBodyUnmarshalsResults(t *testing.T) {
 	require.NotNil(t, payments.ParticipantVersion)
 	assert.Equal(t, "3.1.0", *payments.ParticipantVersion)
 
-	interactions := payments.Endpoints["/payments/*"]["put"]
+	var endpoints map[string]map[string]map[string][]reports.ContractBreak
+	require.NoError(t, json.Unmarshal(payments.Trees["endpoints"], &endpoints))
+	interactions := endpoints["/payments/*"]["put"]
 	require.Len(t, interactions, 2)
 
 	requestBreaks := interactions["request"]
@@ -101,6 +104,5 @@ func TestCanIDeployResponseBodyUnmarshalsResults(t *testing.T) {
 	users := body.Results["users"]
 	assert.True(t, users.Deployable)
 	assert.Nil(t, users.ParticipantVersion)
-	require.NotNil(t, users.Endpoints)
-	assert.Empty(t, users.Endpoints)
+	assert.Empty(t, users.Trees)
 }

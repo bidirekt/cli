@@ -1,0 +1,10 @@
+scalar DateTime
+
+type Query {
+  pet(id: ID!): Pet
+}
+
+type Pet {
+  id: ID!
+  bornAt: DateTime!
+}

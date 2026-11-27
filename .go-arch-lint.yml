@@ -24,6 +24,8 @@ components:
     in: internal/paint
   reports:
     in: internal/reports
+  reports_protocols:
+    in: internal/reports/protocols/*
   contractfiles:
     in: internal/contractfiles
   features:
@@ -39,6 +41,7 @@ deps:
       - components
       - paint
       - reports
+      - reports_protocols
       - features
     canUse:
       - cobra
@@ -61,6 +64,10 @@ deps:
       - components
   reports:
     mayDependOn:
+      - paint
+  reports_protocols:
+    mayDependOn:
+      - reports
       - paint
     canUse:
       - testify

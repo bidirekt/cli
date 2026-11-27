@@ -8,9 +8,9 @@ import (
 const contractParticipantNotFound = "contract participant not found"
 
 type PublishContractRequestBody struct {
-	Participant string                           `json:"participant"`
-	Version     string                           `json:"version"`
-	Contracts   []contractfiles.ContractFragment `json:"contracts"`
+	Participant string                       `json:"participant"`
+	Version     string                       `json:"version"`
+	Contracts   []contractfiles.ContractFile `json:"contracts"`
 }
 
 type PublishContractResponseBody struct {

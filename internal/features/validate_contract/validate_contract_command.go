@@ -13,12 +13,17 @@ import (
 
 const requestTimeout = 30 * time.Second
 
-func NewValidateCommand(validateContractClient *ValidateContractClient) *cobra.Command {
+func NewValidateCommand(validateContractClient *ValidateContractClient, modules []reports.Module) *cobra.Command {
+	var extensions []string
+	for _, module := range modules {
+		extensions = append(extensions, module.Extensions...)
+	}
+
 	commandHandler := func(command *cobra.Command, args []string) error {
 		command.SilenceUsage = true
 		command.SilenceErrors = true
 
-		contracts, err := contractfiles.ToContractFragments(args)
+		contracts, err := contractfiles.ToContractFiles(args, extensions)
 		if err != nil {
 			return err
 		}
@@ -44,7 +49,7 @@ func NewValidateCommand(validateContractClient *ValidateContractClient) *cobra.C
 
 		response, err := validateContractClient.ValidateContract(ctx, requestBody)
 		if err != nil {
-			return reports.WriteValidationFailed(command.ErrOrStderr(), err)
+			return reports.WriteValidationFailed(command.ErrOrStderr(), err, modules)
 		}
 
 		if participant == "" {
@@ -55,12 +60,13 @@ func NewValidateCommand(validateContractClient *ValidateContractClient) *cobra.C
 
 		checkedSideLabel := participant + " local contract"
 
-		return reports.WriteVerdict(command.OutOrStdout(), checkedSideLabel, participant, response.Environment, response.Deployable, response.Results)
+		return reports.WriteVerdict(command.OutOrStdout(), checkedSideLabel, participant, response.Environment, response.Deployable, response.Results, modules)
 	}
 
 	command := &cobra.Command{
 		Use:   "validate [file or folder...]",
-		Short: "Validate contract YAML files or folders, and compare them with an environment, without publishing them",
+		Short: "Validate contract files or folders, and compare them with an environment, without publishing them",
+		Long:  "Validate contract files or folders, and compare them with an environment, without publishing them.\n\n" + contractfiles.FileTypesHelp(extensions),
 		Args:  cobra.MatchAll(cobra.MinimumNArgs(1), rejectEmptyFlags("participant", "environment")),
 		RunE:  commandHandler,
 	}

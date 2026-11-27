@@ -13,6 +13,8 @@ import (
 	"github.com/bidirekt/cli/internal/components"
 	"github.com/bidirekt/cli/internal/features/validate_contract"
 	"github.com/bidirekt/cli/internal/reports"
+	graphqlreports "github.com/bidirekt/cli/internal/reports/protocols/graphql"
+	restreports "github.com/bidirekt/cli/internal/reports/protocols/rest"
 	"github.com/jarcoal/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,6 +29,8 @@ func TestValidateContractCommand(t *testing.T) {
 		content     = "consumes:\n  payments:\n    rest:\n      /payments/*:\n        put:\n          request: Payment\n"
 	)
 
+	restModules := []reports.Module{restreports.Module()}
+
 	writeContract := func(t *testing.T) string {
 		t.Helper()
 
@@ -36,7 +40,7 @@ func TestValidateContractCommand(t *testing.T) {
 		return file
 	}
 
-	runValidate := func(t *testing.T, responder httpmock.Responder, args ...string) (string, string, error) {
+	runValidate := func(t *testing.T, modules []reports.Module, responder httpmock.Responder, args ...string) (string, string, error) {
 		t.Helper()
 
 		httpClient := components.NewHTTPClient()
@@ -47,6 +51,7 @@ func TestValidateContractCommand(t *testing.T) {
 
 		command := validate_contract.NewValidateCommand(
 			validate_contract.NewValidateContractClient(httpClient),
+			modules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -73,7 +78,7 @@ func TestValidateContractCommand(t *testing.T) {
 			return httpmock.NewStringResponse(http.StatusOK, `{"message":"contract validated successfully","participant":"front","environment":"production","deployable":true,"results":{}}`), nil
 		}
 
-		out, errOut, err := runValidate(t, responder, file, "--participant", participant, "--environment", environment)
+		out, errOut, err := runValidate(t, restModules, responder, file, "--participant", participant, "--environment", environment)
 
 		require.NoError(t, err)
 		assert.Equal(t, 1, httpmock.GetCallCountInfo()["POST "+endpoint])
@@ -103,7 +108,7 @@ func TestValidateContractCommand(t *testing.T) {
 		}`
 		responder := httpmock.NewStringResponder(http.StatusOK, responseBody)
 
-		out, errOut, err := runValidate(t, responder, file, "--participant", participant, "--environment", environment)
+		out, errOut, err := runValidate(t, restModules, responder, file, "--participant", participant, "--environment", environment)
 
 		require.NoError(t, err)
 		assert.Equal(t, "front local contract can be deployed to production\ncompared with: admin, site\n", out)
@@ -145,7 +150,7 @@ func TestValidateContractCommand(t *testing.T) {
 		}`
 		responder := httpmock.NewStringResponder(http.StatusOK, responseBody)
 
-		out, errOut, err := runValidate(t, responder, file, "--participant", participant, "--environment", environment)
+		out, errOut, err := runValidate(t, restModules, responder, file, "--participant", participant, "--environment", environment)
 
 		require.ErrorIs(t, err, reports.ErrSilent)
 		assert.Equal(t, `front local contract cannot be deployed to production
@@ -159,16 +164,177 @@ payments (v2, deployed):
 		assert.Empty(t, errOut)
 	})
 
+	t.Run("compatible verdict reads the same when the counterparts carry no empty endpoints tree", func(t *testing.T) {
+		file := writeContract(t)
+
+		responseBody := `{
+		  "message": "contract validated successfully",
+		  "participant": "front",
+		  "environment": "production",
+		  "deployable": true,
+		  "results": {
+		    "site": { "deployable": true, "participantVersion": "v4" },
+		    "admin": { "deployable": true, "participantVersion": "v2" }
+		  }
+		}`
+		responder := httpmock.NewStringResponder(http.StatusOK, responseBody)
+
+		out, errOut, err := runValidate(t, restModules, responder, file, "--participant", participant, "--environment", environment)
+
+		require.NoError(t, err)
+		assert.Equal(t, "front local contract can be deployed to production\ncompared with: admin, site\n", out)
+		assert.Empty(t, errOut)
+	})
+
+	t.Run("incompatible verdict reads the same when a compatible counterpart carries no empty endpoints tree", func(t *testing.T) {
+		file := writeContract(t)
+
+		responseBody := `{
+		  "message": "contract validated successfully",
+		  "participant": "front",
+		  "environment": "production",
+		  "deployable": false,
+		  "results": {
+		    "payments": {
+		      "deployable": false,
+		      "participantVersion": "v2",
+		      "endpoints": {
+		        "/payments/*": {
+		          "put": {
+		            "request": [
+		              {
+		                "reason": "property_missing_in_consumer",
+		                "role": "consumer",
+		                "details": { "providerField": "UpdatePaymentRequest.currency", "property": "$.currency", "propertyType": "string", "consumerName": "front", "providerName": "payments" }
+		              }
+		            ]
+		          }
+		        }
+		      }
+		    },
+		    "users": {
+		      "deployable": true,
+		      "participantVersion": "v3"
+		    }
+		  }
+		}`
+		responder := httpmock.NewStringResponder(http.StatusOK, responseBody)
+
+		out, errOut, err := runValidate(t, restModules, responder, file, "--participant", participant, "--environment", environment)
+
+		require.ErrorIs(t, err, reports.ErrSilent)
+		assert.Equal(t, `front local contract cannot be deployed to production
+
+payments (v2, deployed):
+  UpdatePaymentRequest.currency — front doesn't send it, but payments requires it
+    → front: send it
+    → payments: stop requiring it, then mark it optional there
+      · PUT /payments/* request at "$.currency" (payments: UpdatePaymentRequest.currency)
+`, out)
+		assert.Empty(t, errOut)
+	})
+
+	for _, test := range []struct {
+		name     string
+		modules  []reports.Module
+		protocol string
+		tree     string
+	}{
+		{
+			name:     "an endpoints tree without any module",
+			protocol: "endpoints",
+			tree:     `{ "/payments/*": { "put": { "request": [{ "reason": "provider_resource_not_found", "role": "consumer" }] } } }`,
+		},
+		{
+			name:     "an operations tree beside the REST module",
+			modules:  restModules,
+			protocol: "operations",
+			tree:     `{ "query": { "payment": { "returns": [{ "reason": "provider_resource_not_found", "role": "consumer" }] } } }`,
+		},
+	} {
+		t.Run(test.name+" fails naming the protocol, printing nothing", func(t *testing.T) {
+			file := writeContract(t)
+
+			responseBody := `{
+			  "message": "contract validated successfully",
+			  "participant": "front",
+			  "environment": "production",
+			  "deployable": false,
+			  "results": {
+			    "payments": {
+			      "deployable": false,
+			      "participantVersion": "v2",
+			      "` + test.protocol + `": ` + test.tree + `
+			    }
+			  }
+			}`
+			responder := httpmock.NewStringResponder(http.StatusOK, responseBody)
+
+			out, errOut, err := runValidate(t, test.modules, responder, file, "--participant", participant, "--environment", environment)
+
+			require.EqualError(t, err, "the broker reported protocol "+test.protocol+", which this bidirekt doesn't know; update bidirekt")
+			assert.NotErrorIs(t, err, reports.ErrSilent)
+			assert.Empty(t, out)
+			assert.Empty(t, errOut)
+		})
+	}
+
+	t.Run("an operations tree beside the GraphQL module prints its breaks, exits silently non-zero", func(t *testing.T) {
+		file := writeContract(t)
+
+		responder := httpmock.NewStringResponder(http.StatusOK, `{
+		  "message": "contract validated successfully",
+		  "participant": "front",
+		  "environment": "production",
+		  "deployable": false,
+		  "results": {
+		    "payments": {
+		      "deployable": false,
+		      "participantVersion": "v2",
+		      "operations": { "query": { "payment": { "returns": [{ "reason": "provider_resource_not_found", "role": "consumer" }] } } }
+		    }
+		  }
+		}`)
+		modules := []reports.Module{restreports.Module(), graphqlreports.Module()}
+
+		out, errOut, err := runValidate(t, modules, responder, file, "--participant", participant, "--environment", environment)
+
+		require.ErrorIs(t, err, reports.ErrSilent)
+		assert.Equal(t, `front local contract cannot be deployed to production
+
+payments (v2, deployed):
+  query payment
+    - front calls query payment, but payments doesn't provide it
+      → front: stop calling it
+      → payments: publish it
+`, out)
+		assert.Empty(t, errOut)
+	})
+
 	t.Run("validation failure prints the violation report on stderr, exits silently non-zero", func(t *testing.T) {
 		file := writeContract(t)
 
 		responder := httpmock.NewStringResponder(http.StatusBadRequest, `{"message":"contract validation failed","violations":[{"code":"schema.unresolved_name","path":"consumes;payments;rest;/payments/*;put;request","source":"contract.yaml","details":{"schema":"Payment","resource":"consumes payments PUT /payments/* request"}}]}`)
 
-		out, errOut, err := runValidate(t, responder, file, "--participant", participant, "--environment", environment)
+		out, errOut, err := runValidate(t, restModules, responder, file, "--participant", participant, "--environment", environment)
 
 		require.ErrorIs(t, err, reports.ErrSilent)
 		assert.Equal(t, "contract validation failed\n"+
 			"  - contract.yaml: unresolved schema \"Payment\" referenced by consumes payments PUT /payments/* request\n",
+			errOut)
+		assert.Empty(t, out)
+	})
+
+	t.Run("validation failure with a ref cycle names the schemas of the cycle", func(t *testing.T) {
+		file := writeContract(t)
+
+		responder := httpmock.NewStringResponder(http.StatusBadRequest, `{"message":"contract validation failed","violations":[{"code":"schema.ref_cycle","path":"schemas;A","source":"contract.yaml","details":{"schemas":["A","B"]}}]}`)
+
+		out, errOut, err := runValidate(t, restModules, responder, file, "--participant", participant, "--environment", environment)
+
+		require.ErrorIs(t, err, reports.ErrSilent)
+		assert.Equal(t, "contract validation failed\n"+
+			"  - contract.yaml: schema \"A\" only refers to itself through ref (A → B → A): give one of them a type\n",
 			errOut)
 		assert.Empty(t, out)
 	})
@@ -178,7 +344,7 @@ payments (v2, deployed):
 
 		responder := httpmock.NewStringResponder(http.StatusBadRequest, `{"message":"contract validation failed","violations":[{"code":"schema.optional_not_allowed","path":"schemas;Pet;properties;tags;items","source":"contract.yaml","details":{"position":"items"}}]}`)
 
-		out, errOut, err := runValidate(t, responder, file, "--participant", participant, "--environment", environment)
+		out, errOut, err := runValidate(t, restModules, responder, file, "--participant", participant, "--environment", environment)
 
 		require.ErrorIs(t, err, reports.ErrSilent)
 		assert.Equal(t, "contract validation failed\n"+
@@ -192,7 +358,7 @@ payments (v2, deployed):
 
 		responder := httpmock.NewStringResponder(http.StatusBadRequest, `{"message":"contract validation failed","violations":[{"code":"property.name_syntax","path":"schemas;Pet;properties;user.name","source":"contract.yaml","details":{"key":"user.name","error":"must not contain \".\", \"[\", \"]\", \"{\", \"}\" or \";\""}}]}`)
 
-		out, errOut, err := runValidate(t, responder, file, "--participant", participant, "--environment", environment)
+		out, errOut, err := runValidate(t, restModules, responder, file, "--participant", participant, "--environment", environment)
 
 		require.ErrorIs(t, err, reports.ErrSilent)
 		assert.Equal(t, "contract validation failed\n"+
@@ -206,7 +372,7 @@ payments (v2, deployed):
 
 		responder := httpmock.NewStringResponder(http.StatusNotFound, `{"message":"participant not found"}`)
 
-		out, errOut, err := runValidate(t, responder, file, "--participant", "ghost", "--environment", environment)
+		out, errOut, err := runValidate(t, restModules, responder, file, "--participant", "ghost", "--environment", environment)
 
 		require.Error(t, err)
 		assert.NotErrorIs(t, err, reports.ErrSilent)
@@ -220,7 +386,7 @@ payments (v2, deployed):
 
 		responder := httpmock.NewStringResponder(http.StatusNotFound, `{"message":"environment not found"}`)
 
-		out, errOut, err := runValidate(t, responder, file, "--participant", participant, "--environment", "nowhere")
+		out, errOut, err := runValidate(t, restModules, responder, file, "--participant", participant, "--environment", "nowhere")
 
 		require.Error(t, err)
 		assert.NotErrorIs(t, err, reports.ErrSilent)
@@ -233,7 +399,7 @@ payments (v2, deployed):
 		notes := filepath.Join(t.TempDir(), "notes.txt")
 		require.NoError(t, os.WriteFile(notes, []byte("not a contract"), 0o600))
 
-		_, _, err := runValidate(t, unexpectedRequest, notes, "--participant", participant, "--environment", environment)
+		_, _, err := runValidate(t, restModules, unexpectedRequest, notes, "--participant", participant, "--environment", environment)
 
 		require.Error(t, err)
 		assert.Equal(t, `unsupported contract file extension: "`+notes+`"`, err.Error())
@@ -243,7 +409,7 @@ payments (v2, deployed):
 	t.Run("only --participant fails before any request", func(t *testing.T) {
 		file := writeContract(t)
 
-		_, _, err := runValidate(t, unexpectedRequest, file, "--participant", participant)
+		_, _, err := runValidate(t, restModules, unexpectedRequest, file, "--participant", participant)
 
 		require.Error(t, err)
 		assert.Equal(t, "if any flags in the group [participant environment] are set they must all be set; missing [environment]", err.Error())
@@ -263,7 +429,7 @@ payments (v2, deployed):
 			return httpmock.NewStringResponse(http.StatusOK, `{"message":"contract validated successfully"}`), nil
 		}
 
-		out, errOut, err := runValidate(t, responder, file)
+		out, errOut, err := runValidate(t, restModules, responder, file)
 
 		require.NoError(t, err)
 		assert.Equal(t, 1, httpmock.GetCallCountInfo()["POST "+endpoint])
@@ -281,7 +447,7 @@ payments (v2, deployed):
 
 		responder := httpmock.NewStringResponder(http.StatusBadRequest, `{"message":"contract validation failed","violations":[{"code":"schema.unresolved_name","path":"consumes;payments;rest;/payments/*;put;request","source":"contract.yaml","details":{"schema":"Payment","resource":"consumes payments PUT /payments/* request"}}]}`)
 
-		out, errOut, err := runValidate(t, responder, file)
+		out, errOut, err := runValidate(t, restModules, responder, file)
 
 		require.ErrorIs(t, err, reports.ErrSilent)
 		assert.Equal(t, "contract validation failed\n"+

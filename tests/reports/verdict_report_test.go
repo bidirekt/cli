@@ -2,19 +2,24 @@ package reports_test
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/bidirekt/cli/internal/paint"
 	"github.com/bidirekt/cli/internal/reports"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFormatDeployableReportNamesTheCounterpartsComparedWithInAlphabeticalOrder(t *testing.T) {
 	apiVersion := "4.0.0"
 	results := map[string]reports.CanIDeployResult{
-		"petstore_reviews": {Deployable: true, Endpoints: map[string]map[string]map[string][]reports.ContractBreak{}},
-		"petstore_api":     {Deployable: true, ParticipantVersion: &apiVersion, Endpoints: map[string]map[string]map[string][]reports.ContractBreak{}},
-		"petstore_admin":   {Deployable: true, Endpoints: map[string]map[string]map[string][]reports.ContractBreak{}},
+		"petstore_reviews": {Deployable: true},
+		"petstore_api":     {Deployable: true, ParticipantVersion: &apiVersion},
+		"petstore_admin":   {Deployable: true},
 	}
 
 	report := reports.FormatDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 3.0.0", "production", results)
@@ -36,7 +41,7 @@ func TestFormatDeployableReportPaintsOnlyTheVerdictGreen(t *testing.T) {
 	t.Setenv("NO_COLOR", "")
 	t.Setenv("CLICOLOR_FORCE", "1")
 	results := map[string]reports.CanIDeployResult{
-		"petstore_api": {Deployable: true, Endpoints: map[string]map[string]map[string][]reports.ContractBreak{}},
+		"petstore_api": {Deployable: true},
 	}
 
 	report := reports.FormatDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 3.0.0", "production", results)
@@ -59,1428 +64,251 @@ func TestFormatSyntaxValidReportPaintsTheLineGreen(t *testing.T) {
 	assert.Equal(t, "\x1b[32mcontract is valid; add --participant and --environment to compare it with what is deployed\x1b[0m\n", report)
 }
 
-func TestFormatNotDeployableReportWalksTheTree(t *testing.T) {
+func TestFormatNotDeployableReportHeadsEachBreakingCounterpartAndHandsItsTreesToTheirModule(t *testing.T) {
 	apiVersion := "4.0.0"
 	paymentsVersion := "1.4.0"
 	results := map[string]reports.CanIDeployResult{
 		"petstore_api": {
 			Deployable:         false,
 			ParticipantVersion: &apiVersion,
-			Endpoints: map[string]map[string]map[string][]reports.ContractBreak{
-				"/pets": {
-					"post": {
-						"request": {
-							{Reason: "property_optional_in_consumer_required_in_provider", Role: "consumer", Details: map[string]string{
-								"consumerField": "NewPet.name", "providerField": "NewPetRecord.name", "property": "$.name", "propertyType": "string",
-								"consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-							{Reason: "property_missing_in_consumer", Role: "consumer", Details: map[string]string{
-								"providerField": "NewPetRecord.ownerId", "property": "$.ownerId", "propertyType": "integer",
-								"consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-						},
-					},
-				},
-				"/pets/*": {
-					"get": {
-						"200": {
-							{Reason: "property_missing_in_provider", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet.photoUrl", "property": "$.photoUrl", "propertyType": "string",
-								"consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-							{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet.weight", "providerField": "PetRecord.weight", "property": "$.weight",
-								"consumerPropertyType": "integer", "providerPropertyType": "float", "consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-						},
-					},
-				},
+			Trees: map[string]json.RawMessage{
+				"topics": json.RawMessage(`{"pet_events":[{"reason":"topic_not_found","role":"consumer"}]}`),
 			},
 		},
 		"petstore_reviews": {
 			Deployable: false,
-			Endpoints: map[string]map[string]map[string][]reports.ContractBreak{
-				"/reviews/*": {
-					"get": {
-						"200": {
-							{Reason: "provider_resource_not_found", Role: "consumer"},
-						},
-					},
-				},
+			Trees: map[string]json.RawMessage{
+				"topics": json.RawMessage(`{"review_events":[{"reason":"topic_not_found","role":"consumer"}]}`),
 			},
 		},
-		"petstore_payments": {
-			Deployable:         true,
-			ParticipantVersion: &paymentsVersion,
-			Endpoints:          map[string]map[string]map[string][]reports.ContractBreak{},
-		},
+		"petstore_payments": {Deployable: true, ParticipantVersion: &paymentsVersion},
 	}
 
-	report := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 2.0.0", "petstore_web", "production", results)
+	report, err := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 2.0.0", "petstore_web", "production", results, []reports.Module{
+		{Report: echoProtocol{reportKey: "topics"}},
+	})
 
+	require.NoError(t, err)
 	assert.Equal(t, `petstore_web 2.0.0 cannot be deployed to production
 
 petstore_api (4.0.0, deployed):
-  NewPet.name — petstore_web sends it only sometimes, but petstore_api requires it
-    → petstore_web: always send it
-    → petstore_api: handle its absence in the code, then mark it optional there
-      · POST /pets request at "$.name" (petstore_api: NewPetRecord.name)
-  NewPetRecord.ownerId — petstore_web doesn't send it, but petstore_api requires it
-    → petstore_web: send it
-    → petstore_api: stop requiring it, then mark it optional there
-      · POST /pets request at "$.ownerId" (petstore_api: NewPetRecord.ownerId)
-  Pet.photoUrl — petstore_web reads it, but petstore_api doesn't provide it
-    → petstore_web: stop reading it, or handle its absence in the code and mark it optional
-    → petstore_api: provide it
-      · GET /pets/* response 200 at "$.photoUrl"
-  Pet.weight — petstore_web reads it as integer, but petstore_api provides float
-    → petstore_web: read it as float
-    → petstore_api: provide it as integer there
-      · GET /pets/* response 200 at "$.weight" (petstore_api: PetRecord.weight)
+  topics of petstore_api, checked for petstore_web in production: {"pet_events":[{"reason":"topic_not_found","role":"consumer"}]}
 
 petstore_reviews:
-  GET /reviews/*
-    response 200:
-      - petstore_web calls GET /reviews/*, but petstore_reviews doesn't provide it
-        → petstore_web: stop calling it
-        → petstore_reviews: publish it
+  topics of petstore_reviews, checked for petstore_web in production: {"review_events":[{"reason":"topic_not_found","role":"consumer"}]}
 `, report)
 }
 
-func TestFormatNotDeployableReportSpeaksFromTheProviderSide(t *testing.T) {
-	webVersion := "1.0.0"
+func TestFormatNotDeployableReportNamesTheMembersOfACounterpartInPlaceOfItsVersion(t *testing.T) {
 	results := map[string]reports.CanIDeployResult{
-		"petstore_web": {
-			Deployable:         false,
-			ParticipantVersion: &webVersion,
-			Endpoints: map[string]map[string]map[string][]reports.ContractBreak{
-				"/pets/*": {
-					"get": {
-						"200": {
-							{Reason: "property_optional_in_provider_required_in_consumer", Role: "provider", Details: map[string]string{
-								"consumerField": "Pet.status", "providerField": "PetRecord.status", "property": "$.status", "propertyType": "string",
-								"consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	report := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_api 3.0.0", "petstore_api", "production", results)
-
-	assert.Equal(t, `petstore_api 3.0.0 cannot be deployed to production
-
-petstore_web (1.0.0, deployed):
-  PetRecord.status — petstore_api provides it only sometimes, but petstore_web requires it
-    → petstore_api: always provide it
-    → petstore_web: handle its absence in the code, then mark it optional there
-      · GET /pets/* response 200 at "$.status" (petstore_web: Pet.status)
-`, report)
-}
-
-func TestFormatNotDeployableReportPrintsARemovedEndpointOnce(t *testing.T) {
-	results := map[string]reports.CanIDeployResult{
-		"petstore_web": {
+		"petstore_graph": {
 			Deployable: false,
-			Endpoints: map[string]map[string]map[string][]reports.ContractBreak{
-				"/pets": {
-					"post": {
-						"request": {{Reason: "provider_resource_removed_but_still_consumed", Role: "provider"}},
-						"201":     {{Reason: "provider_resource_removed_but_still_consumed", Role: "provider"}},
-						"400":     {{Reason: "provider_resource_removed_but_still_consumed", Role: "provider"}},
-					},
-				},
+			Members:    map[string]string{"petstore_reviews": "2.0.0", "petstore_api": "1.4.0", "petstore_orders": "1.0.0"},
+			Trees: map[string]json.RawMessage{
+				"topics": json.RawMessage(`{"pet_events":[{"reason":"topic_not_found","role":"consumer"}]}`),
 			},
 		},
 	}
 
-	report := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_api 3.0.0", "petstore_api", "production", results)
+	report, err := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 2.0.0", "petstore_web", "production", results, []reports.Module{
+		{Report: echoProtocol{reportKey: "topics"}},
+	})
 
-	assert.Equal(t, `petstore_api 3.0.0 cannot be deployed to production
-
-petstore_web:
-  POST /pets
-    - petstore_api removed POST /pets, but petstore_web still calls it
-      → petstore_api: keep it until petstore_web stops calling it
-      → petstore_web: stop calling it
-`, report)
-}
-
-func TestFormatNotDeployableReportKeepsTheOtherBreaksOfARemovedEndpoint(t *testing.T) {
-	results := map[string]reports.CanIDeployResult{
-		"petstore_web": {
-			Deployable: false,
-			Endpoints: map[string]map[string]map[string][]reports.ContractBreak{
-				"/pets": {
-					"post": {
-						"request": {{Reason: "provider_resource_removed_but_still_consumed", Role: "provider"}},
-						"201": {
-							{Reason: "provider_resource_removed_but_still_consumed", Role: "provider"},
-							{Reason: "property_optional_in_provider_required_in_consumer", Role: "provider", Details: map[string]string{
-								"consumerField": "Pet.status", "providerField": "PetRecord.status", "property": "$.status", "propertyType": "string",
-								"consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	report := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_api 3.0.0", "petstore_api", "production", results)
-
-	assert.Equal(t, `petstore_api 3.0.0 cannot be deployed to production
-
-petstore_web:
-  POST /pets
-    - petstore_api removed POST /pets, but petstore_web still calls it
-      → petstore_api: keep it until petstore_web stops calling it
-      → petstore_web: stop calling it
-  PetRecord.status — petstore_api provides it only sometimes, but petstore_web requires it
-    → petstore_api: always provide it
-    → petstore_web: handle its absence in the code, then mark it optional there
-      · POST /pets response 201 at "$.status" (petstore_web: Pet.status)
-`, report)
-}
-
-func TestFormatNotDeployableReportPrintsEachRemovedEndpointOnce(t *testing.T) {
-	results := map[string]reports.CanIDeployResult{
-		"petstore_web": {
-			Deployable: false,
-			Endpoints: map[string]map[string]map[string][]reports.ContractBreak{
-				"/pets": {
-					"post": {
-						"request": {{Reason: "provider_resource_removed_but_still_consumed", Role: "provider"}},
-						"201":     {{Reason: "provider_resource_removed_but_still_consumed", Role: "provider"}},
-					},
-				},
-				"/pets/*": {
-					"delete": {
-						"204": {{Reason: "provider_resource_removed_but_still_consumed", Role: "provider"}},
-					},
-				},
-			},
-		},
-	}
-
-	report := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_api 3.0.0", "petstore_api", "production", results)
-
-	assert.Equal(t, `petstore_api 3.0.0 cannot be deployed to production
-
-petstore_web:
-  POST /pets
-    - petstore_api removed POST /pets, but petstore_web still calls it
-      → petstore_api: keep it until petstore_web stops calling it
-      → petstore_web: stop calling it
-  DELETE /pets/*
-    - petstore_api removed DELETE /pets/*, but petstore_web still calls it
-      → petstore_api: keep it until petstore_web stops calling it
-      → petstore_web: stop calling it
-`, report)
-}
-
-func TestFormatNotDeployableReportPrintsARemovedInteractionPerInteraction(t *testing.T) {
-	results := map[string]reports.CanIDeployResult{
-		"petstore_web": {
-			Deployable: false,
-			Endpoints: map[string]map[string]map[string][]reports.ContractBreak{
-				"/pets/*": {
-					"delete": {
-						"200": {{Reason: "provider_resource_interaction_removed_but_still_consumed", Role: "provider", Details: map[string]string{"providerStatuses": "204"}}},
-						"202": {{Reason: "provider_resource_interaction_removed_but_still_consumed", Role: "provider", Details: map[string]string{"providerStatuses": "204"}}},
-					},
-				},
-				"/pets": {
-					"post": {
-						"request": {{Reason: "provider_resource_removed_but_still_consumed", Role: "provider"}},
-						"201":     {{Reason: "provider_resource_removed_but_still_consumed", Role: "provider"}},
-					},
-				},
-			},
-		},
-	}
-
-	report := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_api 3.0.0", "petstore_api", "production", results)
-
-	assert.Equal(t, `petstore_api 3.0.0 cannot be deployed to production
-
-petstore_web:
-  POST /pets
-    - petstore_api removed POST /pets, but petstore_web still calls it
-      → petstore_api: keep it until petstore_web stops calling it
-      → petstore_web: stop calling it
-  DELETE /pets/*
-    response 200:
-      - petstore_api now answers DELETE /pets/* only with 204, but petstore_web still reads response 200
-        → petstore_api: keep answering 200 until petstore_web stops reading it
-        → petstore_web: read response 204
-    response 202:
-      - petstore_api now answers DELETE /pets/* only with 204, but petstore_web still reads response 202
-        → petstore_api: keep answering 202 until petstore_web stops reading it
-        → petstore_web: read response 204
-`, report)
-}
-
-func TestFormatNotDeployableReportOmitsVersionWhenNull(t *testing.T) {
-	results := map[string]reports.CanIDeployResult{
-		"petstore_reviews": {
-			Deployable: false,
-			Endpoints: map[string]map[string]map[string][]reports.ContractBreak{
-				"/reviews/*": {
-					"get": {
-						"200": {
-							{Reason: "provider_resource_not_found", Role: "consumer"},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	report := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 2.0.0", "petstore_web", "production", results)
-
+	require.NoError(t, err)
 	assert.Equal(t, `petstore_web 2.0.0 cannot be deployed to production
 
-petstore_reviews:
-  GET /reviews/*
-    response 200:
-      - petstore_web calls GET /reviews/*, but petstore_reviews doesn't provide it
-        → petstore_web: stop calling it
-        → petstore_reviews: publish it
+petstore_graph (petstore_api 1.4.0 + petstore_orders 1.0.0 + petstore_reviews 2.0.0, deployed):
+  topics of petstore_graph, checked for petstore_web in production: {"pet_events":[{"reason":"topic_not_found","role":"consumer"}]}
 `, report)
 }
 
-func TestFormatNotDeployableReportSaysWhatTheProviderLacksOnAMethodItHas(t *testing.T) {
+func TestFormatNotDeployableReportMarksTheMemberThatIsTheCheckedParticipantAsTheCandidate(t *testing.T) {
 	results := map[string]reports.CanIDeployResult{
-		"api": {
+		"petstore_graph": {
 			Deployable: false,
-			Endpoints: map[string]map[string]map[string][]reports.ContractBreak{
-				"/api/newsletter/unsubscribe": {
-					"post": {
-						"200": {
-							{Reason: "provider_resource_interaction_not_found", Role: "consumer", Details: map[string]string{"providerStatuses": "204"}},
-						},
-					},
-					"delete": {
-						"204": {
-							{Reason: "provider_resource_not_found", Role: "consumer"},
-						},
-					},
-				},
-				"/api/users/*/restore": {
-					"post": {
-						"request": {
-							{Reason: "provider_resource_interaction_not_found", Role: "consumer", Details: map[string]string{"providerStatuses": "204, 404"}},
-						},
-					},
-				},
+			Members:    map[string]string{"petstore_reviews": "v1", "petstore_api": "v2"},
+			Trees: map[string]json.RawMessage{
+				"topics": json.RawMessage(`{"pet_events":[{"reason":"topic_not_found","role":"consumer"}]}`),
 			},
 		},
 	}
 
-	report := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "site 1.0.0", "site", "production", results)
+	report, err := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_api v2", "petstore_api", "production", results, []reports.Module{
+		{Report: echoProtocol{reportKey: "topics"}},
+	})
 
-	assert.Equal(t, `site 1.0.0 cannot be deployed to production
+	require.NoError(t, err)
+	assert.Equal(t, `petstore_api v2 cannot be deployed to production
 
-api:
-  DELETE /api/newsletter/unsubscribe
-    response 204:
-      - site calls DELETE /api/newsletter/unsubscribe, but api doesn't provide it
-        → site: stop calling it
-        → api: publish it
-  POST /api/newsletter/unsubscribe
-    response 200:
-      - site reads response 200, but api answers only 204
-        → site: read response 204
-        → api: answer 200
-  POST /api/users/*/restore
-    request:
-      - site sends a request body, but api declares none
-        → site: stop sending it
-        → api: accept a request body
+petstore_graph (petstore_api v2 candidate + petstore_reviews v1, deployed):
+  topics of petstore_graph, checked for petstore_api in production: {"pet_events":[{"reason":"topic_not_found","role":"consumer"}]}
 `, report)
+}
+
+func TestFormatNotDeployableReportMarksACandidateWithoutAVersionOnce(t *testing.T) {
+	results := map[string]reports.CanIDeployResult{
+		"petstore_graph": {
+			Deployable: false,
+			Members:    map[string]string{"petstore_reviews": "v1", "petstore_api": "candidate"},
+			Trees: map[string]json.RawMessage{
+				"topics": json.RawMessage(`{"pet_events":[{"reason":"topic_not_found","role":"consumer"}]}`),
+			},
+		},
+	}
+
+	report, err := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_api local contract", "petstore_api", "production", results, []reports.Module{
+		{Report: echoProtocol{reportKey: "topics"}},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, `petstore_api local contract cannot be deployed to production
+
+petstore_graph (petstore_api candidate + petstore_reviews v1, deployed):
+  topics of petstore_graph, checked for petstore_api in production: {"pet_events":[{"reason":"topic_not_found","role":"consumer"}]}
+`, report)
+}
+
+func TestFormatNotDeployableReportWritesTheTreesOfACounterpartInReportKeyOrder(t *testing.T) {
+	results := map[string]reports.CanIDeployResult{
+		"petstore_api": {
+			Deployable: false,
+			Trees: map[string]json.RawMessage{
+				"topics": json.RawMessage(`{"pet_events":[{"reason":"topic_not_found","role":"consumer"}]}`),
+				"queues": json.RawMessage(`{"adoptions":[{"reason":"queue_not_found","role":"consumer"}]}`),
+			},
+		},
+	}
+
+	report, err := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 2.0.0", "petstore_web", "production", results, []reports.Module{
+		{Report: echoProtocol{reportKey: "topics"}},
+		{Report: echoProtocol{reportKey: "queues"}},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, `petstore_web 2.0.0 cannot be deployed to production
+
+petstore_api:
+  queues of petstore_api, checked for petstore_web in production: {"adoptions":[{"reason":"queue_not_found","role":"consumer"}]}
+  topics of petstore_api, checked for petstore_web in production: {"pet_events":[{"reason":"topic_not_found","role":"consumer"}]}
+`, report)
+}
+
+func TestFormatNotDeployableReportRefusesATreeNoModuleReports(t *testing.T) {
+	results := map[string]reports.CanIDeployResult{
+		"petstore_api": {
+			Deployable: false,
+			Trees: map[string]json.RawMessage{
+				"endpoints": json.RawMessage(`{"/pets":{"get":{"200":[{"reason":"provider_resource_not_found","role":"consumer"}]}}}`),
+			},
+		},
+	}
+
+	report, err := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 2.0.0", "petstore_web", "production", results, []reports.Module{
+		{Report: echoProtocol{reportKey: "topics"}},
+	})
+
+	require.EqualError(t, err, "the broker reported protocol endpoints, which this bidirekt doesn't know; update bidirekt")
+	assert.Empty(t, report)
+}
+
+func TestFormatNotDeployableReportReturnsTheErrorOfATreeItsModuleCannotWrite(t *testing.T) {
+	failure := errors.New("cannot parse the topics of petstore_api: unexpected end of JSON input")
+	results := map[string]reports.CanIDeployResult{
+		"petstore_api": {
+			Deployable: false,
+			Trees: map[string]json.RawMessage{
+				"topics": json.RawMessage(`{"pet_events":[`),
+			},
+		},
+	}
+
+	report, err := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 2.0.0", "petstore_web", "production", results, []reports.Module{
+		{Report: echoProtocol{reportKey: "topics", failure: failure}},
+	})
+
+	require.ErrorIs(t, err, failure)
+	assert.Empty(t, report)
 }
 
 func TestFormatNotDeployableReportPaintsTheHeadlineRed(t *testing.T) {
 	t.Setenv("NO_COLOR", "")
 	t.Setenv("CLICOLOR_FORCE", "1")
-
 	results := map[string]reports.CanIDeployResult{
 		"petstore_reviews": {
 			Deployable: false,
-			Endpoints: map[string]map[string]map[string][]reports.ContractBreak{
-				"/reviews/*": {
-					"get": {
-						"200": {
-							{Reason: "provider_resource_not_found", Role: "consumer"},
-						},
-					},
-				},
+			Trees: map[string]json.RawMessage{
+				"topics": json.RawMessage(`{"review_events":[{"reason":"topic_not_found","role":"consumer"}]}`),
 			},
 		},
 	}
 
-	report := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 2.0.0", "petstore_web", "production", results)
+	report, err := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 2.0.0", "petstore_web", "production", results, []reports.Module{
+		{Report: echoProtocol{reportKey: "topics"}},
+	})
 
+	require.NoError(t, err)
 	assert.Equal(t, "\x1b[31mpetstore_web 2.0.0 cannot be deployed to production\x1b[0m\n"+
 		"\n"+
 		"petstore_reviews:\n"+
-		"  GET /reviews/*\n"+
-		"    response 200:\n"+
-		"      - petstore_web calls GET /reviews/*, but petstore_reviews doesn't provide it\n"+
-		"        → petstore_web: stop calling it\n"+
-		"        → petstore_reviews: publish it\n",
+		`  topics of petstore_reviews, checked for petstore_web in production: {"review_events":[{"reason":"topic_not_found","role":"consumer"}]}`+"\n",
 		report)
 }
 
-func TestFormatNotDeployableReportGathersAFieldsPlacesInOneBlock(t *testing.T) {
-	results := map[string]reports.CanIDeployResult{
-		"petstore_api": {
-			Deployable: false,
-			Endpoints: map[string]map[string]map[string][]reports.ContractBreak{
-				"/pets/*": {
-					"put": {
-						"200": {
-							{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet.weight", "providerField": "PetRecord.weight", "property": "$.weight",
-								"consumerPropertyType": "integer", "providerPropertyType": "float", "consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-						},
-					},
-					"get": {
-						"200": {
-							{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet.weight", "providerField": "PetRecord.weight", "property": "$.weight",
-								"consumerPropertyType": "integer", "providerPropertyType": "float", "consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-							{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet.weight", "providerField": "PetRecord.weight", "property": "$.mother.weight",
-								"consumerPropertyType": "integer", "providerPropertyType": "float", "consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-						},
-					},
-				},
-				"/pets": {
-					"post": {
-						"201": {
-							{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet.weight", "providerField": "PetRecord.weight", "property": "$.weight",
-								"consumerPropertyType": "integer", "providerPropertyType": "float", "consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-						},
-						"200": {
-							{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet.weight", "providerField": "PetRecord.weight", "property": "$.weight",
-								"consumerPropertyType": "integer", "providerPropertyType": "float", "consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-						},
-					},
-					"get": {
-						"200": {
-							{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet.weight", "providerField": "PetSummary.weight", "property": "$[].weight",
-								"consumerPropertyType": "integer", "providerPropertyType": "float", "consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-						},
-					},
-				},
-			},
-		},
-	}
+func TestCanIDeployResultReadsTheHeaderKeysAndKeepsEveryOtherKeyAsATree(t *testing.T) {
+	var result reports.CanIDeployResult
 
-	report := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 2.0.0", "petstore_web", "production", results)
+	err := json.Unmarshal([]byte(`{
+	  "deployable": false,
+	  "participantVersion": "4.0.0",
+	  "members": {"petstore_api": "1.4.0", "petstore_reviews": "2.0.0"},
+	  "endpoints": {"/pets": {"get": {"200": [{"reason": "provider_resource_not_found", "role": "consumer"}]}}},
+	  "topics": {"pet_events": [{"reason": "topic_not_found", "role": "consumer"}]}
+	}`), &result)
 
-	assert.Equal(t, `petstore_web 2.0.0 cannot be deployed to production
-
-petstore_api:
-  Pet.weight — petstore_web reads it as integer, but petstore_api provides float (6 places)
-    → petstore_web: read it as float
-    → petstore_api: provide it as integer there
-      · GET /pets response 200 at "$[].weight" (petstore_api: PetSummary.weight)
-      · POST /pets response 200 at "$.weight" (petstore_api: PetRecord.weight)
-      · POST /pets response 201 at "$.weight" (petstore_api: PetRecord.weight)
-      · GET /pets/* response 200 at "$.mother.weight" (petstore_api: PetRecord.weight)
-      · GET /pets/* response 200 at "$.weight" (petstore_api: PetRecord.weight)
-      · PUT /pets/* response 200 at "$.weight" (petstore_api: PetRecord.weight)
-`, report)
+	require.NoError(t, err)
+	assert.False(t, result.Deployable)
+	require.NotNil(t, result.ParticipantVersion)
+	assert.Equal(t, "4.0.0", *result.ParticipantVersion)
+	assert.Equal(t, map[string]string{"petstore_api": "1.4.0", "petstore_reviews": "2.0.0"}, result.Members)
+	require.Len(t, result.Trees, 2)
+	assert.JSONEq(t, `{"/pets": {"get": {"200": [{"reason": "provider_resource_not_found", "role": "consumer"}]}}}`, string(result.Trees["endpoints"]))
+	assert.JSONEq(t, `{"pet_events": [{"reason": "topic_not_found", "role": "consumer"}]}`, string(result.Trees["topics"]))
 }
 
-func TestFormatNotDeployableReportGathersAMissingValuesPlacesInOneBlock(t *testing.T) {
-	results := map[string]reports.CanIDeployResult{
-		"petstore_api": {
-			Deployable: false,
-			Endpoints: map[string]map[string]map[string][]reports.ContractBreak{
-				"/pets/*": {
-					"get": {
-						"200": {
-							{Reason: "property_member_missing_in_provider", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet.status", "providerField": "PetRecord.status", "property": "$.status", "member": "adopted",
-								"consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-						},
-					},
-				},
-				"/pets": {
-					"get": {
-						"200": {
-							{Reason: "property_member_missing_in_provider", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet.status", "providerField": "PetRecord.status", "property": "$[].status", "member": "adopted",
-								"consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-						},
-					},
-				},
-			},
-		},
-	}
+func TestCanIDeployResultCountsAnEmptyTreeAsAbsent(t *testing.T) {
+	var result reports.CanIDeployResult
 
-	report := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 2.0.0", "petstore_web", "production", results)
+	err := json.Unmarshal([]byte(`{"deployable": true, "participantVersion": null, "endpoints": {}, "topics": { }, "queues": null}`), &result)
 
-	assert.Equal(t, `petstore_web 2.0.0 cannot be deployed to production
-
-petstore_api:
-  Pet.status — petstore_web reads "adopted", but petstore_api doesn't provide it (2 places)
-    → petstore_web: stop reading "adopted"
-    → petstore_api: provide "adopted" there
-      · GET /pets response 200 at "$[].status" (petstore_api: PetRecord.status)
-      · GET /pets/* response 200 at "$.status" (petstore_api: PetRecord.status)
-`, report)
+	require.NoError(t, err)
+	assert.True(t, result.Deployable)
+	assert.Nil(t, result.ParticipantVersion)
+	assert.Nil(t, result.Members)
+	assert.Empty(t, result.Trees)
 }
 
-func TestFormatNotDeployableReportKeepsAFieldsMissingValuesInSeparateBlocks(t *testing.T) {
-	results := map[string]reports.CanIDeployResult{
-		"petstore_api": {
-			Deployable: false,
-			Endpoints: map[string]map[string]map[string][]reports.ContractBreak{
-				"/pets/*": {
-					"get": {
-						"200": {
-							{Reason: "property_member_missing_in_provider", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet.status", "providerField": "PetRecord.status", "property": "$.status", "member": "lost",
-								"consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-						},
-					},
-				},
-				"/pets": {
-					"get": {
-						"200": {
-							{Reason: "property_member_missing_in_provider", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet.status", "providerField": "PetRecord.status", "property": "$[].status", "member": "lost",
-								"consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-							{Reason: "property_member_missing_in_provider", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet.status", "providerField": "PetRecord.status", "property": "$[].status", "member": "adopted",
-								"consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	report := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 2.0.0", "petstore_web", "production", results)
-
-	assert.Equal(t, `petstore_web 2.0.0 cannot be deployed to production
-
-petstore_api:
-  Pet.status — petstore_web reads "adopted", but petstore_api doesn't provide it
-    → petstore_web: stop reading "adopted"
-    → petstore_api: provide "adopted" there
-      · GET /pets response 200 at "$[].status" (petstore_api: PetRecord.status)
-  Pet.status — petstore_web reads "lost", but petstore_api doesn't provide it (2 places)
-    → petstore_web: stop reading "lost"
-    → petstore_api: provide "lost" there
-      · GET /pets response 200 at "$[].status" (petstore_api: PetRecord.status)
-      · GET /pets/* response 200 at "$.status" (petstore_api: PetRecord.status)
-`, report)
+type echoProtocol struct {
+	reportKey string
+	failure   error
 }
 
-func TestFormatNotDeployableReportPutsAFieldsReasonsInSeparateBlocks(t *testing.T) {
-	results := map[string]reports.CanIDeployResult{
-		"petstore_api": {
-			Deployable: false,
-			Endpoints: map[string]map[string]map[string][]reports.ContractBreak{
-				"/pets/*": {
-					"get": {
-						"200": {
-							{Reason: "property_optional_in_provider_required_in_consumer", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet.tag", "providerField": "PetRecord.tag", "property": "$.tag", "propertyType": "string",
-								"consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-							{Reason: "property_nullable_in_provider_not_nullable_in_consumer", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet.tag", "providerField": "PetRecord.tag", "property": "$.tag", "propertyType": "string",
-								"consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	report := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 2.0.0", "petstore_web", "production", results)
-
-	assert.Equal(t, `petstore_web 2.0.0 cannot be deployed to production
-
-petstore_api:
-  Pet.tag — petstore_web doesn't accept null, but petstore_api may provide null
-    → petstore_web: handle null in the code, then mark it nullable
-    → petstore_api: stop providing null there
-      · GET /pets/* response 200 at "$.tag" (petstore_api: PetRecord.tag)
-  Pet.tag — petstore_web requires it, but petstore_api only sometimes provides it
-    → petstore_web: handle its absence in the code, then mark it optional
-    → petstore_api: always provide it there
-      · GET /pets/* response 200 at "$.tag" (petstore_api: PetRecord.tag)
-`, report)
+func (this echoProtocol) ReportKey() string {
+	return this.reportKey
 }
 
-func TestFormatNotDeployableReportOrdersBlocksByFieldThenReasonThenTypes(t *testing.T) {
-	results := map[string]reports.CanIDeployResult{
-		"petstore_api": {
-			Deployable: false,
-			Endpoints: map[string]map[string]map[string][]reports.ContractBreak{
-				"/pets/*": {
-					"get": {
-						"200": {
-							{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet.weight", "providerField": "PetRecord.weight", "property": "$.weight",
-								"consumerPropertyType": "integer", "providerPropertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-							{Reason: "property_missing_in_provider", Role: "consumer", Details: map[string]string{
-								"consumerField": "Owner.name", "property": "$.owner.name", "propertyType": "string",
-								"consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-						},
-					},
-				},
-				"/pets": {
-					"get": {
-						"200": {
-							{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet.weight", "providerField": "PetSummary.weight", "property": "$[].weight",
-								"consumerPropertyType": "integer", "providerPropertyType": "float", "consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-						},
-					},
-				},
-			},
-		},
+func (this echoProtocol) WriteTree(report *strings.Builder, counterpart reports.Counterpart, tree json.RawMessage) error {
+	if this.failure != nil {
+		return this.failure
 	}
 
-	report := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 2.0.0", "petstore_web", "production", results)
-
-	assert.Equal(t, `petstore_web 2.0.0 cannot be deployed to production
-
-petstore_api:
-  Owner.name — petstore_web reads it, but petstore_api doesn't provide it
-    → petstore_web: stop reading it, or handle its absence in the code and mark it optional
-    → petstore_api: provide it
-      · GET /pets/* response 200 at "$.owner.name"
-  Pet.weight — petstore_web reads it as integer, but petstore_api provides float
-    → petstore_web: read it as float
-    → petstore_api: provide it as integer there
-      · GET /pets response 200 at "$[].weight" (petstore_api: PetSummary.weight)
-  Pet.weight — petstore_web reads it as integer, but petstore_api provides string
-    → petstore_web: read it as string
-    → petstore_api: provide it as integer there
-      · GET /pets/* response 200 at "$.weight" (petstore_api: PetRecord.weight)
-`, report)
+	_, err := fmt.Fprintf(report, "  %s of %s, checked for %s in %s: %s\n", this.reportKey, counterpart.Name, counterpart.CheckedParticipant, counterpart.Environment, tree)
+	return err
 }
 
-func TestFormatNotDeployableReportSplitsAFieldsBlocksByDirectionThenRole(t *testing.T) {
-	results := map[string]reports.CanIDeployResult{
-		"petstore_api": {
-			Deployable: false,
-			Endpoints: map[string]map[string]map[string][]reports.ContractBreak{
-				"/web/pets/*": {
-					"get": {
-						"200": {
-							{Reason: "property_type_mismatch", Role: "provider", Details: map[string]string{
-								"consumerField": "PetView.weight", "providerField": "Pet.weight", "property": "$.weight",
-								"consumerPropertyType": "integer", "providerPropertyType": "float", "consumerName": "petstore_api", "providerName": "petstore_web",
-							}},
-						},
-					},
-				},
-				"/pets/*": {
-					"get": {
-						"200": {
-							{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet.weight", "providerField": "PetRecord.weight", "property": "$.weight",
-								"consumerPropertyType": "integer", "providerPropertyType": "float", "consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-						},
-					},
-				},
-				"/pets": {
-					"post": {
-						"request": {
-							{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet.weight", "providerField": "PetRecord.weight", "property": "$.weight",
-								"consumerPropertyType": "integer", "providerPropertyType": "float", "consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	report := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 2.0.0", "petstore_web", "production", results)
-
-	assert.Equal(t, `petstore_web 2.0.0 cannot be deployed to production
-
-petstore_api:
-  Pet.weight — petstore_web sends it as integer, but petstore_api expects float
-    → petstore_web: send float
-    → petstore_api: accept integer there
-      · POST /pets request at "$.weight" (petstore_api: PetRecord.weight)
-  Pet.weight — petstore_web reads it as integer, but petstore_api provides float
-    → petstore_web: read it as float
-    → petstore_api: provide it as integer there
-      · GET /pets/* response 200 at "$.weight" (petstore_api: PetRecord.weight)
-  Pet.weight — petstore_web provides it as float, but petstore_api reads integer
-    → petstore_web: provide it as integer
-    → petstore_api: read it as float there
-      · GET /web/pets/* response 200 at "$.weight" (petstore_api: PetView.weight)
-`, report)
+func (this echoProtocol) ViolationLine(reports.Violation) (headline, explanation string, known bool) {
+	return "", "", false
 }
 
-func TestFormatNotDeployableReportPrintsARepeatedPlaceOnce(t *testing.T) {
-	results := map[string]reports.CanIDeployResult{
-		"petstore_api": {
-			Deployable: false,
-			Endpoints: map[string]map[string]map[string][]reports.ContractBreak{
-				"/pets/*": {
-					"get": {
-						"200": {
-							{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet.weight", "providerField": "PetRecord.weight", "property": "$.weight",
-								"consumerPropertyType": "integer", "providerPropertyType": "float", "consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-							{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet.weight", "providerField": "LegacyPetRecord.weight", "property": "$.weight",
-								"consumerPropertyType": "integer", "providerPropertyType": "float", "consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-						},
-					},
-				},
-				"/pets": {
-					"get": {
-						"200": {
-							{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet.weight", "providerField": "PetRecord.weight", "property": "$[].weight",
-								"consumerPropertyType": "integer", "providerPropertyType": "float", "consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	report := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 2.0.0", "petstore_web", "production", results)
-
-	assert.Equal(t, `petstore_web 2.0.0 cannot be deployed to production
-
-petstore_api:
-  Pet.weight — petstore_web reads it as integer, but petstore_api provides float (2 places)
-    → petstore_web: read it as float
-    → petstore_api: provide it as integer there
-      · GET /pets response 200 at "$[].weight" (petstore_api: PetRecord.weight)
-      · GET /pets/* response 200 at "$.weight" (petstore_api: LegacyPetRecord.weight)
-`, report)
-}
-
-func TestFormatNotDeployableReportSaysThereWhenAnyPlaceNamesTheOtherSidesField(t *testing.T) {
-	results := map[string]reports.CanIDeployResult{
-		"petstore_api": {
-			Deployable: false,
-			Endpoints: map[string]map[string]map[string][]reports.ContractBreak{
-				"/pets/*": {
-					"get": {
-						"200": {
-							{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet.weight", "providerField": "PetRecord.weight", "property": "$.weight",
-								"consumerPropertyType": "integer", "providerPropertyType": "float", "consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-						},
-					},
-				},
-				"/pets": {
-					"get": {
-						"200": {
-							{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet.weight", "property": "$[].weight",
-								"consumerPropertyType": "integer", "providerPropertyType": "float", "consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	report := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 2.0.0", "petstore_web", "production", results)
-
-	assert.Equal(t, `petstore_web 2.0.0 cannot be deployed to production
-
-petstore_api:
-  Pet.weight — petstore_web reads it as integer, but petstore_api provides float (2 places)
-    → petstore_web: read it as float
-    → petstore_api: provide it as integer there
-      · GET /pets response 200 at "$[].weight"
-      · GET /pets/* response 200 at "$.weight" (petstore_api: PetRecord.weight)
-`, report)
-}
-
-func TestFormatNotDeployableReportPrintsTheEndpointBreaksBeforeTheBlocks(t *testing.T) {
-	apiVersion := "4.0.0"
-	results := map[string]reports.CanIDeployResult{
-		"petstore_api": {
-			Deployable:         false,
-			ParticipantVersion: &apiVersion,
-			Endpoints: map[string]map[string]map[string][]reports.ContractBreak{
-				"/pets/*/archive": {
-					"post": {
-						"200": {
-							{Reason: "provider_resource_interaction_not_found", Role: "consumer", Details: map[string]string{"providerStatuses": "204"}},
-						},
-					},
-				},
-				"/pets/*": {
-					"get": {
-						"200": {
-							{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet.weight", "providerField": "PetRecord.weight", "property": "$.weight",
-								"consumerPropertyType": "integer", "providerPropertyType": "float", "consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-							{Reason: "property_nullable_in_provider_not_nullable_in_consumer", Role: "consumer", Details: map[string]string{
-								"property": "$.owner.uuid", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-						},
-					},
-				},
-				"/pets": {
-					"get": {
-						"200": {
-							{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet.weight", "providerField": "PetSummary.weight", "property": "$[].weight",
-								"consumerPropertyType": "integer", "providerPropertyType": "float", "consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	report := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 2.0.0", "petstore_web", "production", results)
-
-	assert.Equal(t, `petstore_web 2.0.0 cannot be deployed to production
-
-petstore_api (4.0.0, deployed):
-  POST /pets/*/archive
-    response 200:
-      - petstore_web reads response 200, but petstore_api answers only 204
-        → petstore_web: read response 204
-        → petstore_api: answer 200
-  "$.owner.uuid" — petstore_web doesn't accept null, but petstore_api may provide null
-    → petstore_web: handle null in the code, then mark it nullable
-    → petstore_api: stop providing null
-      · GET /pets/* response 200 at "$.owner.uuid"
-  Pet.weight — petstore_web reads it as integer, but petstore_api provides float (2 places)
-    → petstore_web: read it as float
-    → petstore_api: provide it as integer there
-      · GET /pets response 200 at "$[].weight" (petstore_api: PetSummary.weight)
-      · GET /pets/* response 200 at "$.weight" (petstore_api: PetRecord.weight)
-`, report)
-}
-
-func TestFormatNotDeployableReportNamesABreakWithoutFieldsByItsProperty(t *testing.T) {
-	results := map[string]reports.CanIDeployResult{
-		"petstore_api": {
-			Deployable: false,
-			Endpoints: map[string]map[string]map[string][]reports.ContractBreak{
-				"/pets/*": {
-					"get": {
-						"200": {
-							{Reason: "property_nullable_in_provider_not_nullable_in_consumer", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet.tag", "providerField": "PetRecord.tag", "property": "$.tag", "propertyType": "string",
-								"consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-							{Reason: "property_nullable_in_provider_not_nullable_in_consumer", Role: "consumer", Details: map[string]string{
-								"property": "$.owner.uuid", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
-							}},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	report := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 2.0.0", "petstore_web", "production", results)
-
-	assert.Equal(t, `petstore_web 2.0.0 cannot be deployed to production
-
-petstore_api:
-  "$.owner.uuid" — petstore_web doesn't accept null, but petstore_api may provide null
-    → petstore_web: handle null in the code, then mark it nullable
-    → petstore_api: stop providing null
-      · GET /pets/* response 200 at "$.owner.uuid"
-  Pet.tag — petstore_web doesn't accept null, but petstore_api may provide null
-    → petstore_web: handle null in the code, then mark it nullable
-    → petstore_api: stop providing null there
-      · GET /pets/* response 200 at "$.tag" (petstore_api: PetRecord.tag)
-`, report)
-}
-
-func TestFormatNotDeployableReportWritesAPropertyBreakAsAFieldBlock(t *testing.T) {
-	type checkedPlace struct {
-		participant, counterpart, endpoint, method, interaction string
-	}
-	webGetsPet := checkedPlace{participant: "petstore_web", counterpart: "petstore_api", endpoint: "/pets/*", method: "get", interaction: "200"}
-	apiServesPet := checkedPlace{participant: "petstore_api", counterpart: "petstore_web", endpoint: "/pets/*", method: "get", interaction: "200"}
-	webPostsPet := checkedPlace{participant: "petstore_web", counterpart: "petstore_api", endpoint: "/pets", method: "post", interaction: "request"}
-	apiReceivesPet := checkedPlace{participant: "petstore_api", counterpart: "petstore_web", endpoint: "/pets", method: "post", interaction: "request"}
-	spaGetsFiles := checkedPlace{participant: "spa", counterpart: "api", endpoint: "/files", method: "get", interaction: "200"}
-	spaGetsSession := checkedPlace{participant: "spa", counterpart: "api", endpoint: "/session", method: "get", interaction: "200"}
-
-	tests := []struct {
-		name          string
-		place         checkedPlace
-		contractBreak reports.ContractBreak
-		block         string
-	}{
-		{
-			name:  "property_missing_in_provider as consumer on a response",
-			place: webGetsPet,
-			contractBreak: reports.ContractBreak{Reason: "property_missing_in_provider", Role: "consumer", Details: map[string]string{
-				"consumerField": "Pet.photoUrl", "property": "$.photoUrl", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  Pet.photoUrl — petstore_web reads it, but petstore_api doesn't provide it
-    → petstore_web: stop reading it, or handle its absence in the code and mark it optional
-    → petstore_api: provide it
-      · GET /pets/* response 200 at "$.photoUrl"
-`,
-		},
-		{
-			name:  "property_missing_in_provider as provider on a response is named by the consumer's field",
-			place: apiServesPet,
-			contractBreak: reports.ContractBreak{Reason: "property_missing_in_provider", Role: "provider", Details: map[string]string{
-				"consumerField": "Pet.photoUrl", "property": "$.photoUrl", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  Pet.photoUrl — petstore_api doesn't provide it, but petstore_web reads it
-    → petstore_api: provide it
-    → petstore_web: stop reading it, or handle its absence in the code and mark it optional there
-      · GET /pets/* response 200 at "$.photoUrl" (petstore_web: Pet.photoUrl)
-`,
-		},
-		{
-			name:  "property_optional_in_provider_required_in_consumer as consumer on a response",
-			place: webGetsPet,
-			contractBreak: reports.ContractBreak{Reason: "property_optional_in_provider_required_in_consumer", Role: "consumer", Details: map[string]string{
-				"consumerField": "Pet.status", "providerField": "PetRecord.status", "property": "$.status", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  Pet.status — petstore_web requires it, but petstore_api only sometimes provides it
-    → petstore_web: handle its absence in the code, then mark it optional
-    → petstore_api: always provide it there
-      · GET /pets/* response 200 at "$.status" (petstore_api: PetRecord.status)
-`,
-		},
-		{
-			name:  "property_optional_in_provider_required_in_consumer as provider on a response",
-			place: apiServesPet,
-			contractBreak: reports.ContractBreak{Reason: "property_optional_in_provider_required_in_consumer", Role: "provider", Details: map[string]string{
-				"consumerField": "Pet.status", "providerField": "PetRecord.status", "property": "$.status", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  PetRecord.status — petstore_api provides it only sometimes, but petstore_web requires it
-    → petstore_api: always provide it
-    → petstore_web: handle its absence in the code, then mark it optional there
-      · GET /pets/* response 200 at "$.status" (petstore_web: Pet.status)
-`,
-		},
-		{
-			name:  "property_type_mismatch as consumer on a response",
-			place: webGetsPet,
-			contractBreak: reports.ContractBreak{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-				"consumerField": "Pet.weight", "providerField": "PetRecord.weight", "property": "$.weight", "consumerPropertyType": "integer", "providerPropertyType": "float",
-				"consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  Pet.weight — petstore_web reads it as integer, but petstore_api provides float
-    → petstore_web: read it as float
-    → petstore_api: provide it as integer there
-      · GET /pets/* response 200 at "$.weight" (petstore_api: PetRecord.weight)
-`,
-		},
-		{
-			name:  "property_type_mismatch as provider on a response",
-			place: apiServesPet,
-			contractBreak: reports.ContractBreak{Reason: "property_type_mismatch", Role: "provider", Details: map[string]string{
-				"consumerField": "Pet.weight", "providerField": "PetRecord.weight", "property": "$.weight", "consumerPropertyType": "integer", "providerPropertyType": "float",
-				"consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  PetRecord.weight — petstore_api provides it as float, but petstore_web reads integer
-    → petstore_api: provide it as integer
-    → petstore_web: read it as float there
-      · GET /pets/* response 200 at "$.weight" (petstore_web: Pet.weight)
-`,
-		},
-		{
-			name:  "property_nullable_in_provider_not_nullable_in_consumer as consumer on a response",
-			place: webGetsPet,
-			contractBreak: reports.ContractBreak{Reason: "property_nullable_in_provider_not_nullable_in_consumer", Role: "consumer", Details: map[string]string{
-				"consumerField": "Pet.tag", "providerField": "PetRecord.tag", "property": "$.tag", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  Pet.tag — petstore_web doesn't accept null, but petstore_api may provide null
-    → petstore_web: handle null in the code, then mark it nullable
-    → petstore_api: stop providing null there
-      · GET /pets/* response 200 at "$.tag" (petstore_api: PetRecord.tag)
-`,
-		},
-		{
-			name:  "property_nullable_in_provider_not_nullable_in_consumer as provider on a response",
-			place: apiServesPet,
-			contractBreak: reports.ContractBreak{Reason: "property_nullable_in_provider_not_nullable_in_consumer", Role: "provider", Details: map[string]string{
-				"consumerField": "Pet.tag", "providerField": "PetRecord.tag", "property": "$.tag", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  PetRecord.tag — petstore_api may provide null, but petstore_web doesn't accept it
-    → petstore_api: stop providing null
-    → petstore_web: handle null in the code, then mark it nullable there
-      · GET /pets/* response 200 at "$.tag" (petstore_web: Pet.tag)
-`,
-		},
-		{
-			name:  "property_missing_in_consumer as consumer on a request is named by the provider's field",
-			place: webPostsPet,
-			contractBreak: reports.ContractBreak{Reason: "property_missing_in_consumer", Role: "consumer", Details: map[string]string{
-				"providerField": "NewPetRecord.ownerId", "property": "$.ownerId", "propertyType": "integer", "consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  NewPetRecord.ownerId — petstore_web doesn't send it, but petstore_api requires it
-    → petstore_web: send it
-    → petstore_api: stop requiring it, then mark it optional there
-      · POST /pets request at "$.ownerId" (petstore_api: NewPetRecord.ownerId)
-`,
-		},
-		{
-			name:  "property_missing_in_consumer as provider on a request",
-			place: apiReceivesPet,
-			contractBreak: reports.ContractBreak{Reason: "property_missing_in_consumer", Role: "provider", Details: map[string]string{
-				"providerField": "NewPetRecord.ownerId", "property": "$.ownerId", "propertyType": "integer", "consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  NewPetRecord.ownerId — petstore_api requires it, but petstore_web doesn't send it
-    → petstore_api: stop requiring it, then mark it optional
-    → petstore_web: send it
-      · POST /pets request at "$.ownerId"
-`,
-		},
-		{
-			name:  "property_optional_in_consumer_required_in_provider as consumer on a request",
-			place: webPostsPet,
-			contractBreak: reports.ContractBreak{Reason: "property_optional_in_consumer_required_in_provider", Role: "consumer", Details: map[string]string{
-				"consumerField": "NewPet.name", "providerField": "NewPetRecord.name", "property": "$.name", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  NewPet.name — petstore_web sends it only sometimes, but petstore_api requires it
-    → petstore_web: always send it
-    → petstore_api: handle its absence in the code, then mark it optional there
-      · POST /pets request at "$.name" (petstore_api: NewPetRecord.name)
-`,
-		},
-		{
-			name:  "property_optional_in_consumer_required_in_provider as provider on a request",
-			place: apiReceivesPet,
-			contractBreak: reports.ContractBreak{Reason: "property_optional_in_consumer_required_in_provider", Role: "provider", Details: map[string]string{
-				"consumerField": "NewPet.name", "providerField": "NewPetRecord.name", "property": "$.name", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  NewPetRecord.name — petstore_api requires it, but petstore_web sends it only sometimes
-    → petstore_api: handle its absence in the code, then mark it optional
-    → petstore_web: always send it there
-      · POST /pets request at "$.name" (petstore_web: NewPet.name)
-`,
-		},
-		{
-			name:  "property_type_mismatch as consumer on a request",
-			place: webPostsPet,
-			contractBreak: reports.ContractBreak{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-				"consumerField": "NewPet.age", "providerField": "NewPetRecord.age", "property": "$.age", "consumerPropertyType": "string", "providerPropertyType": "integer",
-				"consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  NewPet.age — petstore_web sends it as string, but petstore_api expects integer
-    → petstore_web: send integer
-    → petstore_api: accept string there
-      · POST /pets request at "$.age" (petstore_api: NewPetRecord.age)
-`,
-		},
-		{
-			name:  "property_type_mismatch as provider on a request",
-			place: apiReceivesPet,
-			contractBreak: reports.ContractBreak{Reason: "property_type_mismatch", Role: "provider", Details: map[string]string{
-				"consumerField": "NewPet.age", "providerField": "NewPetRecord.age", "property": "$.age", "consumerPropertyType": "string", "providerPropertyType": "integer",
-				"consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  NewPetRecord.age — petstore_api expects it as integer, but petstore_web sends string
-    → petstore_api: accept string
-    → petstore_web: send integer there
-      · POST /pets request at "$.age" (petstore_web: NewPet.age)
-`,
-		},
-		{
-			name:  "property_nullable_in_consumer_not_nullable_in_provider as consumer on a request",
-			place: webPostsPet,
-			contractBreak: reports.ContractBreak{Reason: "property_nullable_in_consumer_not_nullable_in_provider", Role: "consumer", Details: map[string]string{
-				"consumerField": "NewPet.birthDate", "providerField": "NewPetRecord.birthDate", "property": "$.birthDate", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  NewPet.birthDate — petstore_web may send null, but petstore_api doesn't accept it
-    → petstore_web: stop sending null
-    → petstore_api: handle null in the code, then mark it nullable there
-      · POST /pets request at "$.birthDate" (petstore_api: NewPetRecord.birthDate)
-`,
-		},
-		{
-			name:  "property_nullable_in_consumer_not_nullable_in_provider as provider on a request",
-			place: apiReceivesPet,
-			contractBreak: reports.ContractBreak{Reason: "property_nullable_in_consumer_not_nullable_in_provider", Role: "provider", Details: map[string]string{
-				"consumerField": "NewPet.birthDate", "providerField": "NewPetRecord.birthDate", "property": "$.birthDate", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  NewPetRecord.birthDate — petstore_api doesn't accept null, but petstore_web may send it
-    → petstore_api: handle null in the code, then mark it nullable
-    → petstore_web: stop sending null there
-      · POST /pets request at "$.birthDate" (petstore_web: NewPet.birthDate)
-`,
-		},
-		{
-			name:  "property_member_missing_in_provider for an enum value as consumer on a response",
-			place: webGetsPet,
-			contractBreak: reports.ContractBreak{Reason: "property_member_missing_in_provider", Role: "consumer", Details: map[string]string{
-				"consumerField": "Pet.status", "providerField": "Pet.status", "property": "$[].status", "member": "adopted", "consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  Pet.status — petstore_web reads "adopted", but petstore_api doesn't provide it
-    → petstore_web: stop reading "adopted"
-    → petstore_api: provide "adopted" there
-      · GET /pets/* response 200 at "$[].status" (petstore_api: Pet.status)
-`,
-		},
-		{
-			name:  "property_member_missing_in_provider for an enum value as provider on a response",
-			place: apiServesPet,
-			contractBreak: reports.ContractBreak{Reason: "property_member_missing_in_provider", Role: "provider", Details: map[string]string{
-				"consumerField": "Pet.status", "providerField": "PetRecord.status", "property": "$.status", "member": "adopted", "consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  PetRecord.status — petstore_api doesn't provide "adopted", but petstore_web reads it
-    → petstore_api: provide "adopted"
-    → petstore_web: stop reading "adopted" there
-      · GET /pets/* response 200 at "$.status" (petstore_web: Pet.status)
-`,
-		},
-		{
-			name:  "property_member_missing_in_provider for an enum value as consumer on a request",
-			place: webPostsPet,
-			contractBreak: reports.ContractBreak{Reason: "property_member_missing_in_provider", Role: "consumer", Details: map[string]string{
-				"consumerField": "Pet.status", "providerField": "Pet.status", "property": "$.status", "member": "sold", "consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  Pet.status — petstore_web sends "sold", but petstore_api doesn't accept it
-    → petstore_web: stop sending "sold"
-    → petstore_api: accept "sold" there
-      · POST /pets request at "$.status" (petstore_api: Pet.status)
-`,
-		},
-		{
-			name:  "property_member_missing_in_provider for an enum value as provider on a request",
-			place: apiReceivesPet,
-			contractBreak: reports.ContractBreak{Reason: "property_member_missing_in_provider", Role: "provider", Details: map[string]string{
-				"consumerField": "NewPet.status", "providerField": "NewPetRecord.status", "property": "$.status", "member": "sold", "consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  NewPetRecord.status — petstore_api doesn't accept "sold", but petstore_web sends it
-    → petstore_api: accept "sold"
-    → petstore_web: stop sending "sold" there
-      · POST /pets request at "$.status" (petstore_web: NewPet.status)
-`,
-		},
-		{
-			name:  "property_member_missing_in_provider for a union member as consumer on a response",
-			place: webGetsPet,
-			contractBreak: reports.ContractBreak{Reason: "property_member_missing_in_provider", Role: "consumer", Details: map[string]string{
-				"consumerField": "Pet.payment", "providerField": "PetRecord.payment", "property": "$.payment", "member": "card", "consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  Pet.payment — petstore_web reads "card", but petstore_api doesn't provide it
-    → petstore_web: stop reading "card"
-    → petstore_api: provide "card" there
-      · GET /pets/* response 200 at "$.payment" (petstore_api: PetRecord.payment)
-`,
-		},
-		{
-			name:  "property_member_missing_in_provider for a union member as provider on a response",
-			place: apiServesPet,
-			contractBreak: reports.ContractBreak{Reason: "property_member_missing_in_provider", Role: "provider", Details: map[string]string{
-				"consumerField": "Pet.payment", "providerField": "PetRecord.payment", "property": "$.payment", "member": "card", "consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  PetRecord.payment — petstore_api doesn't provide "card", but petstore_web reads it
-    → petstore_api: provide "card"
-    → petstore_web: stop reading "card" there
-      · GET /pets/* response 200 at "$.payment" (petstore_web: Pet.payment)
-`,
-		},
-		{
-			name:  "property_member_missing_in_provider for a union member as consumer on a request",
-			place: webPostsPet,
-			contractBreak: reports.ContractBreak{Reason: "property_member_missing_in_provider", Role: "consumer", Details: map[string]string{
-				"consumerField": "NewPet.payment", "providerField": "NewPetRecord.payment", "property": "$.payment", "member": "pix", "consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  NewPet.payment — petstore_web sends "pix", but petstore_api doesn't accept it
-    → petstore_web: stop sending "pix"
-    → petstore_api: accept "pix" there
-      · POST /pets request at "$.payment" (petstore_api: NewPetRecord.payment)
-`,
-		},
-		{
-			name:  "property_member_missing_in_provider for a union member as provider on a request",
-			place: apiReceivesPet,
-			contractBreak: reports.ContractBreak{Reason: "property_member_missing_in_provider", Role: "provider", Details: map[string]string{
-				"consumerField": "NewPet.payment", "providerField": "NewPetRecord.payment", "property": "$.payment", "member": "pix", "consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  NewPetRecord.payment — petstore_api doesn't accept "pix", but petstore_web sends it
-    → petstore_api: accept "pix"
-    → petstore_web: stop sending "pix" there
-      · POST /pets request at "$.payment" (petstore_web: NewPet.payment)
-`,
-		},
-		{
-			name:  "property_type_mismatch of an enum reader against a string as consumer on a response",
-			place: webGetsPet,
-			contractBreak: reports.ContractBreak{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-				"consumerField": "Pet.status", "providerField": "PetRecord.status", "property": "$.status", "consumerPropertyType": "enum", "providerPropertyType": "string",
-				"consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  Pet.status — petstore_web reads it as enum, but petstore_api provides string
-    → petstore_web: read it as string
-    → petstore_api: provide it as enum there
-      · GET /pets/* response 200 at "$.status" (petstore_api: PetRecord.status)
-`,
-		},
-		{
-			name:  "property_type_mismatch of a string sent to an enum as consumer on a request",
-			place: webPostsPet,
-			contractBreak: reports.ContractBreak{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-				"consumerField": "NewPet.status", "providerField": "NewPetRecord.status", "property": "$.status", "consumerPropertyType": "string", "providerPropertyType": "enum",
-				"consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  NewPet.status — petstore_web sends it as string, but petstore_api expects enum
-    → petstore_web: send enum
-    → petstore_api: accept string there
-      · POST /pets request at "$.status" (petstore_api: NewPetRecord.status)
-`,
-		},
-		{
-			name:  "checked side without a field is named by the other side's field",
-			place: webGetsPet,
-			contractBreak: reports.ContractBreak{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-				"providerField": "PetRecord.weight", "property": "$.weight", "consumerPropertyType": "integer", "providerPropertyType": "float",
-				"consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  PetRecord.weight — petstore_web reads it as integer, but petstore_api provides float
-    → petstore_web: read it as float
-    → petstore_api: provide it as integer there
-      · GET /pets/* response 200 at "$.weight" (petstore_api: PetRecord.weight)
-`,
-		},
-		{
-			name:  "other side without a field ends its fix without there",
-			place: webGetsPet,
-			contractBreak: reports.ContractBreak{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-				"consumerField": "Pet.weight", "property": "$.weight", "consumerPropertyType": "integer", "providerPropertyType": "float",
-				"consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  Pet.weight — petstore_web reads it as integer, but petstore_api provides float
-    → petstore_web: read it as float
-    → petstore_api: provide it as integer
-      · GET /pets/* response 200 at "$.weight"
-`,
-		},
-		{
-			name:  "break without fields is named by its property",
-			place: webGetsPet,
-			contractBreak: reports.ContractBreak{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-				"property": "$.weight", "consumerPropertyType": "integer", "providerPropertyType": "float", "consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			block: `  "$.weight" — petstore_web reads it as integer, but petstore_api provides float
-    → petstore_web: read it as float
-    → petstore_api: provide it as integer
-      · GET /pets/* response 200 at "$.weight"
-`,
-		},
-		{
-			name:  "property_missing_in_provider at the root path is placed at the body",
-			place: spaGetsFiles,
-			contractBreak: reports.ContractBreak{Reason: "property_missing_in_provider", Role: "consumer", Details: map[string]string{
-				"consumerField": "Order", "property": "$", "propertyType": "object", "consumerName": "spa", "providerName": "api",
-			}},
-			block: `  Order — spa reads it, but api doesn't provide it
-    → spa: stop reading it, or handle its absence in the code and mark it optional
-    → api: provide it
-      · GET /files response 200 at the body
-`,
-		},
-		{
-			name:  "property_type_mismatch at the root path is placed at the body",
-			place: spaGetsFiles,
-			contractBreak: reports.ContractBreak{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-				"consumerField": "Order", "providerField": "Orders", "property": "$", "consumerPropertyType": "object", "providerPropertyType": "array<object>",
-				"consumerName": "spa", "providerName": "api",
-			}},
-			block: `  Order — spa reads it as object, but api provides array<object>
-    → spa: read it as array<object>
-    → api: provide it as object there
-      · GET /files response 200 at the body (api: Orders)
-`,
-		},
-		{
-			name:  "break without fields at the root path is named the body",
-			place: spaGetsFiles,
-			contractBreak: reports.ContractBreak{Reason: "property_type_mismatch", Role: "consumer", Details: map[string]string{
-				"property": "$", "consumerPropertyType": "object", "providerPropertyType": "array<object>", "consumerName": "spa", "providerName": "api",
-			}},
-			block: `  the body — spa reads it as object, but api provides array<object>
-    → spa: read it as array<object>
-    → api: provide it as object
-      · GET /files response 200 at the body
-`,
-		},
-		{
-			name:  "a fix that doesn't mark it optional keeps its words and there at an array's items",
-			place: spaGetsSession,
-			contractBreak: reports.ContractBreak{Reason: "property_nullable_in_provider_not_nullable_in_consumer", Role: "consumer", Details: map[string]string{
-				"consumerField": "Session.tags[]", "providerField": "SessionRecord.tags[]", "property": "$.tags[]", "propertyType": "string", "consumerName": "spa", "providerName": "api",
-			}},
-			block: `  Session.tags[] — spa doesn't accept null, but api may provide null
-    → spa: handle null in the code, then mark it nullable
-    → api: stop providing null there
-      · GET /session response 200 at "$.tags[]" (api: SessionRecord.tags[])
-`,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			results := map[string]reports.CanIDeployResult{
-				test.place.counterpart: {
-					Deployable: false,
-					Endpoints: map[string]map[string]map[string][]reports.ContractBreak{
-						test.place.endpoint: {test.place.method: {test.place.interaction: {test.contractBreak}}},
-					},
-				},
-			}
-
-			report := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), test.place.participant+" 2.0.0", test.place.participant, "production", results)
-
-			assert.Equal(t, test.place.participant+" 2.0.0 cannot be deployed to production\n\n"+test.place.counterpart+":\n"+test.block, report)
-		})
-	}
-}
-
-func TestFormatNotDeployableReportKeepsABreakItCannotNameUnderItsEndpoint(t *testing.T) {
-	tests := []struct {
-		name                          string
-		endpoint, method, interaction string
-		contractBreak                 reports.ContractBreak
-		endpointBreaks                string
-	}{
-		{
-			name:     "unknown reason with a property",
-			endpoint: "/pets/*", method: "get", interaction: "200",
-			contractBreak: reports.ContractBreak{Reason: "some_future_reason", Role: "consumer", Details: map[string]string{
-				"consumerField": "Pet.photoUrl", "property": "$.photoUrl", "consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			endpointBreaks: `  GET /pets/*
-    response 200:
-      - some_future_reason (consumerField: Pet.photoUrl, consumerName: petstore_web, property: $.photoUrl, providerName: petstore_api)
-`,
-		},
-		{
-			name:     "missing role falls back to the raw line instead of inferring it from consumerName",
-			endpoint: "/pets/*", method: "get", interaction: "200",
-			contractBreak: reports.ContractBreak{Reason: "property_missing_in_provider", Details: map[string]string{
-				"property": "$.photoUrl", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			endpointBreaks: `  GET /pets/*
-    response 200:
-      - property_missing_in_provider (consumerName: petstore_web, property: $.photoUrl, propertyType: string, providerName: petstore_api)
-`,
-		},
-		{
-			name:     "unknown role falls back to the raw line",
-			endpoint: "/pets/*", method: "get", interaction: "200",
-			contractBreak: reports.ContractBreak{Reason: "property_missing_in_provider", Role: "observer", Details: map[string]string{
-				"property": "$.photoUrl", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			endpointBreaks: `  GET /pets/*
-    response 200:
-      - property_missing_in_provider (consumerName: petstore_web, property: $.photoUrl, propertyType: string, providerName: petstore_api)
-`,
-		},
-		{
-			name:     "fallback keeps the raw root path",
-			endpoint: "/files", method: "get", interaction: "200",
-			contractBreak: reports.ContractBreak{Reason: "property_missing_in_provider", Role: "observer", Details: map[string]string{
-				"property": "$", "propertyType": "object", "consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			endpointBreaks: `  GET /files
-    response 200:
-      - property_missing_in_provider (consumerName: petstore_web, property: $, propertyType: object, providerName: petstore_api)
-`,
-		},
-		{
-			name:     "fallback keeps the raw fields",
-			endpoint: "/pets/*", method: "get", interaction: "200",
-			contractBreak: reports.ContractBreak{Reason: "property_missing_in_provider", Role: "observer", Details: map[string]string{
-				"property": "$.photoUrl", "consumerField": "Pet.photoUrl", "consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			endpointBreaks: `  GET /pets/*
-    response 200:
-      - property_missing_in_provider (consumerField: Pet.photoUrl, consumerName: petstore_web, property: $.photoUrl, providerName: petstore_api)
-`,
-		},
-		{
-			name:     "property_missing_in_provider on a request is outside the catalog and falls back to the raw line",
-			endpoint: "/pets", method: "post", interaction: "request",
-			contractBreak: reports.ContractBreak{Reason: "property_missing_in_provider", Role: "consumer", Details: map[string]string{
-				"property": "$.name", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			endpointBreaks: `  POST /pets
-    request:
-      - property_missing_in_provider (consumerName: petstore_web, property: $.name, propertyType: string, providerName: petstore_api)
-`,
-		},
-		{
-			name:     "property break without its property falls back to the raw line",
-			endpoint: "/pets/*", method: "get", interaction: "200",
-			contractBreak: reports.ContractBreak{Reason: "property_missing_in_provider", Role: "consumer", Details: map[string]string{
-				"consumerField": "Pet.photoUrl", "propertyType": "string", "consumerName": "petstore_web", "providerName": "petstore_api",
-			}},
-			endpointBreaks: `  GET /pets/*
-    response 200:
-      - property_missing_in_provider (consumerField: Pet.photoUrl, consumerName: petstore_web, propertyType: string, providerName: petstore_api)
-`,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			results := map[string]reports.CanIDeployResult{
-				"petstore_api": {
-					Deployable: false,
-					Endpoints: map[string]map[string]map[string][]reports.ContractBreak{
-						test.endpoint: {test.method: {test.interaction: {test.contractBreak}}},
-					},
-				},
-			}
-
-			report := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_web 2.0.0", "petstore_web", "production", results)
-
-			assert.Equal(t, "petstore_web 2.0.0 cannot be deployed to production\n\npetstore_api:\n"+test.endpointBreaks, report)
-		})
-	}
+func (this echoProtocol) SchemaKeys() map[string][]string {
+	return nil
 }

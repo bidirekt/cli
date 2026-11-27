@@ -12,6 +12,8 @@ import (
 
 	"github.com/bidirekt/cli/internal/components"
 	"github.com/bidirekt/cli/internal/features/publish_contract"
+	"github.com/bidirekt/cli/internal/reports"
+	restreports "github.com/bidirekt/cli/internal/reports/protocols/rest"
 	"github.com/jarcoal/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,6 +26,8 @@ func TestPublishContractFolderCommand(t *testing.T) {
 		version     = "v1"
 		endpoint    = brokerURL + "/api/contracts"
 	)
+
+	restModules := []reports.Module{restreports.Module()}
 
 	t.Run("publishes a folder with its subfolders and the files passed beside it as one request, each YAML file once, in path order", func(t *testing.T) {
 		httpClient := components.NewHTTPClient()
@@ -60,6 +64,7 @@ func TestPublishContractFolderCommand(t *testing.T) {
 
 		command := publish_contract.NewPublishCommand(
 			publish_contract.NewPublishContractClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -85,7 +90,7 @@ func TestPublishContractFolderCommand(t *testing.T) {
 		assert.Empty(t, errOut.String())
 	})
 
-	t.Run("a folder without YAML files fails naming the folder before any request", func(t *testing.T) {
+	t.Run("a folder without contract files fails naming the folder before any request", func(t *testing.T) {
 		httpClient := components.NewHTTPClient()
 		httpClient.UseBroker(brokerURL, "")
 		httpmock.ActivateNonDefault(httpClient.StdClient())
@@ -98,6 +103,7 @@ func TestPublishContractFolderCommand(t *testing.T) {
 
 		command := publish_contract.NewPublishCommand(
 			publish_contract.NewPublishContractClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -107,7 +113,7 @@ func TestPublishContractFolderCommand(t *testing.T) {
 		err := command.Execute()
 
 		require.Error(t, err)
-		assert.Equal(t, `no contract YAML files in folder: "`+docs+`"`, err.Error())
+		assert.Equal(t, `no contract files (.yaml, .yml) in folder: "`+docs+`"`, err.Error())
 		assert.Zero(t, httpmock.GetTotalCallCount())
 		assert.Empty(t, out.String())
 		assert.Empty(t, errOut.String())

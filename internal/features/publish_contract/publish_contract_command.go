@@ -13,13 +13,17 @@ import (
 
 const requestTimeout = 30 * time.Second
 
-func NewPublishCommand(publishContractClient *PublishContractClient) *cobra.Command {
+func NewPublishCommand(publishContractClient *PublishContractClient, modules []reports.Module) *cobra.Command {
+	var extensions []string
+	for _, module := range modules {
+		extensions = append(extensions, module.Extensions...)
+	}
 
 	commandHandler := func(command *cobra.Command, args []string) error {
 		command.SilenceUsage = true
 		command.SilenceErrors = true
 
-		contracts, err := contractfiles.ToContractFragments(args)
+		contracts, err := contractfiles.ToContractFiles(args, extensions)
 		if err != nil {
 			return err
 		}
@@ -45,7 +49,7 @@ func NewPublishCommand(publishContractClient *PublishContractClient) *cobra.Comm
 
 		message, err := publishContractClient.PublishContract(ctx, requestBody)
 		if err != nil {
-			return reports.WriteValidationFailed(command.ErrOrStderr(), err)
+			return reports.WriteValidationFailed(command.ErrOrStderr(), err, modules)
 		}
 
 		writer := command.OutOrStdout()
@@ -59,7 +63,8 @@ func NewPublishCommand(publishContractClient *PublishContractClient) *cobra.Comm
 
 	command := &cobra.Command{
 		Use:   "publish [file or folder...]",
-		Short: "Publish one or more contract YAML files or folders to the broker",
+		Short: "Publish one or more contract files or folders to the broker",
+		Long:  "Publish one or more contract files or folders to the broker.\n\n" + contractfiles.FileTypesHelp(extensions),
 		Args:  cobra.MinimumNArgs(1),
 		RunE:  commandHandler,
 	}

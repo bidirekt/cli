@@ -1,0 +1,18 @@
+consumes:
+  ${API}:
+    graphql:
+      query:
+        pets:
+          returns: PetList
+
+schemas:
+  PetList:
+    type: array
+    items:
+      ref: Pet
+
+  Pet:
+    type: object
+    properties:
+      name:
+        type: string
