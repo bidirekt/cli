@@ -31,7 +31,7 @@ func (this Plugin) ViolationLine(violation reports.Violation) (headline, explana
 	case "returns.required":
 		return `missing "returns"` + pathAt, "", true
 	case "graph.without_schema":
-		return fmt.Sprintf("graph %q without a GraphQL schema%s", details["graph"], graphAt), "publish its " + schemaFileExtensionsText() + " in the same publish", true
+		return fmt.Sprintf("graph %q without a GraphQL schema%s", details["graph"], graphAt), "pass its " + schemaFileExtensionsText() + " in the same command", true
 	case "graph.required_by_federation":
 		return "the GraphQL schema links Apollo Federation, but no graph is declared" + pathAt, "declare it in provides.graphql.graph", true
 	case "graph.name_taken":

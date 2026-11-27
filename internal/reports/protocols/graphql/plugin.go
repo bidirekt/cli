@@ -18,12 +18,8 @@ var schemaFileExtensions = []string{".graphql", ".graphqls", ".gql"}
 
 type Plugin struct{}
 
-func New() Plugin {
-	return Plugin{}
-}
-
 func Module() reports.Module {
-	return reports.Module{Report: New(), Extensions: schemaFileExtensions}
+	return reports.Module{Report: Plugin{}, Extensions: schemaFileExtensions}
 }
 
 func (this Plugin) ReportKey() string {

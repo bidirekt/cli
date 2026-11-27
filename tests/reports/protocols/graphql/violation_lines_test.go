@@ -19,7 +19,7 @@ func TestFormatValidationFailedReportRendersTheGraphQLCodes(t *testing.T) {
 	}, modules)
 
 	assert.Equal(t, `contract validation failed
-  - contracts/api.yaml: graph "petstore_graph" without a GraphQL schema at provides graphql, publish its .graphql, .graphqls or .gql in the same publish
+  - contracts/api.yaml: graph "petstore_graph" without a GraphQL schema at provides graphql, pass its .graphql, .graphqls or .gql in the same command
   - graph/schema.graphqls: the GraphQL schema links Apollo Federation, but no graph is declared, declare it in provides.graphql.graph
 `, report)
 }
@@ -92,7 +92,7 @@ func TestFormatViolationLine(t *testing.T) {
 			violation: reports.Violation{Code: "graph.without_schema", Path: "provides;graphql;graph", Source: "contracts/api.yaml",
 				Details: map[string]string{"graph": "petstore_graph"}},
 			headline:    `graph "petstore_graph" without a GraphQL schema at provides graphql`,
-			explanation: `publish its .graphql, .graphqls or .gql in the same publish`,
+			explanation: `pass its .graphql, .graphqls or .gql in the same command`,
 		},
 		{
 			name:        "graph.required_by_federation",
@@ -146,7 +146,7 @@ func TestFormatViolationLine(t *testing.T) {
 }
 
 func TestViolationLineLeavesTheCodesOfOtherProtocolsToThem(t *testing.T) {
-	_, _, known := graphql.New().ViolationLine(reports.Violation{Code: "endpoint.syntax", Path: "provides;rest;/users/{userId}"})
+	_, _, known := graphql.Module().Report.ViolationLine(reports.Violation{Code: "endpoint.syntax", Path: "provides;rest;/users/{userId}"})
 
 	assert.False(t, known)
 }
