@@ -11,7 +11,7 @@ import (
 
 const requestTimeout = 30 * time.Second
 
-func NewCanIDeployCommand(client *CanIDeployClient) *cobra.Command {
+func NewCanIDeployCommand(client *CanIDeployClient, modules []reports.Module) *cobra.Command {
 	commandHandler := func(command *cobra.Command, args []string) error {
 		command.SilenceUsage = true
 		command.SilenceErrors = true
@@ -44,7 +44,7 @@ func NewCanIDeployCommand(client *CanIDeployClient) *cobra.Command {
 
 		checkedSideLabel := participant + " " + version
 
-		return reports.WriteVerdict(command.OutOrStdout(), checkedSideLabel, participant, resp.Environment, resp.Deployable, resp.Results)
+		return reports.WriteVerdict(command.OutOrStdout(), checkedSideLabel, participant, resp.Environment, resp.Deployable, resp.Results, modules)
 	}
 
 	command := &cobra.Command{

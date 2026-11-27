@@ -10,20 +10,25 @@ import (
 	"strings"
 )
 
-var supportedFileExtensions = map[string]bool{".yaml": true, ".yml": true}
+var yamlFileExtensions = []string{".yaml", ".yml"}
 
-type ContractFragment struct {
+type ContractFile struct {
 	Source  string `json:"source"`
 	Content string `json:"content"`
 }
 
-func ToContractFragments(paths []string) ([]ContractFragment, error) {
-	filePaths, err := toContractFilePaths(paths)
+func FileTypesHelp(extensions []string) string {
+	return fmt.Sprintf("A contract file ends in one of %s. A folder takes every contract file inside it, subfolders included.",
+		strings.Join(slices.Concat(yamlFileExtensions, extensions), ", "))
+}
+
+func ToContractFiles(paths []string, extensions []string) ([]ContractFile, error) {
+	filePaths, err := toContractFilePaths(paths, slices.Concat(yamlFileExtensions, extensions))
 	if err != nil {
 		return nil, err
 	}
 
-	contracts := make([]ContractFragment, 0, len(filePaths))
+	contracts := make([]ContractFile, 0, len(filePaths))
 
 	for _, filePath := range filePaths {
 		contractFileContent, err := os.ReadFile(filePath)
@@ -31,7 +36,7 @@ func ToContractFragments(paths []string) ([]ContractFragment, error) {
 			return nil, fmt.Errorf("read contract file: %w", err)
 		}
 
-		contracts = append(contracts, ContractFragment{
+		contracts = append(contracts, ContractFile{
 			Source:  filePath,
 			Content: string(contractFileContent),
 		})
@@ -40,12 +45,12 @@ func ToContractFragments(paths []string) ([]ContractFragment, error) {
 	return contracts, nil
 }
 
-func toContractFilePaths(paths []string) ([]string, error) {
+func toContractFilePaths(paths []string, extensions []string) ([]string, error) {
 	var uniqueFilePaths []string
 	reachedCleanPaths := map[string]bool{}
 
 	for _, path := range paths {
-		filePaths, err := pathToContractFilePaths(path)
+		filePaths, err := pathToContractFilePaths(path, extensions)
 		if err != nil {
 			return nil, err
 		}
@@ -66,13 +71,13 @@ func toContractFilePaths(paths []string) ([]string, error) {
 	return uniqueFilePaths, nil
 }
 
-func pathToContractFilePaths(path string) ([]string, error) {
+func pathToContractFilePaths(path string, extensions []string) ([]string, error) {
 	info, err := os.Stat(path)
 	if err == nil && info.IsDir() {
-		return folderToContractFilePaths(path)
+		return folderToContractFilePaths(path, extensions)
 	}
 
-	if !isContractFile(path) {
+	if !isContractFile(path, extensions) {
 		if errors.Is(err, fs.ErrNotExist) {
 			return nil, fmt.Errorf("contract file or folder not found: %q", path)
 		}
@@ -83,7 +88,7 @@ func pathToContractFilePaths(path string) ([]string, error) {
 	return []string{path}, nil
 }
 
-func folderToContractFilePaths(folder string) ([]string, error) {
+func folderToContractFilePaths(folder string, extensions []string) ([]string, error) {
 	var filePaths []string
 
 	err := fs.WalkDir(os.DirFS(folder), ".", func(pathInFolder string, entry fs.DirEntry, err error) error {
@@ -91,7 +96,7 @@ func folderToContractFilePaths(folder string) ([]string, error) {
 			return err
 		}
 
-		if !entry.IsDir() && isContractFile(pathInFolder) {
+		if !entry.IsDir() && isContractFile(pathInFolder, extensions) {
 			filePaths = append(filePaths, filepath.Join(folder, filepath.FromSlash(pathInFolder)))
 		}
 
@@ -102,12 +107,12 @@ func folderToContractFilePaths(folder string) ([]string, error) {
 	}
 
 	if len(filePaths) == 0 {
-		return nil, fmt.Errorf("no contract YAML files in folder: %q", folder)
+		return nil, fmt.Errorf("no contract files (%s) in folder: %q", strings.Join(extensions, ", "), folder)
 	}
 
 	return filePaths, nil
 }
 
-func isContractFile(path string) bool {
-	return supportedFileExtensions[strings.ToLower(filepath.Ext(path))]
+func isContractFile(path string, extensions []string) bool {
+	return slices.Contains(extensions, strings.ToLower(filepath.Ext(path)))
 }

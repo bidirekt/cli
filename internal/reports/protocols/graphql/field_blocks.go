@@ -1,4 +1,4 @@
-package reports
+package graphql
 
 import (
 	"cmp"
@@ -6,15 +6,18 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/bidirekt/cli/internal/reports"
 )
 
-// One block has one header and one set of fixes, so a break's direction and role are part of its block's key too.
+// One block has one header and one set of fixes, so a break's direction, role and graph are part of its block's key too.
 type fieldBlockKey struct {
 	field                                    string
 	reason                                   string
 	consumerType, providerType, propertyType string
 	member                                   string
 	direction, role                          string
+	graph                                    string
 	propertyBreakLine
 }
 
@@ -24,27 +27,28 @@ type fieldBlock struct {
 }
 
 type breakPlace struct {
-	method, endpoint, interaction, property string
-	counterpartField                        string
+	operation, interaction, property, argument string
+	counterpartField                           string
 }
 
-func toFieldBlock(checked checkedInteraction, interaction string, contractBreak ContractBreak) (fieldBlock, bool) {
-	checked.isRequest = interaction == "request"
+func toFieldBlock(checked checkedOperation, interaction string, contractBreak reports.ContractBreak) (fieldBlock, bool) {
+	details := contractBreak.Details
+	// An argument of a nested field is something the consumer sends, even when it breaks under "returns".
+	checked.sendsIt = interaction == "arguments" || details["argument"] != ""
 	property, line, named := formatPropertyBreakLine(checked, contractBreak)
 	if !named {
 		return fieldBlock{}, false
 	}
 
-	details := contractBreak.Details
 	checkedField, otherField := property.checkedAndOtherFields()
-	direction := "response"
-	if checked.isRequest {
-		direction = "request"
+	direction := "returns"
+	if checked.sendsIt {
+		direction = "arguments"
 	}
 
 	return fieldBlock{
 		fieldBlockKey: fieldBlockKey{
-			field:             cmp.Or(checkedField, otherField, propertyPathPhrase(property.path)),
+			field:             cmp.Or(checkedField, otherField, strconv.Quote(property.path)),
 			reason:            contractBreak.Reason,
 			consumerType:      details["consumerPropertyType"],
 			providerType:      details["providerPropertyType"],
@@ -52,13 +56,14 @@ func toFieldBlock(checked checkedInteraction, interaction string, contractBreak 
 			member:            details["member"],
 			direction:         direction,
 			role:              contractBreak.Role,
+			graph:             details["graph"],
 			propertyBreakLine: line,
 		},
 		places: []breakPlace{{
-			method:           checked.method,
-			endpoint:         checked.endpoint,
+			operation:        checked.operation,
 			interaction:      interaction,
 			property:         property.path,
+			argument:         details["argument"],
 			counterpartField: otherField,
 		}},
 	}, true
@@ -99,15 +104,16 @@ func compareFieldBlockKeys(a, b fieldBlockKey) int {
 		strings.Compare(a.member, b.member),
 		strings.Compare(a.direction, b.direction),
 		strings.Compare(a.role, b.role),
+		strings.Compare(a.graph, b.graph),
 	)
 }
 
 func comparePlaces(a, b breakPlace) int {
 	return cmp.Or(
-		strings.Compare(a.endpoint, b.endpoint),
-		strings.Compare(a.method, b.method),
-		compareInteractions(a.interaction, b.interaction),
+		strings.Compare(a.operation, b.operation),
+		strings.Compare(a.interaction, b.interaction),
 		strings.Compare(a.property, b.property),
+		strings.Compare(a.argument, b.argument),
 	)
 }
 
@@ -126,7 +132,14 @@ func writeFieldBlock(report *strings.Builder, counterpart string, block fieldBlo
 	fmt.Fprintf(report, "    → %s\n    → %s\n", block.checkedFix, otherFix)
 
 	for _, place := range block.places {
-		fmt.Fprintf(report, "      · %s %s %s at %s", place.method, place.endpoint, interactionPhrase(place.interaction), propertyPathPhrase(place.property))
+		fmt.Fprintf(report, "      · %s %s", place.operation, place.interaction)
+		// The broker places every break of the arguments at "$" and names the argument.
+		if place.interaction != "arguments" {
+			fmt.Fprintf(report, " at %q", place.property)
+		}
+		if place.argument != "" {
+			fmt.Fprintf(report, " (argument %q)", place.argument)
+		}
 		if place.counterpartField != "" {
 			fmt.Fprintf(report, " (%s: %s)", counterpart, place.counterpartField)
 		}
@@ -139,11 +152,11 @@ type propertyBreakLine struct {
 	checkedFix, otherFix string
 }
 
-func formatPropertyBreakLine(interaction checkedInteraction, contractBreak ContractBreak) (propertyBreak, propertyBreakLine, bool) {
+func formatPropertyBreakLine(operation checkedOperation, contractBreak reports.ContractBreak) (propertyBreak, propertyBreakLine, bool) {
 	reason, details := contractBreak.Reason, contractBreak.Details
 	consumerType, providerType := details["consumerPropertyType"], details["providerPropertyType"]
 	asConsumer, asProvider := contractBreak.Role == "consumer", contractBreak.Role == "provider"
-	consumer, provider := interaction.participant, interaction.counterpart
+	consumer, provider := operation.participant, operation.counterpart
 	if asProvider {
 		consumer, provider = provider, consumer
 	}
@@ -156,75 +169,86 @@ func formatPropertyBreakLine(interaction checkedInteraction, contractBreak Contr
 		consumerIsChecked: asConsumer,
 	}
 	member := strconv.Quote(details["member"])
-	onRequest, onResponse := interaction.isRequest, !interaction.isRequest
+	onArguments, onReturns := operation.sendsIt, !operation.sendsIt
+	// Only the phrase names the subgraph through its graph; its fix names the subgraph alone.
+	if asProvider && details["graph"] != "" {
+		provider = viaGraph(provider, details["graph"])
+	}
 
 	switch {
 	case !asConsumer && !asProvider || property.path == "":
 		return propertyBreak{}, propertyBreakLine{}, false
-	case reason == "property_missing_in_provider" && onResponse:
+	case reason == "property_missing_in_provider" && onReturns:
 		return property, property.toPropertyBreakLine(propertyBreakPhrases{
 			consumerChecked: fmt.Sprintf("%s reads it, but %s doesn't provide it", consumer, provider),
 			providerChecked: fmt.Sprintf("%s doesn't provide it, but %s reads it", provider, consumer),
-			consumerFix:     "stop reading it, or handle its absence in the code and mark it optional",
+			consumerFix:     "stop reading it",
 			providerFix:     "provide it",
 		}), true
-	case reason == "property_optional_in_provider_required_in_consumer" && onResponse:
+	case reason == "property_optional_in_provider_required_in_consumer" && onReturns:
 		return property, property.toPropertyBreakLine(propertyBreakPhrases{
 			consumerChecked: fmt.Sprintf("%s requires it, but %s only sometimes provides it", consumer, provider),
 			providerChecked: fmt.Sprintf("%s provides it only sometimes, but %s requires it", provider, consumer),
 			consumerFix:     "handle its absence in the code, then mark it optional",
 			providerFix:     "always provide it",
 		}), true
-	case reason == "property_type_mismatch" && onResponse:
+	case reason == "property_type_mismatch" && onReturns:
 		return property, property.toPropertyBreakLine(propertyBreakPhrases{
 			consumerChecked: fmt.Sprintf("%s reads it as %s, but %s provides %s", consumer, consumerType, provider, providerType),
 			providerChecked: fmt.Sprintf("%s provides it as %s, but %s reads %s", provider, providerType, consumer, consumerType),
 			consumerFix:     "read it as " + providerType,
 			providerFix:     "provide it as " + consumerType,
 		}), true
-	case reason == "property_nullable_in_provider_not_nullable_in_consumer" && onResponse:
+	case reason == "property_nullable_in_provider_not_nullable_in_consumer" && onReturns:
 		return property, property.toPropertyBreakLine(propertyBreakPhrases{
 			consumerChecked: fmt.Sprintf("%s doesn't accept null, but %s may provide null", consumer, provider),
 			providerChecked: fmt.Sprintf("%s may provide null, but %s doesn't accept it", provider, consumer),
 			consumerFix:     "handle null in the code, then mark it nullable",
 			providerFix:     "stop providing null",
 		}), true
-	case reason == "property_member_missing_in_provider" && onResponse:
+	case reason == "property_member_missing_in_provider" && onReturns:
 		return property, property.toPropertyBreakLine(propertyBreakPhrases{
 			consumerChecked: fmt.Sprintf("%s reads %s, but %s doesn't provide it", consumer, member, provider),
 			providerChecked: fmt.Sprintf("%s doesn't provide %s, but %s reads it", provider, member, consumer),
 			consumerFix:     "stop reading " + member,
 			providerFix:     "provide " + member,
 		}), true
-	case reason == "property_missing_in_consumer" && onRequest:
+	case reason == "property_missing_in_provider" && onArguments:
+		return property, property.toPropertyBreakLine(propertyBreakPhrases{
+			consumerChecked: fmt.Sprintf("%s sends it, but %s doesn't accept it", consumer, provider),
+			providerChecked: fmt.Sprintf("%s doesn't accept it, but %s sends it", provider, consumer),
+			consumerFix:     "stop sending it",
+			providerFix:     "accept it",
+		}), true
+	case reason == "property_missing_in_consumer" && onArguments:
 		return property, property.toPropertyBreakLine(propertyBreakPhrases{
 			consumerChecked: fmt.Sprintf("%s doesn't send it, but %s requires it", consumer, provider),
 			providerChecked: fmt.Sprintf("%s requires it, but %s doesn't send it", provider, consumer),
 			consumerFix:     "send it",
 			providerFix:     "stop requiring it, then mark it optional",
 		}), true
-	case reason == "property_optional_in_consumer_required_in_provider" && onRequest:
+	case reason == "property_optional_in_consumer_required_in_provider" && onArguments:
 		return property, property.toPropertyBreakLine(propertyBreakPhrases{
 			consumerChecked: fmt.Sprintf("%s sends it only sometimes, but %s requires it", consumer, provider),
 			providerChecked: fmt.Sprintf("%s requires it, but %s sends it only sometimes", provider, consumer),
 			consumerFix:     "always send it",
 			providerFix:     "handle its absence in the code, then mark it optional",
 		}), true
-	case reason == "property_type_mismatch" && onRequest:
+	case reason == "property_type_mismatch" && onArguments:
 		return property, property.toPropertyBreakLine(propertyBreakPhrases{
 			consumerChecked: fmt.Sprintf("%s sends it as %s, but %s expects %s", consumer, consumerType, provider, providerType),
 			providerChecked: fmt.Sprintf("%s expects it as %s, but %s sends %s", provider, providerType, consumer, consumerType),
 			consumerFix:     "send " + providerType,
 			providerFix:     "accept " + consumerType,
 		}), true
-	case reason == "property_nullable_in_consumer_not_nullable_in_provider" && onRequest:
+	case reason == "property_nullable_in_consumer_not_nullable_in_provider" && onArguments:
 		return property, property.toPropertyBreakLine(propertyBreakPhrases{
 			consumerChecked: fmt.Sprintf("%s may send null, but %s doesn't accept it", consumer, provider),
 			providerChecked: fmt.Sprintf("%s doesn't accept null, but %s may send it", provider, consumer),
 			consumerFix:     "stop sending null",
 			providerFix:     "handle null in the code, then mark it nullable",
 		}), true
-	case reason == "property_member_missing_in_provider" && onRequest:
+	case reason == "property_member_missing_in_provider" && onArguments:
 		return property, property.toPropertyBreakLine(propertyBreakPhrases{
 			consumerChecked: fmt.Sprintf("%s sends %s, but %s doesn't accept it", consumer, member, provider),
 			providerChecked: fmt.Sprintf("%s doesn't accept %s, but %s sends it", provider, member, consumer),

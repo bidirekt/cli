@@ -8,9 +8,9 @@ import (
 const participantNotFound = "participant not found"
 
 type ValidateContractRequestBody struct {
-	Participant string                           `json:"participant,omitempty"`
-	Environment string                           `json:"environment,omitempty"`
-	Contracts   []contractfiles.ContractFragment `json:"contracts"`
+	Participant string                       `json:"participant,omitempty"`
+	Environment string                       `json:"environment,omitempty"`
+	Contracts   []contractfiles.ContractFile `json:"contracts"`
 }
 
 type ValidateContractResponseBody struct {

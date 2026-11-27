@@ -1,8 +1,9 @@
-package reports
+package rest
 
 import (
 	"testing"
 
+	"github.com/bidirekt/cli/internal/reports"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,16 +20,16 @@ func TestFormatBreakLine(t *testing.T) {
 	tests := []struct {
 		name          string
 		interaction   checkedInteraction
-		contractBreak ContractBreak
-		line          breakLine
+		contractBreak reports.ContractBreak
+		line          reports.BreakLine
 	}{
 		{
 			name:          "provider_resource_not_found as consumer",
 			interaction:   webGetsReview,
-			contractBreak: ContractBreak{Reason: "provider_resource_not_found", Role: "consumer"},
-			line: breakLine{
-				text: "petstore_web calls GET /reviews/*, but petstore_reviews doesn't provide it",
-				fixes: []string{
+			contractBreak: reports.ContractBreak{Reason: "provider_resource_not_found", Role: "consumer"},
+			line: reports.BreakLine{
+				Text: "petstore_web calls GET /reviews/*, but petstore_reviews doesn't provide it",
+				Fixes: []string{
 					"petstore_web: stop calling it",
 					"petstore_reviews: publish it",
 				},
@@ -37,12 +38,12 @@ func TestFormatBreakLine(t *testing.T) {
 		{
 			name:        "provider_resource_interaction_not_found as consumer on a response names the status the provider answers",
 			interaction: siteReadsUnsubscribe200,
-			contractBreak: ContractBreak{Reason: "provider_resource_interaction_not_found", Role: "consumer", Details: map[string]string{
+			contractBreak: reports.ContractBreak{Reason: "provider_resource_interaction_not_found", Role: "consumer", Details: map[string]string{
 				"providerStatuses": "204",
 			}},
-			line: breakLine{
-				text: "site reads response 200, but api answers only 204",
-				fixes: []string{
+			line: reports.BreakLine{
+				Text: "site reads response 200, but api answers only 204",
+				Fixes: []string{
 					"site: read response 204",
 					"api: answer 200",
 				},
@@ -51,12 +52,12 @@ func TestFormatBreakLine(t *testing.T) {
 		{
 			name:        "provider_resource_interaction_not_found as consumer on a response joins two statuses with or",
 			interaction: siteReadsUnsubscribe200,
-			contractBreak: ContractBreak{Reason: "provider_resource_interaction_not_found", Role: "consumer", Details: map[string]string{
+			contractBreak: reports.ContractBreak{Reason: "provider_resource_interaction_not_found", Role: "consumer", Details: map[string]string{
 				"providerStatuses": "201, 204",
 			}},
-			line: breakLine{
-				text: "site reads response 200, but api answers only 201 or 204",
-				fixes: []string{
+			line: reports.BreakLine{
+				Text: "site reads response 200, but api answers only 201 or 204",
+				Fixes: []string{
 					"site: read response 201 or 204",
 					"api: answer 200",
 				},
@@ -65,12 +66,12 @@ func TestFormatBreakLine(t *testing.T) {
 		{
 			name:        "provider_resource_interaction_not_found as consumer on a response puts or before the last of several statuses",
 			interaction: siteReadsUnsubscribe200,
-			contractBreak: ContractBreak{Reason: "provider_resource_interaction_not_found", Role: "consumer", Details: map[string]string{
+			contractBreak: reports.ContractBreak{Reason: "provider_resource_interaction_not_found", Role: "consumer", Details: map[string]string{
 				"providerStatuses": "201, 204, 404",
 			}},
-			line: breakLine{
-				text: "site reads response 200, but api answers only 201, 204 or 404",
-				fixes: []string{
+			line: reports.BreakLine{
+				Text: "site reads response 200, but api answers only 201, 204 or 404",
+				Fixes: []string{
 					"site: read response 201, 204 or 404",
 					"api: answer 200",
 				},
@@ -79,10 +80,10 @@ func TestFormatBreakLine(t *testing.T) {
 		{
 			name:          "provider_resource_interaction_not_found as consumer on a response the provider declares none of",
 			interaction:   siteReadsUpload201,
-			contractBreak: ContractBreak{Reason: "provider_resource_interaction_not_found", Role: "consumer"},
-			line: breakLine{
-				text: "site reads response 201, but api declares no response",
-				fixes: []string{
+			contractBreak: reports.ContractBreak{Reason: "provider_resource_interaction_not_found", Role: "consumer"},
+			line: reports.BreakLine{
+				Text: "site reads response 201, but api declares no response",
+				Fixes: []string{
 					"site: stop reading it",
 					"api: answer 201",
 				},
@@ -91,12 +92,12 @@ func TestFormatBreakLine(t *testing.T) {
 		{
 			name:        "provider_resource_interaction_not_found as consumer on a request ignores the statuses the provider answers",
 			interaction: appSendsRestore,
-			contractBreak: ContractBreak{Reason: "provider_resource_interaction_not_found", Role: "consumer", Details: map[string]string{
+			contractBreak: reports.ContractBreak{Reason: "provider_resource_interaction_not_found", Role: "consumer", Details: map[string]string{
 				"providerStatuses": "204, 404",
 			}},
-			line: breakLine{
-				text: "app sends a request body, but api declares none",
-				fixes: []string{
+			line: reports.BreakLine{
+				Text: "app sends a request body, but api declares none",
+				Fixes: []string{
 					"app: stop sending it",
 					"api: accept a request body",
 				},
@@ -105,19 +106,19 @@ func TestFormatBreakLine(t *testing.T) {
 		{
 			name:          "provider_resource_not_deployed_in_environment as consumer",
 			interaction:   webGetsReview,
-			contractBreak: ContractBreak{Reason: "provider_resource_not_deployed_in_environment", Role: "consumer"},
-			line: breakLine{
-				text:  "petstore_web calls GET /reviews/*, but petstore_reviews is not deployed in production",
-				fixes: []string{"petstore_reviews: deploy it to production first"},
+			contractBreak: reports.ContractBreak{Reason: "provider_resource_not_deployed_in_environment", Role: "consumer"},
+			line: reports.BreakLine{
+				Text:  "petstore_web calls GET /reviews/*, but petstore_reviews is not deployed in production",
+				Fixes: []string{"petstore_reviews: deploy it to production first"},
 			},
 		},
 		{
 			name:          "provider_resource_removed_but_still_consumed as provider",
 			interaction:   apiServesPet,
-			contractBreak: ContractBreak{Reason: "provider_resource_removed_but_still_consumed", Role: "provider"},
-			line: breakLine{
-				text: "petstore_api removed GET /pets/*, but petstore_web still calls it",
-				fixes: []string{
+			contractBreak: reports.ContractBreak{Reason: "provider_resource_removed_but_still_consumed", Role: "provider"},
+			line: reports.BreakLine{
+				Text: "petstore_api removed GET /pets/*, but petstore_web still calls it",
+				Fixes: []string{
 					"petstore_api: keep it until petstore_web stops calling it",
 					"petstore_web: stop calling it",
 				},
@@ -126,12 +127,12 @@ func TestFormatBreakLine(t *testing.T) {
 		{
 			name:        "provider_resource_interaction_removed_but_still_consumed as provider on a response names the statuses it now answers",
 			interaction: apiAnswersDelete200,
-			contractBreak: ContractBreak{Reason: "provider_resource_interaction_removed_but_still_consumed", Role: "provider", Details: map[string]string{
+			contractBreak: reports.ContractBreak{Reason: "provider_resource_interaction_removed_but_still_consumed", Role: "provider", Details: map[string]string{
 				"providerStatuses": "204",
 			}},
-			line: breakLine{
-				text: "petstore_api now answers DELETE /pets/* only with 204, but petstore_web still reads response 200",
-				fixes: []string{
+			line: reports.BreakLine{
+				Text: "petstore_api now answers DELETE /pets/* only with 204, but petstore_web still reads response 200",
+				Fixes: []string{
 					"petstore_api: keep answering 200 until petstore_web stops reading it",
 					"petstore_web: read response 204",
 				},
@@ -140,12 +141,12 @@ func TestFormatBreakLine(t *testing.T) {
 		{
 			name:        "provider_resource_interaction_removed_but_still_consumed as provider on a response puts or before the last of several statuses",
 			interaction: apiAnswersDelete200,
-			contractBreak: ContractBreak{Reason: "provider_resource_interaction_removed_but_still_consumed", Role: "provider", Details: map[string]string{
+			contractBreak: reports.ContractBreak{Reason: "provider_resource_interaction_removed_but_still_consumed", Role: "provider", Details: map[string]string{
 				"providerStatuses": "202, 204, 404",
 			}},
-			line: breakLine{
-				text: "petstore_api now answers DELETE /pets/* only with 202, 204 or 404, but petstore_web still reads response 200",
-				fixes: []string{
+			line: reports.BreakLine{
+				Text: "petstore_api now answers DELETE /pets/* only with 202, 204 or 404, but petstore_web still reads response 200",
+				Fixes: []string{
 					"petstore_api: keep answering 200 until petstore_web stops reading it",
 					"petstore_web: read response 202, 204 or 404",
 				},
@@ -154,10 +155,10 @@ func TestFormatBreakLine(t *testing.T) {
 		{
 			name:          "provider_resource_interaction_removed_but_still_consumed as provider on a response when no response is left",
 			interaction:   apiAnswersDelete200,
-			contractBreak: ContractBreak{Reason: "provider_resource_interaction_removed_but_still_consumed", Role: "provider"},
-			line: breakLine{
-				text: "petstore_api no longer answers DELETE /pets/*, but petstore_web still reads response 200",
-				fixes: []string{
+			contractBreak: reports.ContractBreak{Reason: "provider_resource_interaction_removed_but_still_consumed", Role: "provider"},
+			line: reports.BreakLine{
+				Text: "petstore_api no longer answers DELETE /pets/*, but petstore_web still reads response 200",
+				Fixes: []string{
 					"petstore_api: keep answering 200 until petstore_web stops reading it",
 					"petstore_web: stop reading it",
 				},
@@ -166,10 +167,10 @@ func TestFormatBreakLine(t *testing.T) {
 		{
 			name:          "provider_resource_interaction_removed_but_still_consumed as provider on a request",
 			interaction:   apiAcceptsCreate,
-			contractBreak: ContractBreak{Reason: "provider_resource_interaction_removed_but_still_consumed", Role: "provider"},
-			line: breakLine{
-				text: "petstore_api dropped the request body of POST /pets, but petstore_web still sends it",
-				fixes: []string{
+			contractBreak: reports.ContractBreak{Reason: "provider_resource_interaction_removed_but_still_consumed", Role: "provider"},
+			line: reports.BreakLine{
+				Text: "petstore_api dropped the request body of POST /pets, but petstore_web still sends it",
+				Fixes: []string{
 					"petstore_api: keep accepting it until petstore_web stops sending it",
 					"petstore_web: stop sending it",
 				},
@@ -178,8 +179,8 @@ func TestFormatBreakLine(t *testing.T) {
 		{
 			name:          "unknown reason falls back to the bare reason",
 			interaction:   webGetsPet,
-			contractBreak: ContractBreak{Reason: "some_future_reason", Role: "consumer"},
-			line:          breakLine{text: `some_future_reason`},
+			contractBreak: reports.ContractBreak{Reason: "some_future_reason", Role: "consumer"},
+			line:          reports.BreakLine{Text: `some_future_reason`},
 		},
 	}
 

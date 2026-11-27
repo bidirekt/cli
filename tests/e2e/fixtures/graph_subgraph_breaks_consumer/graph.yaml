@@ -1,0 +1,3 @@
+provides:
+  graphql:
+    graph: ${GRAPH}

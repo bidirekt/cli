@@ -1,0 +1,4 @@
+fragment PetFields on Pet {
+  id
+  name
+}

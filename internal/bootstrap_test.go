@@ -126,6 +126,19 @@ func TestCommandsThatDoNotTalkToTheBrokerNeverResolveIt(t *testing.T) {
 	}
 }
 
+func TestPublishAndValidateHelpNameEveryContractFileType(t *testing.T) {
+	for _, command := range []string{"publish", "validate"} {
+		t.Run(command, func(t *testing.T) {
+			isolateEnvironment(t)
+
+			execution := executeRoot(t, components.New(), command, "--help")
+
+			require.NoError(t, execution.err)
+			assert.Contains(t, execution.stdout, "A contract file ends in one of .yaml, .yml, .graphql, .graphqls, .gql. A folder takes every contract file inside it, subfolders included.")
+		})
+	}
+}
+
 func TestBrokerCommandWithoutABrokerFailsWithoutCallingIt(t *testing.T) {
 	configFilePath := isolateEnvironment(t)
 	broker := startBrokerStub(t)

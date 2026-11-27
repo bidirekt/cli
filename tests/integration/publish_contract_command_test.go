@@ -14,6 +14,8 @@ import (
 	"github.com/bidirekt/cli/internal/components"
 	"github.com/bidirekt/cli/internal/features/publish_contract"
 	"github.com/bidirekt/cli/internal/reports"
+	graphqlreports "github.com/bidirekt/cli/internal/reports/protocols/graphql"
+	restreports "github.com/bidirekt/cli/internal/reports/protocols/rest"
 	"github.com/jarcoal/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,6 +28,8 @@ func TestPublishContractCommand(t *testing.T) {
 		version     = "v1"
 		endpoint    = brokerURL + "/api/contracts"
 	)
+
+	restModules := []reports.Module{restreports.Module()}
 
 	expectedBody := func(t *testing.T, fragments ...[2]string) string {
 		t.Helper()
@@ -68,6 +72,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		command := publish_contract.NewPublishCommand(
 			publish_contract.NewPublishContractClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -114,6 +119,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		command := publish_contract.NewPublishCommand(
 			publish_contract.NewPublishContractClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -131,6 +137,55 @@ func TestPublishContractCommand(t *testing.T) {
 		), string(capturedBody))
 	})
 
+	t.Run("publishes the GraphQL schema files of the GraphQL module beside the YAML files, content verbatim", func(t *testing.T) {
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
+		httpmock.ActivateNonDefault(httpClient.StdClient())
+		defer httpmock.DeactivateAndReset()
+
+		directory := t.TempDir()
+		graphContent := "provides:\n  graphql:\n    graph: petstore_graph\n"
+		schemaContent := "type Query {\n  pet(id: ID!): Pet\n}\n"
+		petContent := "type Pet {\n  name: String!\n}\n"
+
+		graph := filepath.Join(directory, "graph.yaml")
+		schema := filepath.Join(directory, "schema.graphqls")
+		pet := filepath.Join(directory, "pet.graphql")
+		require.NoError(t, os.WriteFile(graph, []byte(graphContent), 0o600))
+		require.NoError(t, os.WriteFile(schema, []byte(schemaContent), 0o600))
+		require.NoError(t, os.WriteFile(pet, []byte(petContent), 0o600))
+
+		var capturedBody []byte
+		httpmock.RegisterResponder(http.MethodPost, endpoint,
+			func(req *http.Request) (*http.Response, error) {
+				body, err := io.ReadAll(req.Body)
+				if err != nil {
+					return nil, err
+				}
+				capturedBody = body
+				return httpmock.NewStringResponse(http.StatusOK, `{"message":"contract publish successful"}`), nil
+			})
+
+		command := publish_contract.NewPublishCommand(
+			publish_contract.NewPublishContractClient(httpClient),
+			[]reports.Module{restreports.Module(), graphqlreports.Module()},
+		)
+		var out, errOut bytes.Buffer
+		command.SetOut(&out)
+		command.SetErr(&errOut)
+		command.SetArgs([]string{directory, "--participant", participant, "--version", version})
+
+		err := command.Execute()
+
+		require.NoError(t, err)
+		assert.JSONEq(t, expectedBody(t,
+			[2]string{graph, graphContent},
+			[2]string{pet, petContent},
+			[2]string{schema, schemaContent},
+		), string(capturedBody))
+		assert.Equal(t, participant+" contract publish successful\n", out.String())
+	})
+
 	t.Run("unsupported extension in the list fails before any request", func(t *testing.T) {
 		httpClient := components.NewHTTPClient()
 		httpClient.UseBroker(brokerURL, "")
@@ -146,6 +201,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		command := publish_contract.NewPublishCommand(
 			publish_contract.NewPublishContractClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -171,6 +227,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		command := publish_contract.NewPublishCommand(
 			publish_contract.NewPublishContractClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -200,6 +257,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		command := publish_contract.NewPublishCommand(
 			publish_contract.NewPublishContractClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -227,6 +285,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		command := publish_contract.NewPublishCommand(
 			publish_contract.NewPublishContractClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -257,6 +316,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		command := publish_contract.NewPublishCommand(
 			publish_contract.NewPublishContractClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -268,6 +328,36 @@ func TestPublishContractCommand(t *testing.T) {
 		require.ErrorIs(t, err, reports.ErrSilent)
 		assert.Equal(t, "contract validation failed\n"+
 			"  - api.yaml: array schema without items at schemas Pets\n",
+			errOut.String())
+		assert.Empty(t, out.String())
+	})
+
+	t.Run("validation failure with a ref cycle names the schemas of the cycle", func(t *testing.T) {
+		httpClient := components.NewHTTPClient()
+		httpClient.UseBroker(brokerURL, "")
+		httpmock.ActivateNonDefault(httpClient.StdClient())
+		defer httpmock.DeactivateAndReset()
+
+		file := filepath.Join(t.TempDir(), "contract.yaml")
+		require.NoError(t, os.WriteFile(file, []byte("provides:\n  rest: {}\n"), 0o600))
+
+		httpmock.RegisterResponder(http.MethodPost, endpoint,
+			httpmock.NewStringResponder(http.StatusBadRequest, `{"message":"contract validation failed","violations":[{"code":"schema.ref_cycle","path":"schemas;A","source":"petstore_web.yaml","details":{"schemas":["A","B"]}}]}`))
+
+		command := publish_contract.NewPublishCommand(
+			publish_contract.NewPublishContractClient(httpClient),
+			restModules,
+		)
+		var out, errOut bytes.Buffer
+		command.SetOut(&out)
+		command.SetErr(&errOut)
+		command.SetArgs([]string{file, "--participant", participant, "--version", version})
+
+		err := command.Execute()
+
+		require.ErrorIs(t, err, reports.ErrSilent)
+		assert.Equal(t, "contract validation failed\n"+
+			"  - petstore_web.yaml: schema \"A\" only refers to itself through ref (A → B → A): give one of them a type\n",
 			errOut.String())
 		assert.Empty(t, out.String())
 	})
@@ -286,6 +376,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		command := publish_contract.NewPublishCommand(
 			publish_contract.NewPublishContractClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -315,6 +406,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		command := publish_contract.NewPublishCommand(
 			publish_contract.NewPublishContractClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -344,6 +436,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		command := publish_contract.NewPublishCommand(
 			publish_contract.NewPublishContractClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
@@ -370,6 +463,7 @@ func TestPublishContractCommand(t *testing.T) {
 
 		command := publish_contract.NewPublishCommand(
 			publish_contract.NewPublishContractClient(httpClient),
+			restModules,
 		)
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
