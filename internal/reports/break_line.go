@@ -7,14 +7,22 @@ import (
 )
 
 type BreakLine struct {
-	Text  string
-	Fixes []string
+	Text   string
+	Causes []string
+	Fixes  []string
+	Link   string
 }
 
 func WriteBreakLine(report *strings.Builder, indent string, line BreakLine) {
 	fmt.Fprintf(report, "%s- %s\n", indent, line.Text)
+	for _, cause := range line.Causes {
+		fmt.Fprintf(report, "%s  %s\n", indent, cause)
+	}
 	for _, fix := range line.Fixes {
 		fmt.Fprintf(report, "%s  → %s\n", indent, fix)
+	}
+	if line.Link != "" {
+		fmt.Fprintf(report, "%s  %s\n", indent, line.Link)
 	}
 }
 

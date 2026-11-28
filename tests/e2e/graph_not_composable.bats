@@ -96,8 +96,10 @@ setup() {
 
 $WEB (v1, deployed):
   query pet
-    - $REVIEWS (via $GRAPH) makes $GRAPH fail to compose in $PRODUCTION: $API v1 and $REVIEWS v2 both resolve Pet.name without @shareable, and $WEB calls query pet
-      → $REVIEWS: make $GRAPH compose (see /graphs/$GRAPH)"
+    - $REVIEWS (via $GRAPH) makes $GRAPH fail to compose in $PRODUCTION, and $WEB calls query pet
+      $API v1 and $REVIEWS v2 both resolve Pet.name without @shareable
+      → $REVIEWS: make $GRAPH compose
+      deployed graph: /graphs/$GRAPH"
 }
 
 @test "record petstore_reviews v2 deployed to production" {
@@ -112,6 +114,8 @@ $WEB (v1, deployed):
 
 $GRAPH ($API v1 + $REVIEWS v2, deployed):
   query pet
-    - $WEB calls query pet, but $GRAPH can't be built in $PRODUCTION: $API v1 and $REVIEWS v2 both resolve Pet.name without @shareable
-      → $GRAPH subgraphs: make it compose (see /graphs/$GRAPH)"
+    - $WEB calls query pet, but $GRAPH can't be built in $PRODUCTION
+      $API v1 and $REVIEWS v2 both resolve Pet.name without @shareable
+      → $GRAPH subgraphs: make it compose
+      deployed graph: /graphs/$GRAPH"
 }

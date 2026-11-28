@@ -77,8 +77,10 @@ setup() {
 
 $GRAPH ($API v2 candidate + $REVIEWS v1, deployed):
   query pet
-    - $API calls query pet, but $GRAPH can't be built in $PRODUCTION: $API v2 and $REVIEWS v1 both resolve Pet.reviews without @shareable
-      → $GRAPH subgraphs: make it compose (see /graphs/$GRAPH)"
+    - $API calls query pet, but $GRAPH can't be built in $PRODUCTION
+      $API v2 and $REVIEWS v1 both resolve Pet.reviews without @shareable
+      → $GRAPH subgraphs: make it compose
+      deployed graph: /graphs/$GRAPH"
 }
 
 @test "petstore_api v2: the deployed petstore_api v1 is no counterpart of it" {
@@ -94,6 +96,8 @@ $GRAPH ($API v2 candidate + $REVIEWS v1, deployed):
 
 $GRAPH ($API candidate + $REVIEWS v1, deployed):
   query pet
-    - $API calls query pet, but $GRAPH can't be built in $PRODUCTION: $API candidate and $REVIEWS v1 both resolve Pet.reviews without @shareable
-      → $GRAPH subgraphs: make it compose (see /graphs/$GRAPH)"
+    - $API calls query pet, but $GRAPH can't be built in $PRODUCTION
+      $API candidate and $REVIEWS v1 both resolve Pet.reviews without @shareable
+      → $GRAPH subgraphs: make it compose
+      deployed graph: /graphs/$GRAPH"
 }

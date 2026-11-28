@@ -88,8 +88,10 @@ $GRAPH ($API v1, deployed):
 
 $WEB (v1, deployed):
   query pet
-    - $ORDERS (via $GRAPH) makes $GRAPH fail to compose in $PRODUCTION: $API v1 and $ORDERS v1 both resolve Money.amount without @shareable, and $WEB calls query pet
-      → $ORDERS: make $GRAPH compose (see /graphs/$GRAPH)"
+    - $ORDERS (via $GRAPH) makes $GRAPH fail to compose in $PRODUCTION, and $WEB calls query pet
+      $API v1 and $ORDERS v1 both resolve Money.amount without @shareable
+      → $ORDERS: make $GRAPH compose
+      deployed graph: /graphs/$GRAPH"
 }
 
 @test "record petstore_orders v1 deployed to production" {

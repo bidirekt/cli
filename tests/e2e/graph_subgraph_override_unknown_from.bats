@@ -97,8 +97,10 @@ setup() {
 
 $WEB (v1, deployed):
   query pet
-    - $REVIEWS (via $GRAPH) makes $GRAPH fail to compose in $PRODUCTION: $API v1 and $REVIEWS v2 both resolve Pet.rating without @shareable: the @override(from: \"petstore_legacy\") of $REVIEWS v2 names no member of $GRAPH, whose members are $API and $REVIEWS, and $WEB calls query pet
-      → $REVIEWS: make $GRAPH compose (see /graphs/$GRAPH)"
+    - $REVIEWS (via $GRAPH) makes $GRAPH fail to compose in $PRODUCTION, and $WEB calls query pet
+      $API v1 and $REVIEWS v2 both resolve Pet.rating without @shareable: the @override(from: \"petstore_legacy\") of $REVIEWS v2 names no member of $GRAPH, whose members are $API and $REVIEWS
+      → $REVIEWS: make $GRAPH compose
+      deployed graph: /graphs/$GRAPH"
 }
 
 @test "publish petstore_reviews v3 (takes rating over from petstore_api)" {
