@@ -134,7 +134,7 @@ func TestPublishAndValidateHelpNameEveryContractFileType(t *testing.T) {
 			execution := executeRoot(t, components.New(), command, "--help")
 
 			require.NoError(t, execution.err)
-			assert.Contains(t, execution.stdout, "A contract file ends in one of .yaml, .yml, .graphql, .graphqls, .gql. A folder takes every contract file inside it, subfolders included.")
+			assert.Contains(t, execution.stdout, "A contract file ends in one of .yaml, .yml, .graphql, .graphqls, .gql. A folder must be named contracts, like contracts/ or api/contracts/, and every contract file inside it is read, subfolders included. With no argument, the contracts/ folder here is read.")
 		})
 	}
 }
@@ -161,7 +161,6 @@ func TestUsageErrorsComeBeforeAnyBrokerResolution(t *testing.T) {
 	}{
 		{args: []string{"record-deployment", "pets", "--environment", "production"}, err: `required flag(s) "version" not set`},
 		{args: []string{"create-participant"}, err: "accepts 1 arg(s), received 0"},
-		{args: []string{"publish", "--participant", "pets", "--version", "v1"}, err: "requires at least 1 arg(s), only received 0"},
 		{args: []string{"can-i-deploy", "pets", "--unknown"}, err: "unknown flag: --unknown"},
 		{args: []string{"list-participants", "--broker-url", "x"}, err: "unknown flag: --broker-url"},
 		{args: []string{"validate", "api.yaml", "--environment", "production"}, err: "if any flags in the group [participant environment] are set they must all be set; missing [participant]"},
