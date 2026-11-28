@@ -69,27 +69,51 @@ func TestFormatBreakLine(t *testing.T) {
 			},
 		},
 		{
-			name:      "provider_graph_not_composable as consumer",
+			name:      "provider_graph_not_composable as consumer lists every cause",
+			operation: webCallsPetOnGraph,
+			contractBreak: reports.ContractBreak{Reason: "provider_graph_not_composable", Role: "consumer", Details: map[string]string{
+				"graph": "petstore_graph",
+				"cause": "petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable",
+				"causes": "petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable\n" +
+					"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.currency without @shareable",
+			}},
+			line: reports.BreakLine{
+				Text: "petstore_web calls query pet, but petstore_graph can't be built in production",
+				Causes: []string{
+					"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable",
+					"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.currency without @shareable",
+				},
+				Fixes: []string{"petstore_graph subgraphs: make it compose"},
+				Link:  "deployed graph: /graphs/petstore_graph",
+			},
+		},
+		{
+			name:      "provider_graph_not_composable from a broker without causes lists the cause",
 			operation: webCallsPetOnGraph,
 			contractBreak: reports.ContractBreak{Reason: "provider_graph_not_composable", Role: "consumer", Details: map[string]string{
 				"graph": "petstore_graph",
 				"cause": "petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable",
 			}},
 			line: reports.BreakLine{
-				Text:  "petstore_web calls query pet, but petstore_graph can't be built in production: petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable",
-				Fixes: []string{"petstore_graph subgraphs: make it compose (see /graphs/petstore_graph)"},
+				Text:   "petstore_web calls query pet, but petstore_graph can't be built in production",
+				Causes: []string{"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable"},
+				Fixes:  []string{"petstore_graph subgraphs: make it compose"},
+				Link:   "deployed graph: /graphs/petstore_graph",
 			},
 		},
 		{
 			name:      "provider_graph_not_composable as the subgraph under check",
 			operation: reviewsServesPetToWeb,
 			contractBreak: reports.ContractBreak{Reason: "provider_graph_not_composable", Role: "provider", Details: map[string]string{
-				"graph": "petstore_graph",
-				"cause": "petstore_api 1.4.0 resolves Pet.age as Int, but petstore_reviews 2.1.0 as String",
+				"graph":  "petstore_graph",
+				"cause":  "petstore_api 1.4.0 resolves Pet.age as Int, but petstore_reviews 2.1.0 as String",
+				"causes": "petstore_api 1.4.0 resolves Pet.age as Int, but petstore_reviews 2.1.0 as String",
 			}},
 			line: reports.BreakLine{
-				Text:  "petstore_reviews (via petstore_graph) makes petstore_graph fail to compose in production: petstore_api 1.4.0 resolves Pet.age as Int, but petstore_reviews 2.1.0 as String, and petstore_web calls query pet",
-				Fixes: []string{"petstore_reviews: make petstore_graph compose (see /graphs/petstore_graph)"},
+				Text:   "petstore_reviews (via petstore_graph) makes petstore_graph fail to compose in production, and petstore_web calls query pet",
+				Causes: []string{"petstore_api 1.4.0 resolves Pet.age as Int, but petstore_reviews 2.1.0 as String"},
+				Fixes:  []string{"petstore_reviews: make petstore_graph compose"},
+				Link:   "deployed graph: /graphs/petstore_graph",
 			},
 		},
 		{

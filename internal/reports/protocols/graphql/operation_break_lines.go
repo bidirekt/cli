@@ -2,6 +2,7 @@ package graphql
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/bidirekt/cli/internal/reports"
 )
@@ -39,13 +40,17 @@ func formatBreakLine(checked checkedOperation, contractBreak reports.ContractBre
 		}
 	case reason == "provider_graph_not_composable" && asConsumer:
 		return reports.BreakLine{
-			Text:  fmt.Sprintf("%s calls %s, but %s can't be built in %s: %s", me, operation, graph, environment, details["cause"]),
-			Fixes: []string{fmt.Sprintf("%s subgraphs: make it compose (see /graphs/%s)", graph, graph)},
+			Text:   fmt.Sprintf("%s calls %s, but %s can't be built in %s", me, operation, graph, environment),
+			Causes: compositionCauses(details),
+			Fixes:  []string{graph + " subgraphs: make it compose"},
+			Link:   deployedGraphLink(graph),
 		}
 	case reason == "provider_graph_not_composable" && asProvider:
 		return reports.BreakLine{
-			Text:  fmt.Sprintf("%s makes %s fail to compose in %s: %s, and %s calls %s", meInPhrase, graph, environment, details["cause"], other, operation),
-			Fixes: []string{fmt.Sprintf("%s: make %s compose (see /graphs/%s)", me, graph, graph)},
+			Text:   fmt.Sprintf("%s makes %s fail to compose in %s, and %s calls %s", meInPhrase, graph, environment, other, operation),
+			Causes: compositionCauses(details),
+			Fixes:  []string{fmt.Sprintf("%s: make %s compose", me, graph)},
+			Link:   deployedGraphLink(graph),
 		}
 	default:
 		return reports.BreakLine{Text: reports.FallbackBreakLine(reason, details)}
@@ -54,4 +59,17 @@ func formatBreakLine(checked checkedOperation, contractBreak reports.ContractBre
 
 func viaGraph(name, graph string) string {
 	return fmt.Sprintf("%s (via %s)", name, graph)
+}
+
+// A broker older than causes sends only the first one.
+func compositionCauses(details map[string]string) []string {
+	if causes := details["causes"]; causes != "" {
+		return strings.Split(causes, "\n")
+	}
+
+	return []string{details["cause"]}
+}
+
+func deployedGraphLink(graph string) string {
+	return "deployed graph: /graphs/" + graph
 }

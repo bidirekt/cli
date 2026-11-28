@@ -43,7 +43,7 @@ func brokenApiOperations(t *testing.T) map[string]json.RawMessage {
 			"pet": {
 				"arguments": {
 					{Reason: "property_missing_in_provider", Role: "consumer", Details: map[string]string{
-						"consumerField": "PetArgs.owner", "property": "$", "argument": "owner", "propertyType": "string",
+						"consumerField": "Query.pet(owner:)", "property": "$", "argument": "owner", "propertyType": "string",
 						"consumerName": "petstore_web", "providerName": "petstore_api",
 					}},
 				},
@@ -63,7 +63,7 @@ const brokenApiReport = `petstore_api (1.4.0, deployed):
     - petstore_web calls query pets, but petstore_api doesn't provide it
       → petstore_web: stop calling it
       → petstore_api: publish it
-  PetArgs.owner — petstore_web sends it, but petstore_api doesn't accept it
+  Query.pet(owner:) — petstore_web sends it, but petstore_api doesn't accept it
     → petstore_web: stop sending it
     → petstore_api: accept it
       · query pet arguments (argument "owner")
@@ -96,6 +96,8 @@ func TestFormatNotDeployableReportWritesAGraphThatDoesNotCompose(t *testing.T) {
 							{Reason: "provider_graph_not_composable", Role: "consumer", Details: map[string]string{
 								"graph": "petstore_graph",
 								"cause": "petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable",
+								"causes": "petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable\n" +
+									"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.currency without @shareable",
 							}},
 						},
 					},
@@ -110,8 +112,11 @@ func TestFormatNotDeployableReportWritesAGraphThatDoesNotCompose(t *testing.T) {
 	assert.Equal(t, "petstore_web 3.0.0 cannot be deployed to production\n\n"+brokenApiReport+`
 petstore_graph (petstore_api 1.4.0 + petstore_orders 1.0.0 + petstore_reviews 2.0.0, deployed):
   query pet
-    - petstore_web calls query pet, but petstore_graph can't be built in production: petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable
-      → petstore_graph subgraphs: make it compose (see /graphs/petstore_graph)
+    - petstore_web calls query pet, but petstore_graph can't be built in production
+      petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.amount without @shareable
+      petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.currency without @shareable
+      → petstore_graph subgraphs: make it compose
+      deployed graph: /graphs/petstore_graph
 `, report)
 }
 
@@ -252,8 +257,9 @@ func TestFormatNotDeployableReportWritesTheCheckedSubgraphThatBreaksTheCompositi
 					"pet": {
 						"returns": {
 							{Reason: "provider_graph_not_composable", Role: "provider", Details: map[string]string{
-								"graph": "petstore_graph",
-								"cause": "petstore_api 1.4.0 resolves Pet.age as Int, but petstore_reviews 2.1.0 as String",
+								"graph":  "petstore_graph",
+								"cause":  "petstore_api 1.4.0 resolves Pet.age as Int, but petstore_reviews 2.1.0 as String",
+								"causes": "petstore_api 1.4.0 resolves Pet.age as Int, but petstore_reviews 2.1.0 as String",
 							}},
 						},
 					},
@@ -269,8 +275,10 @@ func TestFormatNotDeployableReportWritesTheCheckedSubgraphThatBreaksTheCompositi
 
 petstore_web (3.0.0, deployed):
   query pet
-    - petstore_reviews (via petstore_graph) makes petstore_graph fail to compose in production: petstore_api 1.4.0 resolves Pet.age as Int, but petstore_reviews 2.1.0 as String, and petstore_web calls query pet
-      → petstore_reviews: make petstore_graph compose (see /graphs/petstore_graph)
+    - petstore_reviews (via petstore_graph) makes petstore_graph fail to compose in production, and petstore_web calls query pet
+      petstore_api 1.4.0 resolves Pet.age as Int, but petstore_reviews 2.1.0 as String
+      → petstore_reviews: make petstore_graph compose
+      deployed graph: /graphs/petstore_graph
 `, report)
 }
 
@@ -290,7 +298,7 @@ func TestFormatNotDeployableReportWritesTheBreaksOfTheCheckedGraphQLProvider(t *
 					"pet": {
 						"arguments": {
 							{Reason: "property_missing_in_provider", Role: "provider", Details: map[string]string{
-								"consumerField": "PetArgs.owner", "property": "$", "argument": "owner", "propertyType": "string",
+								"consumerField": "Query.pet(owner:)", "property": "$", "argument": "owner", "propertyType": "string",
 								"consumerName": "petstore_web", "providerName": "petstore_api",
 							}},
 						},
@@ -324,10 +332,10 @@ petstore_web (3.0.0, deployed):
     → petstore_api: stop providing null
     → petstore_web: handle null in the code, then mark it nullable there
       · query pet returns at "$.name" (petstore_web: Pet.name)
-  PetArgs.owner — petstore_api doesn't accept it, but petstore_web sends it
+  Query.pet(owner:) — petstore_api doesn't accept it, but petstore_web sends it
     → petstore_api: accept it
     → petstore_web: stop sending it there
-      · query pet arguments (argument "owner") (petstore_web: PetArgs.owner)
+      · query pet arguments (argument "owner") (petstore_web: Query.pet(owner:))
   ReviewsArgs.filter — petstore_api doesn't accept it, but petstore_web sends it
     → petstore_api: accept it
     → petstore_web: stop sending it there
@@ -408,7 +416,7 @@ func TestFormatNotDeployableReportPlacesABreakAtTheTopOfReturnsAtTheRootPath(t *
 					"pet": {
 						"returns": {
 							{Reason: "property_nullable_in_provider_not_nullable_in_consumer", Role: "consumer", Details: map[string]string{
-								"consumerField": "Pet", "providerField": "Query.pet", "property": "$", "propertyType": "object",
+								"consumerField": "Query.pet", "providerField": "Query.pet", "property": "$", "propertyType": "object",
 								"consumerName": "petstore_web", "providerName": "petstore_api",
 							}},
 						},
@@ -424,7 +432,7 @@ func TestFormatNotDeployableReportPlacesABreakAtTheTopOfReturnsAtTheRootPath(t *
 	assert.Equal(t, `petstore_web 3.0.0 cannot be deployed to production
 
 petstore_api (1.5.0, deployed):
-  Pet — petstore_web doesn't accept null, but petstore_api may provide null
+  Query.pet — petstore_web doesn't accept null, but petstore_api may provide null
     → petstore_web: handle null in the code, then mark it nullable
     → petstore_api: stop providing null there
       · query pet returns at "$" (petstore_api: Query.pet)
@@ -440,7 +448,7 @@ func TestFormatNotDeployableReportTitlesABreakAtTheTopOfReturnsWithTheRootFieldW
 					"pet": {
 						"returns": {
 							{Reason: "property_nullable_in_provider_not_nullable_in_consumer", Role: "provider", Details: map[string]string{
-								"consumerField": "Pet", "providerField": "Query.pet", "property": "$", "propertyType": "object",
+								"consumerField": "Query.pet", "providerField": "Query.pet", "property": "$", "propertyType": "object",
 								"consumerName": "petstore_web", "providerName": "petstore_api",
 							}},
 						},
@@ -459,7 +467,7 @@ petstore_web (3.0.0, deployed):
   Query.pet — petstore_api may provide null, but petstore_web doesn't accept it
     → petstore_api: stop providing null
     → petstore_web: handle null in the code, then mark it nullable there
-      · query pet returns at "$" (petstore_web: Pet)
+      · query pet returns at "$" (petstore_web: Query.pet)
 `, report)
 }
 
