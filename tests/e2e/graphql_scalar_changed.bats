@@ -77,5 +77,5 @@ $WEB (v1, deployed):
   Pet.bornAt — $API provides it as Date!, but $WEB reads DateTime!
     → $API: provide it as DateTime!
     → $WEB: read it as Date! there
-      · query pet returns at \"\$.bornAt\" ($WEB: Pet.bornAt)"
+      · query pet returns at \"\$.bornAt\""
 }

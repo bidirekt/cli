@@ -99,7 +99,7 @@ $GRAPH ($API v1 + $REVIEWS v1, deployed):
   Pet.age — $WEB reads it as String, but $GRAPH provides Int
     → $WEB: read it as Int
     → $GRAPH: provide it as String there
-      · query pet returns at \"\$.age\" ($GRAPH: Pet.age)"
+      · query pet returns at \"\$.age\""
 }
 
 @test "validate web_v2.yaml: the same break against the graph" {
@@ -111,5 +111,5 @@ $GRAPH ($API v1 + $REVIEWS v1, deployed):
   Pet.age — $WEB reads it as String, but $GRAPH provides Int
     → $WEB: read it as Int
     → $GRAPH: provide it as String there
-      · query pet returns at \"\$.age\" ($GRAPH: Pet.age)"
+      · query pet returns at \"\$.age\""
 }

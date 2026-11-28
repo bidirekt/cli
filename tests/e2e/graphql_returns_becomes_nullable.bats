@@ -77,5 +77,5 @@ $WEB (v1, deployed):
   Pet.name — $API may provide null, but $WEB doesn't accept it
     → $API: stop providing null
     → $WEB: handle null in the code, then mark it nullable there
-      · query pet returns at \"\$.name\" ($WEB: Pet.name)"
+      · query pet returns at \"\$.name\""
 }

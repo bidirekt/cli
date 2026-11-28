@@ -98,7 +98,7 @@ $WEB (v1, deployed):
   Pet.reviews — $REVIEWS (via $GRAPH) provides it as String!, but $WEB reads [String!]!
     → $REVIEWS: provide it as [String!]!
     → $WEB: read it as String! there
-      · query pet returns at \"\$.reviews\" ($WEB: Pet.reviews)"
+      · query pet returns at \"\$.reviews\""
 }
 
 @test "validate the petstore_reviews v2 files: the same break" {
@@ -110,5 +110,5 @@ $WEB (v1, deployed):
   Pet.reviews — $REVIEWS (via $GRAPH) provides it as String!, but $WEB reads [String!]!
     → $REVIEWS: provide it as [String!]!
     → $WEB: read it as String! there
-      · query pet returns at \"\$.reviews\" ($WEB: Pet.reviews)"
+      · query pet returns at \"\$.reviews\""
 }
