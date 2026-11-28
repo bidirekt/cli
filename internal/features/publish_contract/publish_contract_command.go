@@ -62,10 +62,9 @@ func NewPublishCommand(publishContractClient *PublishContractClient, modules []r
 	}
 
 	command := &cobra.Command{
-		Use:   "publish [file or folder...]",
-		Short: "Publish one or more contract files or folders to the broker",
-		Long:  "Publish one or more contract files or folders to the broker.\n\n" + contractfiles.FileTypesHelp(extensions),
-		Args:  cobra.MinimumNArgs(1),
+		Use:   "publish [contracts folder or file...]",
+		Short: "Publish contract files to the broker, from the contracts/ folder when none is given",
+		Long:  "Publish contract files to the broker, from the contracts/ folder when none is given.\n\n" + contractfiles.FileTypesHelp(extensions),
 		RunE:  commandHandler,
 	}
 

@@ -33,13 +33,13 @@ setup() {
 }
 
 @test "petstore_api v1 rejected: the query file alone doesn't define Pet" {
-  run bidirekt publish ./api/query.graphqls --participant "$API" --version v1
+  run bidirekt publish ./api/contracts/query.graphqls --participant "$API" --version v1
   assert_failure
-  assert_output --partial "./api/query.graphqls:2:17: Undefined type Pet."
+  assert_output --partial "./api/contracts/query.graphqls:2:17: Undefined type Pet."
 }
 
 @test "publish petstore_api v1 (the query file and the types file)" {
-  run bidirekt publish ./api/query.graphqls ./api/types.graphqls --participant "$API" --version v1
+  run bidirekt publish ./api/contracts/query.graphqls ./api/contracts/types.graphqls --participant "$API" --version v1
   assert_success
 }
 
@@ -53,8 +53,8 @@ setup() {
   assert_success
 }
 
-@test "publish petstore_api v2 (the folder of both files)" {
-  run bidirekt publish ./api --participant "$API" --version v2
+@test "publish petstore_api v2 (the contracts folder of both files)" {
+  run bidirekt publish ./api/contracts --participant "$API" --version v2
   assert_success
 }
 

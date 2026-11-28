@@ -43,6 +43,54 @@ func TestToContractFiles(t *testing.T) {
 		}, files)
 	})
 
+	t.Run("with no argument, the contracts folder here is read", func(t *testing.T) {
+		t.Chdir(t.TempDir())
+		writeFiles(t, map[string]string{
+			"contracts/rest/pets.yaml": "# pets\n",
+			"src/schema.yaml":          "# not in the contracts folder\n",
+		})
+
+		files, err := contractfiles.ToContractFiles(nil, nil)
+
+		require.NoError(t, err)
+		assert.Equal(t, []contractfiles.ContractFile{
+			{Source: "contracts/rest/pets.yaml", Content: "# pets\n"},
+		}, files)
+	})
+
+	t.Run("a contracts folder inside another folder is read", func(t *testing.T) {
+		t.Chdir(t.TempDir())
+		writeFiles(t, map[string]string{
+			"api/contracts/pets.yaml":       "# api pets\n",
+			"api/contracts/schemas/pet.yml": "# api pet\n",
+			"app/contracts/pets.yaml":       "# app pets\n",
+		})
+
+		files, err := contractfiles.ToContractFiles([]string{"api/contracts"}, nil)
+
+		require.NoError(t, err)
+		assert.Equal(t, []contractfiles.ContractFile{
+			{Source: "api/contracts/pets.yaml", Content: "# api pets\n"},
+			{Source: "api/contracts/schemas/pet.yml", Content: "# api pet\n"},
+		}, files)
+	})
+
+	t.Run("the contracts folder and a file outside it are read together", func(t *testing.T) {
+		t.Chdir(t.TempDir())
+		writeFiles(t, map[string]string{
+			"contracts/graph.yaml": "provides:\n  graphql:\n    graph: petstore_graph\n",
+			"src/schema.graphql":   "type Query { pet(id: ID!): Pet }\n",
+		})
+
+		files, err := contractfiles.ToContractFiles([]string{"contracts/", "src/schema.graphql"}, []string{".graphql"})
+
+		require.NoError(t, err)
+		assert.Equal(t, []contractfiles.ContractFile{
+			{Source: "contracts/graph.yaml", Content: "provides:\n  graphql:\n    graph: petstore_graph\n"},
+			{Source: "src/schema.graphql", Content: "type Query { pet(id: ID!): Pet }\n"},
+		}, files)
+	})
+
 	t.Run("a symlink to a folder is read as that folder, its files named by the link", func(t *testing.T) {
 		t.Chdir(t.TempDir())
 		writeFiles(t, map[string]string{"shared/contracts/rest/pets.yaml": "# pets\n"})
@@ -139,11 +187,6 @@ func TestToContractFilesReadsAFileReachedTwiceOnce(t *testing.T) {
 			paths:          []string{"contracts", "./contracts/rest/pets.yaml"},
 			expectedSource: "contracts/rest/pets.yaml",
 		},
-		{
-			name:           "found in its folder and in the parent folder",
-			paths:          []string{"contracts/rest", "./contracts"},
-			expectedSource: "contracts/rest/pets.yaml",
-		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())
@@ -170,17 +213,46 @@ func TestToContractFilesFails(t *testing.T) {
 		assert.Nil(t, files)
 	})
 
-	t.Run("a folder with files of other extensions only fails naming the folder", func(t *testing.T) {
+	t.Run("with no argument and no contracts folder here, it fails", func(t *testing.T) {
+		t.Chdir(t.TempDir())
+		writeFiles(t, map[string]string{"api/contracts/pets.yaml": "# pets\n"})
+
+		files, err := contractfiles.ToContractFiles(nil, nil)
+
+		require.EqualError(t, err, "no contract files given and no contracts/ folder here")
+		assert.Nil(t, files)
+	})
+
+	t.Run("with no argument and a contracts file instead of a folder here, it fails", func(t *testing.T) {
+		t.Chdir(t.TempDir())
+		writeFiles(t, map[string]string{"contracts": "# not a folder\n"})
+
+		files, err := contractfiles.ToContractFiles(nil, nil)
+
+		require.EqualError(t, err, "no contract files given and no contracts/ folder here")
+		assert.Nil(t, files)
+	})
+
+	t.Run("a folder with another name fails with the hint to pass its files or move them", func(t *testing.T) {
 		t.Chdir(t.TempDir())
 		writeFiles(t, map[string]string{
-			"contracts/pets.yaml":   "# pets\n",
-			"docs/README.md":        "# docs\n",
-			"docs/drafts/pets.json": "{}\n",
+			"contracts/pets.yaml":    "# pets\n",
+			"graphql/schema.graphql": "type Query { pet(id: ID!): Pet }\n",
 		})
 
-		files, err := contractfiles.ToContractFiles([]string{"contracts", "docs/"}, nil)
+		files, err := contractfiles.ToContractFiles([]string{"contracts", "./graphql/"}, []string{".graphql"})
 
-		require.EqualError(t, err, `no contract files (.yaml, .yml) in folder: "docs/"`)
+		require.EqualError(t, err, "graphql/ is not the contracts folder: pass its files by name, or move them to contracts/")
+		assert.Nil(t, files)
+	})
+
+	t.Run("a subfolder of the contracts folder alone fails with the hint to pass the contracts folder", func(t *testing.T) {
+		t.Chdir(t.TempDir())
+		writeFiles(t, map[string]string{"api/contracts/rest/pets.yaml": "# pets\n"})
+
+		files, err := contractfiles.ToContractFiles([]string{"./api/contracts/rest"}, nil)
+
+		require.EqualError(t, err, "api/contracts/rest/ is inside the contracts folder: pass api/contracts/ instead")
 		assert.Nil(t, files)
 	})
 

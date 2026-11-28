@@ -97,9 +97,9 @@ func TestValidateContractFolderCommand(t *testing.T) {
 		defer httpmock.DeactivateAndReset()
 		httpmock.RegisterNoResponder(httpmock.NewErrorResponder(errors.New("unexpected request to the broker")))
 
-		docs := filepath.Join(t.TempDir(), "docs")
-		require.NoError(t, os.MkdirAll(docs, 0o700))
-		require.NoError(t, os.WriteFile(filepath.Join(docs, "README.md"), []byte("# docs\n"), 0o600))
+		contracts := filepath.Join(t.TempDir(), "contracts")
+		require.NoError(t, os.MkdirAll(contracts, 0o700))
+		require.NoError(t, os.WriteFile(filepath.Join(contracts, "README.md"), []byte("# contracts\n"), 0o600))
 
 		command := validate_contract.NewValidateCommand(
 			validate_contract.NewValidateContractClient(httpClient),
@@ -108,12 +108,12 @@ func TestValidateContractFolderCommand(t *testing.T) {
 		var out, errOut bytes.Buffer
 		command.SetOut(&out)
 		command.SetErr(&errOut)
-		command.SetArgs([]string{docs, "--participant", participant, "--environment", environment})
+		command.SetArgs([]string{contracts, "--participant", participant, "--environment", environment})
 
 		err := command.Execute()
 
 		require.Error(t, err)
-		assert.Equal(t, `no contract files (.yaml, .yml) in folder: "`+docs+`"`, err.Error())
+		assert.Equal(t, `no contract files (.yaml, .yml) in folder: "`+contracts+`"`, err.Error())
 		assert.Zero(t, httpmock.GetTotalCallCount())
 		assert.Empty(t, out.String())
 		assert.Empty(t, errOut.String())

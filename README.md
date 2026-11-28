@@ -26,10 +26,10 @@ bidirekt create-environment production
 bidirekt create-participant petstore_web
 ```
 
-For every version, publish its contract files, ask whether it can be deployed, deploy it, and record the deployment. A contract file is YAML (`.yaml`, `.yml`) or the schema of a GraphQL provider (`.graphql`, `.graphqls`, `.gql`), and a folder sends every contract file inside it:
+For every version, publish its contract files, ask whether it can be deployed, deploy it, and record the deployment. A contract file is YAML (`.yaml`, `.yml`) or the schema of a GraphQL provider (`.graphql`, `.graphqls`, `.gql`). With no file given, `bidirekt publish` and `bidirekt validate` send every contract file in the `contracts/` folder here, subfolders included. A folder passed by name must also be named `contracts`, like `api/contracts`, and files can be passed by name beside it, like `bidirekt publish contracts/ src/schema.graphql`:
 
 ```sh
-bidirekt publish contracts --participant petstore_web --version 2.3.0
+bidirekt publish --participant petstore_web --version 2.3.0
 bidirekt can-i-deploy petstore_web --version 2.3.0 --environment production
 # deploy petstore_web 2.3.0 to production
 bidirekt record-deployment petstore_web --version 2.3.0 --environment production

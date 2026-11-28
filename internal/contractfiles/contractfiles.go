@@ -10,6 +10,8 @@ import (
 	"strings"
 )
 
+const contractsFolderName = "contracts"
+
 var yamlFileExtensions = []string{".yaml", ".yml"}
 
 type ContractFile struct {
@@ -18,11 +20,22 @@ type ContractFile struct {
 }
 
 func FileTypesHelp(extensions []string) string {
-	return fmt.Sprintf("A contract file ends in one of %s. A folder takes every contract file inside it, subfolders included.",
+	return fmt.Sprintf("A contract file ends in one of %s. "+
+		"A folder must be named contracts, like contracts/ or api/contracts/, and every contract file inside it is read, subfolders included. "+
+		"With no argument, the contracts/ folder here is read.",
 		strings.Join(slices.Concat(yamlFileExtensions, extensions), ", "))
 }
 
 func ToContractFiles(paths []string, extensions []string) ([]ContractFile, error) {
+	if len(paths) == 0 {
+		info, err := os.Stat(contractsFolderName)
+		if err != nil || !info.IsDir() {
+			return nil, errors.New("no contract files given and no contracts/ folder here")
+		}
+
+		paths = []string{contractsFolderName}
+	}
+
 	filePaths, err := toContractFilePaths(paths, slices.Concat(yamlFileExtensions, extensions))
 	if err != nil {
 		return nil, err
@@ -74,6 +87,10 @@ func toContractFilePaths(paths []string, extensions []string) ([]string, error) 
 func pathToContractFilePaths(path string, extensions []string) ([]string, error) {
 	info, err := os.Stat(path)
 	if err == nil && info.IsDir() {
+		if err := requireContractsFolder(path); err != nil {
+			return nil, err
+		}
+
 		return folderToContractFilePaths(path, extensions)
 	}
 
@@ -86,6 +103,21 @@ func pathToContractFilePaths(path string, extensions []string) ([]string, error)
 	}
 
 	return []string{path}, nil
+}
+
+func requireContractsFolder(folder string) error {
+	cleanFolder := filepath.Clean(folder)
+	if filepath.Base(cleanFolder) == contractsFolderName {
+		return nil
+	}
+
+	for parent := filepath.Dir(cleanFolder); parent != filepath.Dir(parent); parent = filepath.Dir(parent) {
+		if filepath.Base(parent) == contractsFolderName {
+			return fmt.Errorf("%s/ is inside the contracts folder: pass %s/ instead", cleanFolder, parent)
+		}
+	}
+
+	return fmt.Errorf("%s/ is not the contracts folder: pass its files by name, or move them to contracts/", cleanFolder)
 }
 
 func folderToContractFilePaths(folder string, extensions []string) ([]string, error) {

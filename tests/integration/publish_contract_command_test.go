@@ -143,7 +143,8 @@ func TestPublishContractCommand(t *testing.T) {
 		httpmock.ActivateNonDefault(httpClient.StdClient())
 		defer httpmock.DeactivateAndReset()
 
-		directory := t.TempDir()
+		directory := filepath.Join(t.TempDir(), "contracts")
+		require.NoError(t, os.MkdirAll(directory, 0o700))
 		graphContent := "provides:\n  graphql:\n    graph: petstore_graph\n"
 		schemaContent := "type Query {\n  pet(id: ID!): Pet\n}\n"
 		petContent := "type Pet {\n  name: String!\n}\n"

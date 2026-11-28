@@ -35,15 +35,16 @@ setup() {
   assert_success
 }
 
-@test "validate the todo_api folder: its subfolder is read, its README is not" {
-  run bidirekt validate ./api --participant "$API" --environment "$PRODUCTION"
+@test "validate the todo_api contracts folder with no argument: its subfolder is read, its README is not" {
+  cd api || return 1
+  run bidirekt validate --participant "$API" --environment "$PRODUCTION"
   assert_success
   assert_output --partial "$API local contract can be deployed to $PRODUCTION
 nothing deployed in $PRODUCTION to compare with"
 }
 
-@test "publish todo_api v1 from its folder" {
-  run bidirekt publish ./api --participant "$API" --version v1
+@test "publish todo_api v1 from api/contracts" {
+  run bidirekt publish ./api/contracts --participant "$API" --version v1
   assert_success
 }
 
@@ -57,36 +58,77 @@ nothing deployed in $PRODUCTION to compare with"
   assert_success
 }
 
-@test "publish todo_app v1 from its folder" {
-  run bidirekt publish ./app --participant "$APP" --version v1
+@test "publish todo_app v1 from app/contracts" {
+  run bidirekt publish ./app/contracts --participant "$APP" --version v1
   assert_success
 }
 
-@test "todo_app v1 can be deployed to production: the todo_api folder published both endpoints" {
+@test "todo_app v1 can be deployed to production: the todo_api contracts folder published both endpoints" {
   run bidirekt can-i-deploy "$APP" --version v1 --environment "$PRODUCTION"
   assert_success
 }
 
-@test "publish todo_api v2 from its folder and a file inside it: the file is read once" {
-  run bidirekt publish ./api ./api/todos.yaml --participant "$API" --version v2
+@test "publish todo_app v2 with no argument: the contracts folder here is read" {
+  cd app || return 1
+  run bidirekt publish --participant "$APP" --version v2
   assert_success
 }
 
-@test "validate a folder with a typo: the report names the file by the folder and its path inside it" {
-  run bidirekt validate ./typo --participant "$API" --environment "$PRODUCTION"
+@test "todo_app v2 can be deployed to production" {
+  run bidirekt can-i-deploy "$APP" --version v2 --environment "$PRODUCTION"
+  assert_success
+}
+
+@test "publish todo_api v2 from its contracts folder and a file inside it: the file is read once" {
+  run bidirekt publish ./api/contracts ./api/contracts/todos.yaml --participant "$API" --version v2
+  assert_success
+}
+
+@test "validate a contracts folder with a typo: the report names the file by the folder and its path inside it" {
+  run bidirekt validate ./typo/contracts --participant "$API" --environment "$PRODUCTION"
   assert_failure
   assert_output --partial "contract validation failed
-  - typo/todos.yaml: unresolved schema \"Todso\" referenced by provides GET /todos 200"
+  - typo/contracts/todos.yaml: unresolved schema \"Todso\" referenced by provides GET /todos 200"
 }
 
-@test "validate a folder without contract files: fails naming the folder" {
+@test "validate with no argument and no contracts folder here: fails" {
+  run bidirekt validate --participant "$API" --environment "$PRODUCTION"
+  assert_failure 1
+  assert_output --partial "no contract files given and no contracts/ folder here"
+}
+
+@test "publish with no argument and no contracts folder here: fails" {
+  run bidirekt publish --participant "$API" --version v3
+  assert_failure 1
+  assert_output --partial "no contract files given and no contracts/ folder here"
+}
+
+@test "validate a folder with another name: fails with the hint to pass its files or move them" {
   run bidirekt validate ./docs --participant "$API" --environment "$PRODUCTION"
   assert_failure 1
-  assert_output --partial "no contract files (.yaml, .yml, .graphql, .graphqls, .gql) in folder: \"./docs\""
+  assert_output --partial "docs/ is not the contracts folder: pass its files by name, or move them to contracts/"
 }
 
-@test "publish a folder without contract files: fails naming the folder" {
+@test "publish a folder with another name: fails with the hint to pass its files or move them" {
   run bidirekt publish ./docs --participant "$API" --version v3
   assert_failure 1
-  assert_output --partial "no contract files (.yaml, .yml, .graphql, .graphqls, .gql) in folder: \"./docs\""
+  assert_output --partial "docs/ is not the contracts folder: pass its files by name, or move them to contracts/"
+}
+
+@test "publish a subfolder of the contracts folder alone: fails with the hint to pass the contracts folder" {
+  run bidirekt publish ./api/contracts/schemas --participant "$API" --version v3
+  assert_failure 1
+  assert_output --partial "api/contracts/schemas/ is inside the contracts folder: pass api/contracts/ instead"
+}
+
+@test "validate a contracts folder without contract files: fails naming the folder" {
+  run bidirekt validate ./notes/contracts --participant "$API" --environment "$PRODUCTION"
+  assert_failure 1
+  assert_output --partial "no contract files (.yaml, .yml, .graphql, .graphqls, .gql) in folder: \"./notes/contracts\""
+}
+
+@test "publish a contracts folder without contract files: fails naming the folder" {
+  run bidirekt publish ./notes/contracts --participant "$API" --version v3
+  assert_failure 1
+  assert_output --partial "no contract files (.yaml, .yml, .graphql, .graphqls, .gql) in folder: \"./notes/contracts\""
 }
