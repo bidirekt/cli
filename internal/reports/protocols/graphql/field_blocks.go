@@ -140,7 +140,7 @@ func writeFieldBlock(report *strings.Builder, counterpart string, block fieldBlo
 		if place.argument != "" {
 			fmt.Fprintf(report, " (argument %q)", place.argument)
 		}
-		if place.counterpartField != "" {
+		if place.counterpartField != "" && place.counterpartField != block.field {
 			fmt.Fprintf(report, " (%s: %s)", counterpart, place.counterpartField)
 		}
 		report.WriteString("\n")

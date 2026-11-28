@@ -68,7 +68,7 @@ $GRAPH ($API v1, deployed):
   Pet.age — $WEB reads it as String, but $GRAPH provides Int
     → $WEB: read it as Int
     → $GRAPH: provide it as String there
-      · query pet returns at \"\$.age\" ($GRAPH: Pet.age)"
+      · query pet returns at \"\$.age\""
 }
 
 @test "record petstore_web v1 deployed to production" {

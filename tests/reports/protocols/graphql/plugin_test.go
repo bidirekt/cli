@@ -149,7 +149,7 @@ petstore_web (3.0.0, deployed):
   Pet.age — petstore_reviews (via petstore_graph) provides it as integer, but petstore_web reads string
     → petstore_reviews: provide it as string
     → petstore_web: read it as integer there
-      · query pet returns at "$.age" (petstore_web: Pet.age)
+      · query pet returns at "$.age"
 `, report)
 }
 
@@ -196,12 +196,12 @@ petstore_web (3.0.0, deployed):
   Pet.age — petstore_reviews provides it as integer, but petstore_web reads string
     → petstore_reviews: provide it as string
     → petstore_web: read it as integer there
-      · query pet returns at "$.age" (petstore_web: Pet.age)
+      · query pet returns at "$.age"
   Pet.age — petstore_reviews (via petstore_graph) provides it as integer, but petstore_web reads string (2 places)
     → petstore_reviews: provide it as string
     → petstore_web: read it as integer there
-      · query pet returns at "$.age" (petstore_web: Pet.age)
-      · query pets returns at "$[].age" (petstore_web: Pet.age)
+      · query pet returns at "$.age"
+      · query pets returns at "$[].age"
 `, report)
 }
 
@@ -331,15 +331,15 @@ petstore_web (3.0.0, deployed):
   Pet.name — petstore_api may provide null, but petstore_web doesn't accept it
     → petstore_api: stop providing null
     → petstore_web: handle null in the code, then mark it nullable there
-      · query pet returns at "$.name" (petstore_web: Pet.name)
+      · query pet returns at "$.name"
   Query.pet(owner:) — petstore_api doesn't accept it, but petstore_web sends it
     → petstore_api: accept it
     → petstore_web: stop sending it there
-      · query pet arguments (argument "owner") (petstore_web: Query.pet(owner:))
+      · query pet arguments (argument "owner")
   ReviewsArgs.filter — petstore_api doesn't accept it, but petstore_web sends it
     → petstore_api: accept it
     → petstore_web: stop sending it there
-      · query pet returns at "$.reviews" (argument "filter.minStars") (petstore_web: ReviewsArgs.filter)
+      · query pet returns at "$.reviews" (argument "filter.minStars")
 `, report)
 }
 
@@ -371,7 +371,7 @@ petstore_api (1.5.0, deployed):
   Query.pet(id:) — petstore_web doesn't send it, but petstore_api requires it
     → petstore_web: send it
     → petstore_api: stop requiring it, then mark it optional there
-      · query pet arguments (argument "id") (petstore_api: Query.pet(id:))
+      · query pet arguments (argument "id")
 `, report)
 }
 
@@ -403,7 +403,7 @@ petstore_api (1.5.0, deployed):
   Pet.reviews(first:) — petstore_web doesn't send it, but petstore_api requires it
     → petstore_web: send it
     → petstore_api: stop requiring it, then mark it optional there
-      · query pet returns at "$.reviews" (argument "first") (petstore_api: Pet.reviews(first:))
+      · query pet returns at "$.reviews" (argument "first")
 `, report)
 }
 
@@ -435,7 +435,7 @@ petstore_api (1.5.0, deployed):
   Query.pet — petstore_web doesn't accept null, but petstore_api may provide null
     → petstore_web: handle null in the code, then mark it nullable
     → petstore_api: stop providing null there
-      · query pet returns at "$" (petstore_api: Query.pet)
+      · query pet returns at "$"
 `, report)
 }
 
@@ -467,7 +467,72 @@ petstore_web (3.0.0, deployed):
   Query.pet — petstore_api may provide null, but petstore_web doesn't accept it
     → petstore_api: stop providing null
     → petstore_web: handle null in the code, then mark it nullable there
-      · query pet returns at "$" (petstore_web: Query.pet)
+      · query pet returns at "$"
+`, report)
+}
+
+func TestFormatNotDeployableReportPlacesARootArgumentWithoutRepeatingItsCoordinateWhenTheProviderIsChecked(t *testing.T) {
+	results := map[string]reports.CanIDeployResult{
+		"petstore_web": {
+			ParticipantVersion: versionOf("3.0.0"),
+			Trees: operationsTree(t, operations{
+				"query": {
+					"pet": {
+						"arguments": {
+							{Reason: "property_type_mismatch", Role: "provider", Details: map[string]string{
+								"consumerField": "Query.pet(id:)", "providerField": "Query.pet(id:)", "property": "$", "argument": "id",
+								"consumerPropertyType": "ID!", "providerPropertyType": "String!",
+								"consumerName": "petstore_web", "providerName": "petstore_api",
+							}},
+						},
+					},
+				},
+			}),
+		},
+	}
+
+	report, err := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_api 1.5.0", "petstore_api", "production", results, graphqlModules)
+
+	require.NoError(t, err)
+	assert.Equal(t, `petstore_api 1.5.0 cannot be deployed to production
+
+petstore_web (3.0.0, deployed):
+  Query.pet(id:) — petstore_api expects it as String!, but petstore_web sends ID!
+    → petstore_api: accept ID!
+    → petstore_web: send String! there
+      · query pet arguments (argument "id")
+`, report)
+}
+
+func TestFormatNotDeployableReportPlacesANestedFieldWithTheOtherSidesFieldWhenItsNameDiffers(t *testing.T) {
+	results := map[string]reports.CanIDeployResult{
+		"petstore_web": {
+			ParticipantVersion: versionOf("3.0.0"),
+			Trees: operationsTree(t, operations{
+				"query": {
+					"pet": {
+						"returns": {
+							{Reason: "property_nullable_in_provider_not_nullable_in_consumer", Role: "provider", Details: map[string]string{
+								"consumerField": "PetView.name", "providerField": "Pet.name", "property": "$.name", "propertyType": "string",
+								"consumerName": "petstore_web", "providerName": "petstore_api",
+							}},
+						},
+					},
+				},
+			}),
+		},
+	}
+
+	report, err := reports.FormatNotDeployableReport(paint.For(&bytes.Buffer{}), "petstore_api 1.5.0", "petstore_api", "production", results, graphqlModules)
+
+	require.NoError(t, err)
+	assert.Equal(t, `petstore_api 1.5.0 cannot be deployed to production
+
+petstore_web (3.0.0, deployed):
+  Pet.name — petstore_api may provide null, but petstore_web doesn't accept it
+    → petstore_api: stop providing null
+    → petstore_web: handle null in the code, then mark it nullable there
+      · query pet returns at "$.name" (petstore_web: PetView.name)
 `, report)
 }
 
@@ -548,7 +613,7 @@ petstore_web (3.0.0, deployed):
   Pet.bornAt — petstore_api doesn't provide it, but petstore_web reads it
     → petstore_api: provide it
     → petstore_web: stop reading it there
-      · query pet returns at "$.bornAt" (petstore_web: Pet.bornAt)
+      · query pet returns at "$.bornAt"
 `, report)
 }
 
@@ -581,7 +646,7 @@ petstore_api (1.4.0, deployed):
   Pet.status — petstore_web reads it as enum (AVAILABLE | SOLD)!, but petstore_api provides String!
     → petstore_web: read it as String!
     → petstore_api: provide it as enum (AVAILABLE | SOLD)! there
-      · query pet returns at "$.status" (petstore_api: Pet.status)
+      · query pet returns at "$.status"
 `, report)
 }
 

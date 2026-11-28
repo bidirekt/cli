@@ -88,6 +88,59 @@ func TestFormatBreakLine(t *testing.T) {
 			},
 		},
 		{
+			name:      "provider_graph_not_composable lists the first five causes and counts the rest",
+			operation: webCallsPetOnGraph,
+			contractBreak: reports.ContractBreak{Reason: "provider_graph_not_composable", Role: "consumer", Details: map[string]string{
+				"graph": "petstore_graph",
+				"cause": "petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.field1 without @shareable",
+				"causes": "petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.field1 without @shareable\n" +
+					"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.field2 without @shareable\n" +
+					"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.field3 without @shareable\n" +
+					"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.field4 without @shareable\n" +
+					"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.field5 without @shareable\n" +
+					"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.field6 without @shareable\n" +
+					"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.field7 without @shareable",
+			}},
+			line: reports.BreakLine{
+				Text: "petstore_web calls query pet, but petstore_graph can't be built in production",
+				Causes: []string{
+					"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.field1 without @shareable",
+					"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.field2 without @shareable",
+					"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.field3 without @shareable",
+					"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.field4 without @shareable",
+					"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.field5 without @shareable",
+					"and 2 more",
+				},
+				Fixes: []string{"petstore_graph subgraphs: make it compose"},
+				Link:  "deployed graph: /graphs/petstore_graph",
+			},
+		},
+		{
+			name:      "provider_graph_not_composable with exactly five causes lists them all",
+			operation: webCallsPetOnGraph,
+			contractBreak: reports.ContractBreak{Reason: "provider_graph_not_composable", Role: "consumer", Details: map[string]string{
+				"graph": "petstore_graph",
+				"cause": "petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.field1 without @shareable",
+				"causes": "petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.field1 without @shareable\n" +
+					"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.field2 without @shareable\n" +
+					"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.field3 without @shareable\n" +
+					"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.field4 without @shareable\n" +
+					"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.field5 without @shareable",
+			}},
+			line: reports.BreakLine{
+				Text: "petstore_web calls query pet, but petstore_graph can't be built in production",
+				Causes: []string{
+					"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.field1 without @shareable",
+					"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.field2 without @shareable",
+					"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.field3 without @shareable",
+					"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.field4 without @shareable",
+					"petstore_api 1.4.0 and petstore_orders 1.0.0 both resolve Money.field5 without @shareable",
+				},
+				Fixes: []string{"petstore_graph subgraphs: make it compose"},
+				Link:  "deployed graph: /graphs/petstore_graph",
+			},
+		},
+		{
 			name:      "provider_graph_not_composable from a broker without causes lists the cause",
 			operation: webCallsPetOnGraph,
 			contractBreak: reports.ContractBreak{Reason: "provider_graph_not_composable", Role: "consumer", Details: map[string]string{

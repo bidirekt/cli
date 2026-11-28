@@ -61,13 +61,21 @@ func viaGraph(name, graph string) string {
 	return fmt.Sprintf("%s (via %s)", name, graph)
 }
 
+// Every consumed field of a graph that fails to compose repeats its causes, so each lists only the first few.
+const shownCompositionCauses = 5
+
 // A broker older than causes sends only the first one.
 func compositionCauses(details map[string]string) []string {
-	if causes := details["causes"]; causes != "" {
-		return strings.Split(causes, "\n")
+	causes := details["causes"]
+	if causes == "" {
+		return []string{details["cause"]}
 	}
 
-	return []string{details["cause"]}
+	lines := strings.Split(causes, "\n")
+	if len(lines) <= shownCompositionCauses {
+		return lines
+	}
+	return append(lines[:shownCompositionCauses], fmt.Sprintf("and %d more", len(lines)-shownCompositionCauses))
 }
 
 func deployedGraphLink(graph string) string {
